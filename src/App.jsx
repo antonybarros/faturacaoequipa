@@ -233,12 +233,14 @@ function MainApp() {
     ? [
         { id: "dashboard", label: "Acompanhamento mensal" },
         { id: "history", label: "Histórico" },
+        { id: "analise", label: "Análise de Dados" },
         { id: "entry", label: "Registo Diário" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
         { id: "dashboard", label: "Acompanhamento mensal" },
         { id: "history", label: "Histórico" },
+        { id: "analise", label: "Análise de Dados" },
       ];
 
   return (
@@ -335,6 +337,7 @@ function MainApp() {
               />
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
+            {tab === "analise" && <AnaliseDados />}
             {tab === "entry" && isAdmin && (
               <Entry
                 data={data}
@@ -1958,6 +1961,200 @@ function History({ annualGoal: annualGoalProp, currentYear }) {
 const SITE_PASSWORD =
   import.meta.env.VITE_SITE_PASSWORD || "Prozis12345";
 const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
+
+// Coordenadas da Maia, Porto
+const MAIA_LAT = 41.2358;
+const MAIA_LON = -8.6199;
+
+const WMO_CODES = {
+  0: { label: "Céu limpo", icon: "☀️" },
+  1: { label: "Maioritariamente limpo", icon: "🌤️" },
+  2: { label: "Parcialmente nublado", icon: "⛅" },
+  3: { label: "Nublado", icon: "☁️" },
+  45: { label: "Nevoeiro", icon: "🌫️" },
+  48: { label: "Nevoeiro gelado", icon: "🌫️" },
+  51: { label: "Chuva fraca", icon: "🌦️" },
+  53: { label: "Chuva moderada", icon: "🌧️" },
+  55: { label: "Chuva forte", icon: "🌧️" },
+  61: { label: "Chuva fraca", icon: "🌦️" },
+  63: { label: "Chuva moderada", icon: "🌧️" },
+  65: { label: "Chuva forte", icon: "🌧️" },
+  71: { label: "Neve fraca", icon: "🌨️" },
+  73: { label: "Neve moderada", icon: "❄️" },
+  75: { label: "Neve forte", icon: "❄️" },
+  80: { label: "Aguaceiros fracos", icon: "🌦️" },
+  81: { label: "Aguaceiros moderados", icon: "🌧️" },
+  82: { label: "Aguaceiros violentos", icon: "⛈️" },
+  95: { label: "Trovoada", icon: "⛈️" },
+  96: { label: "Trovoada c/ granizo", icon: "⛈️" },
+  99: { label: "Trovoada c/ granizo forte", icon: "⛈️" },
+};
+
+const getWmo = (code) => WMO_CODES[code] || { label: "Desconhecido", icon: "🌡️" };
+
+const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+function AnaliseDados() {
+  const [weather, setWeather] = useState(null);
+  const [loadingW, setLoadingW] = useState(true);
+  const [errorW, setErrorW] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const url =
+          `https://api.open-meteo.com/v1/forecast?latitude=${MAIA_LAT}&longitude=${MAIA_LON}` +
+          `&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,relative_humidity_2m,precipitation` +
+          `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,sunrise,sunset` +
+          `&timezone=Europe%2FLisbon&forecast_days=7`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erro ao carregar dados meteorológicos");
+        const json = await res.json();
+        setWeather(json);
+      } catch (e) {
+        setErrorW(e.message);
+      } finally {
+        setLoadingW(false);
+      }
+    })();
+  }, []);
+
+  if (loadingW) {
+    return (
+      <div className="flex items-center justify-center py-20 text-slate-500">
+        <div className="text-center">
+          <div className="text-4xl mb-3">🌤️</div>
+          <p className="text-sm">A carregar dados meteorológicos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorW) {
+    return (
+      <div className="flex items-center justify-center py-20 text-red-500">
+        <div className="text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-sm">{errorW}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const cur = weather.current;
+  const daily = weather.daily;
+  const wmo = getWmo(cur.weathercode);
+
+  // Calcular horas de luz hoje
+  const sunrise = new Date(daily.sunrise[0]);
+  const sunset = new Date(daily.sunset[0]);
+  const lightHours = ((sunset - sunrise) / 3600000).toFixed(1);
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Análise de Dados — Maia</h2>
+          <p className="text-sm text-slate-500">Dados meteorológicos em tempo real · Maia, Porto</p>
+        </div>
+      </div>
+
+      {/* Cards principais — condição atual */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 col-span-2 sm:col-span-2">
+          <div className="flex items-center gap-4">
+            <span className="text-6xl">{wmo.icon}</span>
+            <div>
+              <p className="text-5xl font-bold text-slate-900">{Math.round(cur.temperature_2m)}°C</p>
+              <p className="text-slate-500 text-sm mt-1">{wmo.label}</p>
+              <p className="text-slate-400 text-xs mt-0.5">Sensação: {Math.round(cur.apparent_temperature)}°C</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Humidade</p>
+          <p className="text-3xl font-bold text-blue-600">{cur.relative_humidity_2m}%</p>
+          <p className="text-slate-400 text-xs mt-1">Humidade relativa</p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Vento</p>
+          <p className="text-3xl font-bold text-slate-700">{Math.round(cur.windspeed_10m)}</p>
+          <p className="text-slate-400 text-xs mt-1">km/h</p>
+        </div>
+      </div>
+
+      {/* Nascer/pôr do sol e precipitação */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+          <p className="text-xs text-amber-600 font-medium uppercase tracking-wide mb-1">Nascer do sol</p>
+          <p className="text-2xl font-bold text-amber-700">
+            {sunrise.getHours().toString().padStart(2,"0")}:{sunrise.getMinutes().toString().padStart(2,"0")}
+          </p>
+        </div>
+        <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
+          <p className="text-xs text-orange-600 font-medium uppercase tracking-wide mb-1">Pôr do sol</p>
+          <p className="text-2xl font-bold text-orange-700">
+            {sunset.getHours().toString().padStart(2,"0")}:{sunset.getMinutes().toString().padStart(2,"0")}
+          </p>
+        </div>
+        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+          <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Horas de luz</p>
+          <p className="text-2xl font-bold text-blue-700">{lightHours}h</p>
+        </div>
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Precipitação hoje</p>
+          <p className="text-2xl font-bold text-slate-700">{(daily.precipitation_sum[0] || 0).toFixed(1)} mm</p>
+        </div>
+      </div>
+
+      {/* Previsão 7 dias */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="font-semibold text-slate-800">Previsão — próximos 7 dias</h3>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {daily.time.map((dateStr, i) => {
+            const d = new Date(dateStr + "T12:00:00");
+            const dayWmo = getWmo(daily.weathercode[i]);
+            const isToday = i === 0;
+            return (
+              <div
+                key={dateStr}
+                className={`flex items-center px-5 py-3 gap-4 ${isToday ? "bg-blue-50" : "hover:bg-slate-50"}`}
+              >
+                <div className="w-20">
+                  <p className={`text-sm font-semibold ${isToday ? "text-blue-700" : "text-slate-700"}`}>
+                    {isToday ? "Hoje" : WEEKDAYS_PT[d.getDay()]}
+                  </p>
+                  <p className="text-xs text-slate-400">{d.getDate()} {MONTHS_PT[d.getMonth()]}</p>
+                </div>
+                <span className="text-2xl w-8 text-center">{dayWmo.icon}</span>
+                <p className="text-xs text-slate-500 flex-1 hidden sm:block">{dayWmo.label}</p>
+                <div className="flex items-center gap-3 ml-auto">
+                  {(daily.precipitation_sum[i] || 0) > 0 && (
+                    <span className="text-xs text-blue-500 font-medium">
+                      💧 {daily.precipitation_sum[i].toFixed(1)}mm
+                    </span>
+                  )}
+                  <span className="text-sm text-slate-400">{Math.round(daily.temperature_2m_min[i])}°</span>
+                  <span className="text-sm font-bold text-slate-800">{Math.round(daily.temperature_2m_max[i])}°</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="text-xs text-slate-400 text-center pb-2">
+        Fonte: Open-Meteo · Coordenadas: Maia, Porto (41.24°N, 8.62°W) · Atualizado em tempo real
+      </p>
+    </div>
+  );
+}
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(
