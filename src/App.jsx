@@ -9,17 +9,22 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["PT", "IT", "ES", "FR"];
+const TEAMS = ["PT", "IT", "ES", "FR", "CH", "BNL", "DE", "AT"];
 const SCOPES = [
   { id: "total", label: "Total" },
-  { id: "PT", label: "PT" },
-  { id: "IT", label: "IT" },
-  { id: "ES", label: "ES" },
-  { id: "FR", label: "FR" },
+  { id: "PT", label: "Portugal" },
+  { id: "IT", label: "Itália" },
+  { id: "ES", label: "Espanha" },
+  { id: "FR", label: "França" },
+  { id: "CH", label: "Suíça" },
+  { id: "BNL", label: "Benelux" },
+  { id: "DE", label: "Alemanha" },
+  { id: "AT", label: "Áustria" },
 ];
 const TEAM_COLORS = {
   PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
-  FR: "#9333ea", total: "#0f172a",
+  FR: "#9333ea", CH: "#e11d48", BNL: "#0891b2",
+  DE: "#d97706", AT: "#7c3aed", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -38,7 +43,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0 },
+  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
   entries: {},
 });
 
@@ -86,7 +91,7 @@ function MainApp() {
 
   // If user loses admin status, force back to a public tab
   useEffect(() => {
-    if (!isAdmin && tab !== "dashboard" && tab !== "history") setTab("dashboard");
+    if (!isAdmin && !["dashboard","afiliacao","encomendas","leads","history"].includes(tab)) setTab("dashboard");
   }, [isAdmin, tab]);
 
   // --- Load annual goal when year changes ---
@@ -195,7 +200,7 @@ function MainApp() {
       const each = Math.round((Number(prev.totalGoal) || 0) / TEAMS.length);
       return {
         ...prev,
-        teamGoals: { PT: each, IT: each, ES: each, FR: each },
+        teamGoals: { PT: each, IT: each, ES: each, FR: each, CH: each, BNL: each, DE: each, AT: each },
       };
     });
 
@@ -231,16 +236,20 @@ function MainApp() {
 
   const availableTabs = isAdmin
     ? [
-        { id: "dashboard", label: "Acompanhamento mensal" },
+        { id: "dashboard", label: "Revenda" },
+        { id: "afiliacao", label: "Afiliação" },
+        { id: "encomendas", label: "Encomendas" },
+        { id: "leads", label: "Leads / Parcerias" },
         { id: "history", label: "Histórico" },
-        { id: "analise", label: "Análise de Dados" },
         { id: "entry", label: "Registo Diário" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
-        { id: "dashboard", label: "Acompanhamento mensal" },
+        { id: "dashboard", label: "Revenda" },
+        { id: "afiliacao", label: "Afiliação" },
+        { id: "encomendas", label: "Encomendas" },
+        { id: "leads", label: "Leads / Parcerias" },
         { id: "history", label: "Histórico" },
-        { id: "analise", label: "Análise de Dados" },
       ];
 
   return (
@@ -337,7 +346,18 @@ function MainApp() {
               />
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
-            {tab === "analise" && <AnaliseDados />}
+            {tab === "afiliacao" && (
+              <AfiliacaoDashboard
+                totalDays={totalDays}
+                closedDay={closedDay}
+                month={MONTH_NAMES[month]}
+                monthNum={month}
+                year={year}
+                isCurrentMonth={isCurrentMonth}
+              />
+            )}
+            {tab === "encomendas" && <TabVazia titulo="Encomendas" />}
+            {tab === "leads" && <TabVazia titulo="Leads / Parcerias" />}
             {tab === "entry" && isAdmin && (
               <Entry
                 data={data}
@@ -1962,199 +1982,135 @@ const SITE_PASSWORD =
   import.meta.env.VITE_SITE_PASSWORD || "Prozis12345";
 const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
 
-// Coordenadas da Maia, Porto
-const MAIA_LAT = 41.2358;
-const MAIA_LON = -8.6199;
+// ---- Afiliação ----
+const AFILIACAO_SCOPES = [
+  { id: "total", label: "Total" },
+  { id: "PT", label: "Portugal" },
+  { id: "IT", label: "Itália" },
+  { id: "ES", label: "Espanha" },
+  { id: "FR", label: "França" },
+  { id: "CH", label: "Suíça" },
+  { id: "BNL", label: "Benelux" },
+  { id: "DE", label: "Alemanha" },
+  { id: "AT", label: "Áustria" },
+];
 
-const WMO_CODES = {
-  0: { label: "Céu limpo", icon: "☀️" },
-  1: { label: "Maioritariamente limpo", icon: "🌤️" },
-  2: { label: "Parcialmente nublado", icon: "⛅" },
-  3: { label: "Nublado", icon: "☁️" },
-  45: { label: "Nevoeiro", icon: "🌫️" },
-  48: { label: "Nevoeiro gelado", icon: "🌫️" },
-  51: { label: "Chuva fraca", icon: "🌦️" },
-  53: { label: "Chuva moderada", icon: "🌧️" },
-  55: { label: "Chuva forte", icon: "🌧️" },
-  61: { label: "Chuva fraca", icon: "🌦️" },
-  63: { label: "Chuva moderada", icon: "🌧️" },
-  65: { label: "Chuva forte", icon: "🌧️" },
-  71: { label: "Neve fraca", icon: "🌨️" },
-  73: { label: "Neve moderada", icon: "❄️" },
-  75: { label: "Neve forte", icon: "❄️" },
-  80: { label: "Aguaceiros fracos", icon: "🌦️" },
-  81: { label: "Aguaceiros moderados", icon: "🌧️" },
-  82: { label: "Aguaceiros violentos", icon: "⛈️" },
-  95: { label: "Trovoada", icon: "⛈️" },
-  96: { label: "Trovoada c/ granizo", icon: "⛈️" },
-  99: { label: "Trovoada c/ granizo forte", icon: "⛈️" },
-};
-
-const getWmo = (code) => WMO_CODES[code] || { label: "Desconhecido", icon: "🌡️" };
-
-const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-
-function AnaliseDados() {
-  const [weather, setWeather] = useState(null);
-  const [loadingW, setLoadingW] = useState(true);
-  const [errorW, setErrorW] = useState(null);
+function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth }) {
+  const [afilScope, setAfilScope] = useState("total");
+  const [afilData, setAfilData] = useState({
+    totalGoal: 0,
+    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
+    entries: {},
+  });
+  const [loading, setLoading] = useState(true);
+  const today = new Date();
+  const selectedMonth = `${year}-${String(monthNum + 1).padStart(2, "0")}`;
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      try {
-        const url =
-          `https://api.open-meteo.com/v1/forecast?latitude=${MAIA_LAT}&longitude=${MAIA_LON}` +
-          `&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,relative_humidity_2m,precipitation` +
-          `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,sunrise,sunset` +
-          `&timezone=Europe%2FLisbon&forecast_days=7`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Erro ao carregar dados meteorológicos");
-        const json = await res.json();
-        setWeather(json);
-      } catch (e) {
-        setErrorW(e.message);
-      } finally {
-        setLoadingW(false);
+      setLoading(true);
+      const afilKey = `afil-${selectedMonth}`;
+      const { data: row } = await supabase
+        .from("billing_months")
+        .select("*")
+        .eq("month_key", afilKey)
+        .maybeSingle();
+      if (cancelled) return;
+      if (row) {
+        setAfilData({
+          totalGoal: Number(row.total_goal) || 0,
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
+          entries: row.entries || {},
+        });
+      } else {
+        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 }, entries: {} });
       }
+      setLoading(false);
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
 
-  if (loadingW) {
-    return (
-      <div className="flex items-center justify-center py-20 text-slate-500">
-        <div className="text-center">
-          <div className="text-4xl mb-3">🌤️</div>
-          <p className="text-sm">A carregar dados meteorológicos...</p>
-        </div>
-      </div>
-    );
-  }
+  const stats = useMemo(
+    () => computeScopeStats(afilData, afilScope, totalDays, closedDay, year, monthNum),
+    [afilData, afilScope, totalDays, closedDay, year, monthNum]
+  );
+  const teamStats = useMemo(
+    () => ["PT","IT","ES","FR","CH","BNL","DE","AT"].map((t) => ({
+      team: t,
+      ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
+    })),
+    [afilData, totalDays, closedDay, year, monthNum]
+  );
 
-  if (errorW) {
-    return (
-      <div className="flex items-center justify-center py-20 text-red-500">
-        <div className="text-center">
-          <div className="text-4xl mb-3">⚠️</div>
-          <p className="text-sm">{errorW}</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
 
-  const cur = weather.current;
-  const daily = weather.daily;
-  const wmo = getWmo(cur.weathercode);
-
-  // Calcular horas de luz hoje
-  const sunrise = new Date(daily.sunrise[0]);
-  const sunset = new Date(daily.sunset[0]);
-  const lightHours = ((sunset - sunrise) / 3600000).toFixed(1);
+  const scopeColor = TEAM_COLORS[afilScope] || "#0f172a";
+  const scopeLabel = AFILIACAO_SCOPES.find(s => s.id === afilScope)?.label || afilScope;
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Análise de Dados — Maia</h2>
-          <p className="text-sm text-slate-500">Dados meteorológicos em tempo real · Maia, Porto</p>
-        </div>
+    <div className="space-y-5">
+      {/* Scope tabs */}
+      <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
+        {AFILIACAO_SCOPES.map((s) => {
+          const active = afilScope === s.id;
+          const color = TEAM_COLORS[s.id];
+          return (
+            <button
+              key={s.id}
+              onClick={() => setAfilScope(s.id)}
+              className={`flex-1 min-w-[70px] px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+                active ? "text-white" : "text-slate-600 hover:bg-slate-100"
+              }`}
+              style={active ? { backgroundColor: color } : undefined}
+            >
+              {s.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Cards principais — condição atual */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 col-span-2 sm:col-span-2">
-          <div className="flex items-center gap-4">
-            <span className="text-6xl">{wmo.icon}</span>
-            <div>
-              <p className="text-5xl font-bold text-slate-900">{Math.round(cur.temperature_2m)}°C</p>
-              <p className="text-slate-500 text-sm mt-1">{wmo.label}</p>
-              <p className="text-slate-400 text-xs mt-0.5">Sensação: {Math.round(cur.apparent_temperature)}°C</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Humidade</p>
-          <p className="text-3xl font-bold text-blue-600">{cur.relative_humidity_2m}%</p>
-          <p className="text-slate-400 text-xs mt-1">Humidade relativa</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Vento</p>
-          <p className="text-3xl font-bold text-slate-700">{Math.round(cur.windspeed_10m)}</p>
-          <p className="text-slate-400 text-xs mt-1">km/h</p>
-        </div>
-      </div>
-
-      {/* Nascer/pôr do sol e precipitação */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-          <p className="text-xs text-amber-600 font-medium uppercase tracking-wide mb-1">Nascer do sol</p>
-          <p className="text-2xl font-bold text-amber-700">
-            {sunrise.getHours().toString().padStart(2,"0")}:{sunrise.getMinutes().toString().padStart(2,"0")}
+      {stats.goal === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center mt-4">
+          <Target className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <h3 className="font-semibold text-slate-900">
+            {afilScope === "total"
+              ? "Sem objetivo total definido para este mês"
+              : `Sem objetivo definido para ${scopeLabel}`}
+          </h3>
+          <p className="text-sm text-slate-600 mt-1">
+            O administrador ainda não configurou este âmbito.
           </p>
         </div>
-        <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100">
-          <p className="text-xs text-orange-600 font-medium uppercase tracking-wide mb-1">Pôr do sol</p>
-          <p className="text-2xl font-bold text-orange-700">
-            {sunset.getHours().toString().padStart(2,"0")}:{sunset.getMinutes().toString().padStart(2,"0")}
-          </p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-          <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Horas de luz</p>
-          <p className="text-2xl font-bold text-blue-700">{lightHours}h</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Precipitação hoje</p>
-          <p className="text-2xl font-bold text-slate-700">{(daily.precipitation_sum[0] || 0).toFixed(1)} mm</p>
-        </div>
-      </div>
-
-      {/* Previsão 7 dias */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">Previsão — próximos 7 dias</h3>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {daily.time.map((dateStr, i) => {
-            const d = new Date(dateStr + "T12:00:00");
-            const dayWmo = getWmo(daily.weathercode[i]);
-            const isToday = i === 0;
-            return (
-              <div
-                key={dateStr}
-                className={`flex items-center px-5 py-3 gap-4 ${isToday ? "bg-blue-50" : "hover:bg-slate-50"}`}
-              >
-                <div className="w-20">
-                  <p className={`text-sm font-semibold ${isToday ? "text-blue-700" : "text-slate-700"}`}>
-                    {isToday ? "Hoje" : WEEKDAYS_PT[d.getDay()]}
-                  </p>
-                  <p className="text-xs text-slate-400">{d.getDate()} {MONTHS_PT[d.getMonth()]}</p>
-                </div>
-                <span className="text-2xl w-8 text-center">{dayWmo.icon}</span>
-                <p className="text-xs text-slate-500 flex-1 hidden sm:block">{dayWmo.label}</p>
-                <div className="flex items-center gap-3 ml-auto">
-                  {(daily.precipitation_sum[i] || 0) > 0 && (
-                    <span className="text-xs text-blue-500 font-medium">
-                      💧 {daily.precipitation_sum[i].toFixed(1)}mm
-                    </span>
-                  )}
-                  <span className="text-sm text-slate-400">{Math.round(daily.temperature_2m_min[i])}°</span>
-                  <span className="text-sm font-bold text-slate-800">{Math.round(daily.temperature_2m_max[i])}°</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <p className="text-xs text-slate-400 text-center pb-2">
-        Fonte: Open-Meteo · Coordenadas: Maia, Porto (41.24°N, 8.62°W) · Atualizado em tempo real
-      </p>
+      ) : (
+        <Dashboard
+          stats={stats}
+          scope={afilScope}
+          month={month}
+          year={year}
+          totalDays={totalDays}
+          closedDay={closedDay}
+          isCurrentMonth={isCurrentMonth}
+          teamStats={teamStats}
+        />
+      )}
     </div>
   );
 }
+
+// ---- Tab vazia ----
+function TabVazia({ titulo }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+        <TrendingUp className="w-8 h-8 text-slate-300" />
+      </div>
+      <h3 className="text-lg font-semibold text-slate-500">{titulo}</h3>
+      <p className="text-sm mt-1">Brevemente disponível</p>
+    </div>
+  );
+}
+
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(
