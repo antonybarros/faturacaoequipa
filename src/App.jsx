@@ -9,22 +9,18 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["PT", "IT", "ES", "FR", "CH", "BNL", "DE", "AT"];
+const TEAMS = ["PT", "IT", "ES", "FR", "DEAT"];
 const SCOPES = [
   { id: "total", label: "Total" },
   { id: "PT", label: "Portugal" },
   { id: "IT", label: "Itália" },
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
-  { id: "CH", label: "Suíça" },
-  { id: "BNL", label: "Benelux" },
-  { id: "DE", label: "Alemanha" },
-  { id: "AT", label: "Áustria" },
+  { id: "DEAT", label: "DEAT-CH-BNL" },
 ];
 const TEAM_COLORS = {
   PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
-  FR: "#9333ea", CH: "#e11d48", BNL: "#0891b2",
-  DE: "#d97706", AT: "#7c3aed", total: "#0f172a",
+  FR: "#9333ea", DEAT: "#d97706", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -43,7 +39,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
+  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
   entries: {},
 });
 
@@ -200,7 +196,7 @@ function MainApp() {
       const each = Math.round((Number(prev.totalGoal) || 0) / TEAMS.length);
       return {
         ...prev,
-        teamGoals: { PT: each, IT: each, ES: each, FR: each, CH: each, BNL: each, DE: each, AT: each },
+        teamGoals: { PT: each, IT: each, ES: each, FR: each, DEAT: each },
       };
     });
 
@@ -1989,17 +1985,14 @@ const AFILIACAO_SCOPES = [
   { id: "IT", label: "Itália" },
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
-  { id: "CH", label: "Suíça" },
-  { id: "BNL", label: "Benelux" },
-  { id: "DE", label: "Alemanha" },
-  { id: "AT", label: "Áustria" },
+  { id: "DEAT", label: "DEAT-CH-BNL" },
 ];
 
 function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth }) {
   const [afilScope, setAfilScope] = useState("total");
   const [afilData, setAfilData] = useState({
     totalGoal: 0,
-    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
+    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
     entries: {},
   });
   const [loading, setLoading] = useState(true);
@@ -2020,11 +2013,11 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
       if (row) {
         setAfilData({
           totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 },
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
           entries: row.entries || {},
         });
       } else {
-        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, CH: 0, BNL: 0, DE: 0, AT: 0 }, entries: {} });
+        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 }, entries: {} });
       }
       setLoading(false);
     })();
@@ -2036,7 +2029,7 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
     [afilData, afilScope, totalDays, closedDay, year, monthNum]
   );
   const teamStats = useMemo(
-    () => ["PT","IT","ES","FR","CH","BNL","DE","AT"].map((t) => ({
+    () => ["PT","IT","ES","FR","DEAT"].map((t) => ({
       team: t,
       ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
     })),
