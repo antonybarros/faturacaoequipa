@@ -232,16 +232,16 @@ function MainApp() {
 
   const monthOptions = useMemo(() => {
     const opts = [];
-    const base = new Date(today.getFullYear(), today.getMonth(), 1);
-    for (let i = -6; i <= 6; i++) {
-      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
-      opts.push({
-        key: monthKey(d),
-        label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`,
-      });
+    for (let y = 2025; y <= 2026; y++) {
+      for (let m = 0; m < 12; m++) {
+        const d = new Date(y, m, 1);
+        opts.push({
+          key: monthKey(d),
+          label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`,
+        });
+      }
     }
     return opts;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = async () => {
