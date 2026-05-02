@@ -863,26 +863,7 @@ function DashboardWrapper({
     loadClosing(year - 1, monthNum).then(setClosingPrev);
   }, [year, monthNum, scope]);
 
-  if (stats.goal === 0) {
-    return (
-      <>
-        <ScopeTabs scope={scope} setScope={setScope} />
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center mt-4">
-          <Target className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <h3 className="font-semibold text-slate-900">
-            {scope === "total"
-              ? "Sem objetivo total definido para este mês"
-              : `Sem objetivo definido para ${scope}`}
-          </h3>
-          <p className="text-sm text-slate-600 mt-1">
-            O administrador ainda não configurou este âmbito.
-          </p>
-        </div>
-      </>
-    );
-  }
-
-  // YoY faturação
+  // YoY faturação — use displayActual (may differ from stats.actual when using Registo Revenda)
   const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
@@ -921,6 +902,19 @@ function DashboardWrapper({
     return t > 0 ? t : null;
   })();
 
+  // Fallback: if billing data is empty, try to read total from Registo Revenda closing
+  // This covers months where data was entered via the simple 2025 form
+  const revendaActual = stats.actual > 0 ? stats.actual : (() => {
+    if (!closingCurr) return 0;
+    // Try _total from revenda closing (2025 format stored in closing)
+    const rev = closingCurr?.revenda_total;
+    if (rev) return Number(rev);
+    return 0;
+  })();
+
+  // Use revendaActual instead of stats.actual for YoY comparison display
+  const displayActual = revendaActual || stats.actual;
+
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
@@ -949,7 +943,9 @@ function DashboardWrapper({
           </div>
           <div className="bg-blue-50 rounded-xl p-4">
             <p className="text-xs text-slate-500 font-medium mb-1">{month} {year}</p>
-            <p className="text-xl font-bold text-blue-700">{fmtEur(stats.actual)}</p>
+            <p className="text-xl font-bold text-blue-700">
+              {stats.actual > 0 ? fmtEur(stats.actual) : <span className="text-slate-400 text-sm">Sem dados</span>}
+            </p>
           </div>
           <div className={`rounded-xl p-4 ${evoPct == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
             <p className="text-xs text-slate-500 font-medium mb-1">Evolução %</p>
@@ -1478,7 +1474,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       </div>
 
-      {!noClosedDays && (<>
+      {(closedDay > 0 || marginCurr || ordersCurr || leadsCurr || afilCurr) && (<>
 
         {/* Margem % — logo após Faturação vs ano anterior */}
         <YoYCard title="Margem %" curr={marginCurr} prev={marginPrev} isEur={false} isPct={true} />
