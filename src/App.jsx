@@ -2134,8 +2134,8 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
       <MCCard title="Afiliação — Resultados globais">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => setData(p => ({...p, afil_objective: v}))} />
-          <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => setData(p => ({...p, afil_result: v}))} />
           <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => setData(p => ({...p, afil_prev: v}))} />
+          <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => setData(p => ({...p, afil_result: v}))} />
         </div>
       </MCCard>
 
@@ -2144,8 +2144,8 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
           <div key={m.code} className="mb-4">
             <p className="text-sm font-semibold text-slate-700 mb-2">{m.name}</p>
             <div className="grid grid-cols-2 gap-3">
-              <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
               <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
+              <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
             </div>
           </div>
         ))}
@@ -2248,8 +2248,8 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
           <div className="grid grid-cols-2 gap-3">
-            <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
             <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
+            <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
           </div>
         </MCCard>
       ))}
@@ -2716,7 +2716,10 @@ function Relatorio({ monthNum, year }) {
     setGenerating(false);
   }
 
-  const steps = ["Revenda","Afiliação","Total","Mercados","Programas","Trimestre"];
+  const isQuarterMonth = [2,5,8,11].includes(monthNum); // Mar, Jun, Set, Dez
+  const steps = isQuarterMonth
+    ? ["Revenda","Afiliação","Total","Mercados","Programas","Trimestre"]
+    : ["Revenda","Afiliação","Total","Mercados","Programas"];
 
   if (loading) return (
     <div className="flex items-center justify-center py-20 text-slate-400">
@@ -2791,8 +2794,8 @@ function Relatorio({ monthNum, year }) {
         <>
           <MCCard title="Afiliação — Resultados mensais">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <MCField label={`Resultado ${year-1} (€)`} value={afil.prev_year} onChange={v=>setAfil(p=>({...p,prev_year:v}))} />
               <MCField label={`Objetivo ${year} (€) ✦`} value={String(afil.objective)} onChange={v=>setAfil(p=>({...p,objective:v}))} />
+              <MCField label={`Resultado ${year-1} (€)`} value={afil.prev_year} onChange={v=>setAfil(p=>({...p,prev_year:v}))} />
               <MCField label={`Resultado ${year} (€) ✦`} value={String(afil.result)} onChange={v=>setAfil(p=>({...p,result:v}))} />
             </div>
           </MCCard>
@@ -2801,8 +2804,8 @@ function Relatorio({ monthNum, year }) {
               <div key={m.code} className="mb-3">
                 <p className="text-xs font-semibold text-slate-600 mb-2">{m.name}</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <MCField label={`${year} (€) ✦`} value={String(afil.byMarket[m.code]?.curr||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
                   <MCField label={`${year-1} (€)`} value={String(afil.byMarket[m.code]?.prev||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+                  <MCField label={`${year} (€) ✦`} value={String(afil.byMarket[m.code]?.curr||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
                 </div>
               </div>
             ))}
@@ -2834,15 +2837,23 @@ function Relatorio({ monthNum, year }) {
         <>
           {MC_MARKETS.map(m => (
             <MCCard key={m.code} title={m.name}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <MCField label={`Enc. ${year} ✦`} value={orders.byMarket[m.code]?.orders_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_curr:v}}}))} />
-                <MCField label={`Enc. ${year-1}`} value={orders.byMarket[m.code]?.orders_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_prev:v}}}))} />
-                <MCField label={`1ªs enc. ${year} ✦`} value={orders.byMarket[m.code]?.first_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_curr:v}}}))} />
-                <MCField label={`1ªs enc. ${year-1}`} value={orders.byMarket[m.code]?.first_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_prev:v}}}))} />
-                <MCField label={`Fat. 1ªs enc. ${year} ✦`} value={orders.byMarket[m.code]?.first_rev_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_curr:v}}}))} />
-                <MCField label={`Fat. 1ªs enc. ${year-1}`} value={orders.byMarket[m.code]?.first_rev_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_prev:v}}}))} />
-                <MCField label={`Leads ${year} ✦`} value={leads.byMarket[m.code]?.curr||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
-                <MCField label={`Leads ${year-1}`} value={leads.byMarket[m.code]?.prev||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+              <div className="grid grid-cols-2 gap-6">
+                {/* Coluna 2025 */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{year-1}</p>
+                  <MCField label={`Enc. ${year-1}`} value={orders.byMarket[m.code]?.orders_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_prev:v}}}))} />
+                  <MCField label={`1ªs enc. ${year-1}`} value={orders.byMarket[m.code]?.first_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_prev:v}}}))} />
+                  <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={orders.byMarket[m.code]?.first_rev_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_prev:v}}}))} />
+                  <MCField label={`Leads ${year-1}`} value={leads.byMarket[m.code]?.prev||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+                </div>
+                {/* Coluna 2026 */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs font-bold text-orange-400 uppercase tracking-wide">{year} ✦</p>
+                  <MCField label={`Enc. ${year}`} value={orders.byMarket[m.code]?.orders_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_curr:v}}}))} />
+                  <MCField label={`1ªs enc. ${year}`} value={orders.byMarket[m.code]?.first_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_curr:v}}}))} />
+                  <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={orders.byMarket[m.code]?.first_rev_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_curr:v}}}))} />
+                  <MCField label={`Leads ${year}`} value={leads.byMarket[m.code]?.curr||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
+                </div>
               </div>
             </MCCard>
           ))}
@@ -2857,16 +2868,16 @@ function Relatorio({ monthNum, year }) {
             <div key={p} className="mb-3">
               <p className="text-xs font-semibold text-slate-600 mb-2">{p}</p>
               <div className="grid grid-cols-2 gap-3">
-                <MCField label={`${year} (€)`} value={programs[p]?.curr||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],curr:v}}))} />
                 <MCField label={`${year-1} (€)`} value={programs[p]?.prev||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],prev:v}}))} />
+                <MCField label={`${year} (€)`} value={programs[p]?.curr||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],curr:v}}))} />
               </div>
             </div>
           ))}
         </MCCard>
       )}
 
-      {/* Step 5 – Trimestre */}
-      {step===5 && (
+      {/* Step 5 – Trimestre (só Mar/Jun/Set/Dez) */}
+      {step===5 && isQuarterMonth && (
         <>
           <MCCard title="Revenda — Trimestre">
             <div className="grid grid-cols-3 gap-3">
