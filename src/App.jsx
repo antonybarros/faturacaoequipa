@@ -752,6 +752,27 @@ function DashboardWrapper({
     [data, totalDays, closedDay, year, monthNum]
   );
 
+  // Load prev year same month data for comparison
+  const [prevYearActual, setPrevYearActual] = useState(null);
+  useEffect(() => {
+    const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
+    supabase.from("billing_months").select("entries,team_goals,total_goal").eq("month_key", prevKey).maybeSingle()
+      .then(({ data: row }) => {
+        if (!row?.entries) { setPrevYearActual(null); return; }
+        const days = Object.keys(row.entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
+        if (!days.length) { setPrevYearActual(null); return; }
+        const lastEntry = row.entries[String(days[days.length - 1])] || {};
+        if (scope === "total") {
+          const val = lastEntry.total ?? Object.entries(lastEntry)
+            .filter(([k]) => k !== "supersales" && k !== "total")
+            .reduce((s,[,v]) => s + (Number(v)||0), 0);
+          setPrevYearActual(Number(val) || null);
+        } else {
+          setPrevYearActual(lastEntry[scope] != null ? Number(lastEntry[scope]) : null);
+        }
+      });
+  }, [year, monthNum, scope]);
+
   if (stats.goal === 0) {
     return (
       <>
@@ -771,9 +792,46 @@ function DashboardWrapper({
     );
   }
 
+  const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
+  const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
+  const isAheadYoY = evoPct != null && evoPct >= 0;
+
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
+
+      {/* Comparação vs ano anterior */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-orange-500" />
+          Comparação vs {year - 1}
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-slate-50 rounded-xl p-4">
+            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year - 1}</p>
+            <p className="text-xl font-bold text-slate-700">
+              {prevYearActual != null ? fmtEur(prevYearActual) : <span className="text-slate-400 text-sm">Sem dados</span>}
+            </p>
+          </div>
+          <div className="bg-blue-50 rounded-xl p-4">
+            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year} (atual)</p>
+            <p className="text-xl font-bold text-blue-700">{fmtEur(stats.actual)}</p>
+          </div>
+          <div className={`rounded-xl p-4 ${evoPct == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
+            <p className="text-xs text-slate-500 font-medium mb-1">Evolução %</p>
+            <p className={`text-xl font-bold ${evoPct == null ? "text-slate-400" : isAheadYoY ? "text-green-700" : "text-red-700"}`}>
+              {evoPct == null ? "—" : `${isAheadYoY ? "+" : ""}${evoPct.toFixed(1)}%`}
+            </p>
+          </div>
+          <div className={`rounded-xl p-4 ${evoAbs == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
+            <p className="text-xs text-slate-500 font-medium mb-1">Ganho absoluto</p>
+            <p className={`text-xl font-bold ${evoAbs == null ? "text-slate-400" : isAheadYoY ? "text-green-700" : "text-red-700"}`}>
+              {evoAbs == null ? "—" : `${evoAbs >= 0 ? "+" : ""}${fmtEur(evoAbs)}`}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <Dashboard
         stats={stats}
         scope={scope}
