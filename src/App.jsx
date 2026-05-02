@@ -743,20 +743,16 @@ function DashboardWrapper({
     () => computeScopeStats(data, scope, totalDays, closedDay, year, monthNum),
     [data, scope, totalDays, closedDay, year, monthNum]
   );
-  const teamStats = useMemo(
-    () =>
-      TEAMS.map((t) => ({
-        team: t,
-        ...computeScopeStats(data, t, totalDays, closedDay, year, monthNum),
-      })),
-    [data, totalDays, closedDay, year, monthNum]
-  );
 
-  // Load prev year same month data for comparison
+  // Load prev year data + closing data (margem, encomendas)
   const [prevYearActual, setPrevYearActual] = useState(null);
+  const [closingCurr, setClosingCurr] = useState(null);
+  const [closingPrev, setClosingPrev] = useState(null);
+
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
-    supabase.from("billing_months").select("entries,team_goals,total_goal").eq("month_key", prevKey).maybeSingle()
+    // Prev year billing
+    supabase.from("billing_months").select("entries").eq("month_key", prevKey).maybeSingle()
       .then(({ data: row }) => {
         if (!row?.entries) { setPrevYearActual(null); return; }
         const days = Object.keys(row.entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
@@ -771,6 +767,10 @@ function DashboardWrapper({
           setPrevYearActual(lastEntry[scope] != null ? Number(lastEntry[scope]) : null);
         }
       });
+    // Closing current month
+    loadClosing(year, monthNum).then(setClosingCurr);
+    // Closing prev year same month
+    loadClosing(year - 1, monthNum).then(setClosingPrev);
   }, [year, monthNum, scope]);
 
   if (stats.goal === 0) {
@@ -792,19 +792,39 @@ function DashboardWrapper({
     );
   }
 
+  // YoY faturação
   const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
+
+  // Margem — from closing data (global, same for all scopes for now)
+  const marginCurr = closingCurr?.revenda_margin ? parseFloat(closingCurr.revenda_margin) : null;
+  const marginPrev = closingPrev?.revenda_margin ? parseFloat(closingPrev.revenda_margin) : null;
+
+  // Encomendas — aggregate across all markets (total) or specific market
+  const sumField = (closing, field) => {
+    if (!closing?.markets) return null;
+    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+    const vals = markets.map(m => parseFloat(closing.markets[m]?.[field]) || 0);
+    const total = vals.reduce((s,v) => s+v, 0);
+    return total > 0 ? total : null;
+  };
+  const ordersCurr    = sumField(closingCurr, "orders_curr");
+  const ordersPrev    = sumField(closingPrev, "orders_curr");
+  const firstCurr     = sumField(closingCurr, "first_orders_curr");
+  const firstPrev     = sumField(closingPrev, "first_orders_curr");
+  const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
+  const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
 
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
 
-      {/* Comparação vs ano anterior */}
+      {/* Comparação vs ano anterior — faturação */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-orange-500" />
-          Comparação vs {year - 1}
+          Faturação vs {year - 1}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-50 rounded-xl p-4">
@@ -814,7 +834,7 @@ function DashboardWrapper({
             </p>
           </div>
           <div className="bg-blue-50 rounded-xl p-4">
-            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year} (atual)</p>
+            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year}</p>
             <p className="text-xl font-bold text-blue-700">{fmtEur(stats.actual)}</p>
           </div>
           <div className={`rounded-xl p-4 ${evoPct == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
@@ -832,7 +852,7 @@ function DashboardWrapper({
         </div>
       </div>
 
-      <Dashboard
+      <RevDashboard
         stats={stats}
         scope={scope}
         month={month}
@@ -840,7 +860,15 @@ function DashboardWrapper({
         totalDays={totalDays}
         closedDay={closedDay}
         isCurrentMonth={isCurrentMonth}
-        teamStats={teamStats}
+        prevYearActual={prevYearActual}
+        marginCurr={marginCurr}
+        marginPrev={marginPrev}
+        ordersCurr={ordersCurr}
+        ordersPrev={ordersPrev}
+        firstCurr={firstCurr}
+        firstPrev={firstPrev}
+        firstRevCurr={firstRevCurr}
+        firstRevPrev={firstRevPrev}
       />
     </div>
   );
@@ -1260,6 +1288,212 @@ function Dashboard({
           onClose={() => setModal(null)}
         />
       )}
+    </>
+  );
+}
+
+
+// ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
+function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
+  prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
+  firstRevCurr, firstRevPrev }) {
+  const {
+    goal, dailyAvg, actual, daily,
+    avgWithoutSuper, hasSuperDays,
+    nonSuperCount, nonSuperTotalDays, superDaysCount, superDaysTotal,
+    remainingDays, remaining, neededPerDay,
+    projection, projectionWithoutSuper,
+  } = stats;
+  const color = TEAM_COLORS[scope] || "#2563eb";
+  const noClosedDays = closedDay === 0;
+  const scopeLabel = scope === "total" ? "Total" : scope;
+  const [modal, setModal] = useState(null);
+
+  function YoYCard({ title, curr, prev, isEur = true, isPct = false }) {
+    const fmt = v => v == null ? "—" : isPct ? `${v.toFixed(2)}%` : isEur ? fmtEur(v) : String(Math.round(v));
+    const evo = (prev > 0 && curr != null) ? ((curr - prev) / prev * 100) : null;
+    const diff = (curr != null && prev != null) ? curr - prev : null;
+    const pos = evo != null && evo >= 0;
+    const diffLabel = isPct
+      ? (diff != null ? `${diff >= 0 ? "+" : ""}${diff.toFixed(2)}pp` : "—")
+      : isEur
+        ? (diff != null ? `${diff >= 0 ? "+" : ""}${fmtEur(diff)}` : "—")
+        : (diff != null ? `${diff >= 0 ? "+" : ""}${Math.round(diff)}` : "—");
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">{title}</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <p className="text-xs text-slate-400 mb-1">{year - 1}</p>
+            <p className="text-base font-semibold text-slate-600">{fmt(prev)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-1">{year}</p>
+            <p className="text-lg font-bold text-slate-900">{fmt(curr)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 mb-1">Evolução</p>
+            <p className={`text-sm font-bold ${evo == null ? "text-slate-400" : pos ? "text-green-600" : "text-red-600"}`}>
+              {evo == null ? "—" : `${pos ? "+" : ""}${evo.toFixed(1)}%`}
+            </p>
+            <p className={`text-xs ${diff == null ? "text-slate-400" : pos ? "text-green-600" : "text-red-600"}`}>
+              {diffLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 text-sm">
+        <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-blue-900">
+          <strong>{scopeLabel}</strong> · {month} {year} ·{" "}
+          {noClosedDays ? "Ainda não há dias fechados para analisar." : (
+            <>Análise sobre <strong>{closedDay}</strong> {closedDay === 1 ? "dia fechado" : "dias fechados"}{" "}
+            {isCurrentMonth && "(até ontem)"} de {totalDays}.</>
+          )}
+        </div>
+      </div>
+
+      {!noClosedDays && (<>
+
+        {/* Média diária sem Supersales */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
+            <Calendar className="w-4 h-4" />
+            Média diária (sem Supersales)
+          </div>
+          {closedDay === 0 ? (
+            <div className="mt-2 text-2xl font-bold text-slate-400">—</div>
+          ) : !hasSuperDays ? (
+            <>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{fmtEur(avgWithoutSuper)}/dia</div>
+              <div className="mt-1 text-xs text-slate-500">Sem dias de Supersales no período analisado</div>
+            </>
+          ) : (
+            <>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{fmtEur(avgWithoutSuper)}/dia</div>
+              <div className="mt-1 text-xs text-slate-600">
+                Excluindo dias de Supersales ·{" "}
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  campanha de descontos
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Margem % */}
+        <YoYCard title="Margem %" curr={marginCurr} prev={marginPrev} isEur={false} isPct={true} />
+
+        {/* Encomendas */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Encomendas</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-slate-400 mb-2 font-medium">Total encomendas</p>
+              <div className="grid grid-cols-3 gap-1 text-sm">
+                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{ordersPrev != null ? Math.round(ordersPrev) : "—"}</p></div>
+                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{ordersCurr != null ? Math.round(ordersCurr) : "—"}</p></div>
+                <div>
+                  <p className="text-xs text-slate-400">Evo.</p>
+                  {ordersCurr != null && ordersPrev > 0
+                    ? (() => { const e=(ordersCurr-ordersPrev)/ordersPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
+                    : <p className="text-xs text-slate-400">—</p>}
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-2 font-medium">1ªs encomendas</p>
+              <div className="grid grid-cols-3 gap-1 text-sm">
+                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{firstPrev != null ? Math.round(firstPrev) : "—"}</p></div>
+                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{firstCurr != null ? Math.round(firstCurr) : "—"}</p></div>
+                <div>
+                  <p className="text-xs text-slate-400">Evo.</p>
+                  {firstCurr != null && firstPrev > 0
+                    ? (() => { const e=(firstCurr-firstPrev)/firstPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
+                    : <p className="text-xs text-slate-400">—</p>}
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-2 font-medium">Fat. 1ªs enc.</p>
+              <div className="grid grid-cols-3 gap-1 text-sm">
+                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{firstRevPrev != null ? fmtEur(firstRevPrev) : "—"}</p></div>
+                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{firstRevCurr != null ? fmtEur(firstRevCurr) : "—"}</p></div>
+                <div>
+                  <p className="text-xs text-slate-400">Evo.</p>
+                  {firstRevCurr != null && firstRevPrev > 0
+                    ? (() => { const e=(firstRevCurr-firstRevPrev)/firstRevPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
+                    : <p className="text-xs text-slate-400">—</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Gráfico acumulado */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h3 className="font-semibold text-slate-900 mb-4">
+            Evolução acumulada — {scopeLabel}
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={daily}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => fmtEur(v)} labelFormatter={(l) => {
+                  const e = daily.find(x => x.day === l);
+                  return `Dia ${l}${e?.supersales ? " · Supersales" : ""}`;
+                }} />
+                <Legend />
+                {daily.filter(d => d.supersales).map(d => (
+                  <ReferenceLine key={`ss-${d.day}`} x={d.day} stroke="#f59e0b" strokeWidth={2} strokeDasharray="2 2" ifOverflow="extendDomain" />
+                ))}
+                <Line type="monotone" dataKey="expected" name="Esperado" stroke="#94a3b8" strokeDasharray="5 5" dot={false} />
+                <Line type="monotone" dataKey="cumulative" name="Acumulado real" stroke={color} strokeWidth={2} connectNulls
+                  dot={(props) => {
+                    const { cx, cy, payload, index } = props;
+                    if (cy == null || cx == null) return null;
+                    return payload.supersales
+                      ? <circle key={`dot-${index}`} cx={cx} cy={cy} r={6} fill="#f59e0b" stroke="#fff" strokeWidth={2} />
+                      : <circle key={`dot-${index}`} cx={cx} cy={cy} r={3} fill={color} />;
+                  }}
+                />
+                {closedDay > 0 && closedDay < totalDays && (
+                  <ReferenceLine x={closedDay} stroke="#dc2626" strokeDasharray="3 3"
+                    label={{ value: "Último fechado", fontSize: 11, fill: "#dc2626" }} />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {daily.some(d => d.supersales) && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+              <span className="inline-block w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-1 ring-amber-500" />
+              Dia de Supersales (campanha de descontos)
+            </div>
+          )}
+        </div>
+
+        <ProjectionAccordion
+          projection={projection} projectionWithoutSuper={projectionWithoutSuper}
+          goal={goal} closedDay={closedDay} totalDays={totalDays} dailyAvg={dailyAvg}
+          actual={actual} daily={daily} hasSuperDays={hasSuperDays}
+          avgWithoutSuper={avgWithoutSuper} nonSuperCount={nonSuperCount}
+          nonSuperTotalDays={nonSuperTotalDays} superDaysCount={superDaysCount}
+          superDaysTotal={superDaysTotal}
+        />
+
+        {modal && (
+          <DailyModal mode={modal} daily={daily} closedDay={closedDay} goal={goal}
+            dailyAvg={dailyAvg} scope={scope} onClose={() => setModal(null)} />
+        )}
+      </>)}
     </>
   );
 }
