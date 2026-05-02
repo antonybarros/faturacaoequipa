@@ -592,8 +592,24 @@ function computeScopeStats(data, scope, totalDays, closedDay, year, month) {
 
 
 // Converts daily-value entries (Registo Revenda) into cumulative format
-// so computeScopeStats can process them unchanged
+// so computeScopeStats can process them unchanged.
+// For 2025 entries, the data is stored as a single "_total" key with monthly totals.
 function dailyToCumulative(dailyEntries, teams) {
+  // 2025 format: { _total: { PT: x, IT: y, ... } }
+  if (dailyEntries["_total"]) {
+    const row = dailyEntries["_total"];
+    const total = teams.reduce((s, t) => s + (Number(row[t]) || 0), 0);
+    // Represent as a single entry on day 1 with the full monthly total
+    return {
+      1: {
+        ...teams.reduce((obj, t) => ({ ...obj, [t]: Number(row[t]) || 0 }), {}),
+        total,
+        supersales: false,
+      },
+    };
+  }
+
+  // 2026+ format: daily values
   const cumulative = {};
   const running = {};
   teams.forEach(t => { running[t] = 0; });
@@ -2394,6 +2410,54 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
   const days = Array.from({ length: totalDays }, (_, i) => i + 1);
   const MONTH_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][monthNum];
 
+  const statusBadge = (
+    <div className="flex items-center gap-2 shrink-0 text-xs">
+      {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+      {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+    </div>
+  );
+
+  // ── 2025: formulário simples de total mensal por mercado ──
+  if (year === 2025) {
+    const monthTotal = entries["_total"] || {};
+    const grandTotal = TEAMS.reduce((s, t) => s + (Number(monthTotal[t]) || 0), 0);
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Insere o <strong>total mensal</strong> de faturação por mercado para {year}. Guardado automaticamente.
+            </p>
+          </div>
+          {statusBadge}
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {TEAMS.map(t => (
+              <div key={t} className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: TEAM_COLORS[t] }}>{t}</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={monthTotal[t] ?? ""}
+                  onChange={e => setField("_total", t, e.target.value)}
+                  placeholder="0"
+                  className="text-right px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-5 py-4 border border-slate-200">
+            <span className="text-sm font-medium text-slate-600">Total {MONTH_PT} {year}</span>
+            <span className="text-2xl font-bold text-slate-900">{grandTotal > 0 ? fmtEur(grandTotal) : "—"}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 2026+: tabela dia a dia ──
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
@@ -2404,10 +2468,7 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
             para cada mercado. Guardado automaticamente.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 text-xs">
-          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
-          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
-        </div>
+        {statusBadge}
       </div>
 
       <div className="overflow-x-auto">
@@ -2428,7 +2489,6 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
               const isToday = todayDay === d;
               const isClosed = d <= closedDay;
               const isSupersales = row.supersales === true;
-              // Compute day total from sum of team fields
               const dayTotal = TEAMS.reduce((s, t) => s + (Number(row[t]) || 0), 0);
               const rowBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : isClosed ? "" : "bg-slate-50/40";
               const stickyBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : "bg-white";
@@ -2439,7 +2499,6 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
                     {isToday && <span className="ml-1 text-xs text-blue-600">(hoje)</span>}
                     {isClosed && !isToday && <span className="ml-1 text-xs text-green-600">✓</span>}
                   </td>
-                  {/* Total dia — calculado automaticamente */}
                   <td className="px-2 py-1 text-right align-top">
                     <div className="w-28 text-right px-2 py-1.5 font-bold text-slate-800">
                       {dayTotal > 0 ? fmtEur(dayTotal) : <span className="text-slate-300">—</span>}
