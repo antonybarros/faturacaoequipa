@@ -815,6 +815,21 @@ function DashboardWrapper({
   const firstPrev     = sumField(closingPrev, "first_orders_curr");
   const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
   const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
+  const leadsCurr     = sumField(closingCurr, "leads_curr");
+  const leadsPrev     = sumField(closingPrev, "leads_curr");
+  // Afiliação
+  const afilCurr = (() => {
+    if (!closingCurr?.markets) return null;
+    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+    const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_result)||0), 0);
+    return t > 0 ? t : null;
+  })();
+  const afilPrev = (() => {
+    if (!closingPrev?.markets) return null;
+    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+    const t = markets.reduce((s,m) => s + (parseFloat(closingPrev.markets[m]?.afil_result)||0), 0);
+    return t > 0 ? t : null;
+  })();
 
   return (
     <div className="space-y-5">
@@ -869,6 +884,10 @@ function DashboardWrapper({
         firstPrev={firstPrev}
         firstRevCurr={firstRevCurr}
         firstRevPrev={firstRevPrev}
+        leadsCurr={leadsCurr}
+        leadsPrev={leadsPrev}
+        afilCurr={afilCurr}
+        afilPrev={afilPrev}
       />
     </div>
   );
@@ -1296,7 +1315,7 @@ function Dashboard({
 // ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
-  firstRevCurr, firstRevPrev }) {
+  firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1434,6 +1453,119 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Média diária COM Supersales */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide mb-2">
+            <Calendar className="w-4 h-4" />
+            Média diária (com Supersales)
+          </div>
+          {closedDay === 0 ? (
+            <div className="mt-2 text-2xl font-bold text-slate-400">—</div>
+          ) : (
+            <>
+              <div className="mt-2 text-2xl font-bold text-slate-900">
+                {fmtEur(closedDay > 0 ? Math.round(actual / closedDay) : 0)}/dia
+              </div>
+              {hasSuperDays && (
+                <div className="mt-1 text-xs text-slate-500">
+                  Inclui {superDaysCount} dia{superDaysCount > 1 ? "s" : ""} de Supersales
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* % Supersales na faturação total */}
+        {hasSuperDays && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-5">
+            <div className="flex items-center gap-2 text-amber-700 text-xs font-medium uppercase tracking-wide mb-2">
+              <TrendingUp className="w-4 h-4" />
+              % Supersales na faturação total
+            </div>
+            <div className="mt-1 text-2xl font-bold text-amber-800">
+              {actual > 0 ? ((superDaysTotal / actual) * 100).toFixed(1) : "0"}%
+            </div>
+            <div className="mt-1 text-xs text-slate-600">
+              {fmtEur(superDaysTotal)} em Supersales de {fmtEur(actual)} total ·{" "}
+              {superDaysCount} dia{superDaysCount > 1 ? "s" : ""} de campanha
+            </div>
+          </div>
+        )}
+
+        {/* Leads / Parcerias */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Leads / Parcerias</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">{year - 1}</p>
+              <p className="text-xl font-semibold text-slate-600">
+                {leadsPrev != null ? Math.round(leadsPrev) : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">{year}</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {leadsCurr != null ? Math.round(leadsCurr) : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Evolução</p>
+              {leadsCurr != null && leadsPrev > 0 ? (() => {
+                const e = (leadsCurr - leadsPrev) / leadsPrev * 100;
+                return (
+                  <>
+                    <p className={`text-lg font-bold ${e >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {e >= 0 ? "+" : ""}{e.toFixed(1)}%
+                    </p>
+                    <p className={`text-xs ${e >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {leadsCurr - leadsPrev >= 0 ? "+" : ""}{Math.round(leadsCurr - leadsPrev)} leads
+                    </p>
+                  </>
+                );
+              })() : <p className="text-slate-400 text-sm">—</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Revenda + Afiliação */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Total (Revenda + Afiliação)</p>
+          {(() => {
+            const totalCurr = actual + (afilCurr || 0);
+            const totalPrev = (prevYearActual || 0) + (afilPrev || 0);
+            const evo = totalPrev > 0 ? ((totalCurr - totalPrev) / totalPrev * 100) : null;
+            const diff = totalPrev > 0 ? totalCurr - totalPrev : null;
+            const pos = evo != null && evo >= 0;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 mb-1">Revenda {year}</p>
+                  <p className="text-lg font-bold text-slate-700">{fmtEur(actual)}</p>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 mb-1">Afiliação {year}</p>
+                  <p className="text-lg font-bold text-purple-700">{afilCurr != null ? fmtEur(afilCurr) : <span className="text-slate-400 text-sm">Sem dados</span>}</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <p className="text-xs text-slate-500 mb-1">Total {year}</p>
+                  <p className="text-xl font-bold text-blue-700">{fmtEur(totalCurr)}</p>
+                </div>
+                <div className={`rounded-xl p-4 ${evo == null ? "bg-slate-50" : pos ? "bg-green-50" : "bg-red-50"}`}>
+                  <p className="text-xs text-slate-500 mb-1">vs {year - 1}</p>
+                  <p className={`text-xl font-bold ${evo == null ? "text-slate-400" : pos ? "text-green-700" : "text-red-700"}`}>
+                    {evo == null ? "—" : `${pos ? "+" : ""}${evo.toFixed(1)}%`}
+                  </p>
+                  {diff != null && (
+                    <p className={`text-xs ${pos ? "text-green-600" : "text-red-600"}`}>
+                      {diff >= 0 ? "+" : ""}{fmtEur(diff)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Gráfico acumulado */}
