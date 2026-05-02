@@ -2314,6 +2314,12 @@ function Relatorio({ monthNum, year }) {
         });
       }
 
+      // Restore manual fields from closing
+      const savedByMkt = closing?.revenda_by_market || {};
+      MC_MARKETS.forEach(m => {
+        if (savedByMkt[m.code]?.prev) byMarket[m.code].prev = savedByMkt[m.code].prev;
+      });
+
       setRev(p => ({
         ...p,
         result: bm?.entries ? (() => {
@@ -2322,9 +2328,21 @@ function Relatorio({ monthNum, year }) {
           return lastEntry.total || Object.values(lastEntry).reduce((s,v) => typeof v==="number"?s+v:s, 0);
         })() : 0,
         objective: bm?.total_goal || 0,
-        margin_pct: closing?.revenda_margin || "",
-        margin_pct_prev: closing?.revenda_margin_prev || "",
-        prev_year: closing?.revenda_prev || "",
+        margin_pct:          closing?.revenda_margin || "",
+        margin_pct_prev:     closing?.revenda_margin_prev || "",
+        prev_year:           closing?.revenda_prev || "",
+        q_result_prev_year:  closing?.q_result_prev_year || "",
+        q_objective:         closing?.q_objective || "",
+        q_result:            closing?.q_result || "",
+        q_month1_revenue:    closing?.q_month1_revenue || "",
+        q_month1_evolution:  closing?.q_month1_evolution || "",
+        q_month1_margin:     closing?.q_month1_margin || "",
+        q_month2_revenue:    closing?.q_month2_revenue || "",
+        q_month2_evolution:  closing?.q_month2_evolution || "",
+        q_month2_margin:     closing?.q_month2_margin || "",
+        q_month3_revenue:    closing?.q_month3_revenue || "",
+        q_month3_evolution:  closing?.q_month3_evolution || "",
+        q_month3_margin:     closing?.q_month3_margin || "",
         byMarket,
       }));
 
@@ -2382,9 +2400,57 @@ function Relatorio({ monthNum, year }) {
   };
 
   const MONTHS_UPPER = MC_MONTHS_PT.map(m => m.toUpperCase());
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [savedDraft, setSavedDraft] = useState(false);
+
+  async function saveDraft() {
+    setSavingDraft(true);
+    const existing = await loadClosing(year, monthNum);
+    const merged = {
+      ...existing,
+      revenda_margin:      rev.margin_pct,
+      revenda_margin_prev: rev.margin_pct_prev,
+      revenda_prev:        rev.prev_year,
+      revenda_by_market:   Object.fromEntries(MC_MARKETS.map(m => [m.code, { prev: rev.byMarket[m.code]?.prev || "" }])),
+      afil_objective:      afil.objective,
+      afil_result:         afil.result,
+      afil_prev:           afil.prev_year,
+      q_result_prev_year:  rev.q_result_prev_year,
+      q_objective:         rev.q_objective,
+      q_result:            rev.q_result,
+      q_month1_revenue:    rev.q_month1_revenue,
+      q_month1_evolution:  rev.q_month1_evolution,
+      q_month1_margin:     rev.q_month1_margin,
+      q_month2_revenue:    rev.q_month2_revenue,
+      q_month2_evolution:  rev.q_month2_evolution,
+      q_month2_margin:     rev.q_month2_margin,
+      q_month3_revenue:    rev.q_month3_revenue,
+      q_month3_evolution:  rev.q_month3_evolution,
+      q_month3_margin:     rev.q_month3_margin,
+      programs:            Object.fromEntries(MC_PROGRAMS.map(p => [p, { curr: programs[p]?.curr || "", prev: programs[p]?.prev || "" }])),
+      markets: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+        ...(existing?.markets?.[m.code] || {}),
+        afil_result:             afil.byMarket[m.code]?.curr || "",
+        afil_prev:               afil.byMarket[m.code]?.prev || "",
+        orders_curr:             orders.byMarket[m.code]?.orders_curr || "",
+        orders_prev:             orders.byMarket[m.code]?.orders_prev || "",
+        first_orders_curr:       orders.byMarket[m.code]?.first_curr || "",
+        first_orders_prev:       orders.byMarket[m.code]?.first_prev || "",
+        first_orders_rev_curr:   orders.byMarket[m.code]?.first_rev_curr || "",
+        first_orders_rev_prev:   orders.byMarket[m.code]?.first_rev_prev || "",
+        leads_curr:              leads.byMarket[m.code]?.curr || "",
+        leads_prev:              leads.byMarket[m.code]?.prev || "",
+      }])),
+    };
+    await saveClosing(year, monthNum, merged);
+    setSavingDraft(false);
+    setSavedDraft(true);
+    setTimeout(() => setSavedDraft(false), 3000);
+  }
 
   async function generatePptx() {
     setGenerating(true);
+    await saveDraft(); // auto-save before generating
     try {
       const { default: PptxGenJS } = await import("https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js");
       const prs = new PptxGenJS();
@@ -2650,10 +2716,17 @@ function Relatorio({ monthNum, year }) {
           <h2 className="text-xl font-bold text-slate-900">Relatório — {MC_MONTHS_PT[monthNum+1]} {year}</h2>
           <p className="text-sm text-slate-500 mt-0.5">Dados carregados automaticamente · edita antes de gerar</p>
         </div>
-        <button onClick={generatePptx} disabled={generating}
-          className="px-5 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0">
-          {generating ? "⏳ A gerar…" : "⬇️ Gerar PowerPoint"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {savedDraft && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+          <button onClick={saveDraft} disabled={savingDraft}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+            {savingDraft ? "A guardar…" : "💾 Guardar"}
+          </button>
+          <button onClick={generatePptx} disabled={generating}
+            className="px-5 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center gap-2">
+            {generating ? "⏳ A gerar…" : "⬇️ Gerar PowerPoint"}
+          </button>
+        </div>
       </div>
 
       {/* Stepper */}
