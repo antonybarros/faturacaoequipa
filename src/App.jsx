@@ -258,6 +258,7 @@ function MainApp() {
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo Diário" },
+        { id: "revenda_reg", label: "Registo Revenda" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
@@ -400,6 +401,15 @@ function MainApp() {
               <Entry
                 data={data}
                 setEntry={setEntry}
+                totalDays={totalDays}
+                closedDay={closedDay}
+                isCurrentMonth={isCurrentMonth}
+              />
+            )}
+            {tab === "revenda_reg" && isAdmin && (
+              <EntryRevenda
+                monthNum={month}
+                year={year}
                 totalDays={totalDays}
                 closedDay={closedDay}
                 isCurrentMonth={isCurrentMonth}
@@ -580,6 +590,38 @@ function computeScopeStats(data, scope, totalDays, closedDay, year, month) {
   };
 }
 
+
+// Converts daily-value entries (Registo Revenda) into cumulative format
+// so computeScopeStats can process them unchanged
+function dailyToCumulative(dailyEntries, teams) {
+  const cumulative = {};
+  const running = {};
+  teams.forEach(t => { running[t] = 0; });
+  let runningTotal = 0;
+
+  const days = Object.keys(dailyEntries)
+    .map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+
+  const maxDay = days.length > 0 ? Math.max(...days) : 0;
+
+  for (let d = 1; d <= maxDay; d++) {
+    const row = dailyEntries[d] || {};
+    const hasAnyTeam = teams.some(t => row[t] !== undefined && row[t] !== "" && row[t] !== null);
+    if (hasAnyTeam) {
+      teams.forEach(t => { running[t] += Number(row[t]) || 0; });
+      runningTotal += teams.reduce((s, t) => s + (Number(row[t]) || 0), 0);
+      cumulative[d] = {
+        ...teams.reduce((obj, t) => ({ ...obj, [t]: running[t] }), {}),
+        total: runningTotal,
+        supersales: row.supersales === true,
+      };
+    } else if (row.supersales) {
+      cumulative[d] = { supersales: true };
+    }
+  }
+  return cumulative;
+}
+
 // Agrega múltiplos mercados num único scope virtual para Análise comercial
 function computeTeamScopeStats(data, teamDef, totalDays, closedDay, year, month) {
   if (teamDef.id === "total") {
@@ -739,9 +781,31 @@ function AnaliseDashboardWrapper({
 function DashboardWrapper({
   data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
 }) {
+  // From May 2026 onwards, use Registo Revenda (daily values) as data source
+  const useRevendaReg = (year > 2026) || (year === 2026 && monthNum >= 4);
+  const revendaKey = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
+
+  const [revendaEntries, setRevendaEntries] = useState(null);
+  useEffect(() => {
+    if (!useRevendaReg) { setRevendaEntries(null); return; }
+    supabase.from("billing_months").select("entries").eq("month_key", revendaKey).maybeSingle()
+      .then(({ data: row }) => {
+        setRevendaEntries(row?.entries || {});
+      });
+  }, [revendaKey, useRevendaReg]);
+
+  // Build effective data: if using Registo Revenda, convert daily→cumulative
+  const effectiveData = useMemo(() => {
+    if (!useRevendaReg || revendaEntries === null) return data;
+    return {
+      ...data,
+      entries: dailyToCumulative(revendaEntries, TEAMS),
+    };
+  }, [data, useRevendaReg, revendaEntries]);
+
   const stats = useMemo(
-    () => computeScopeStats(data, scope, totalDays, closedDay, year, monthNum),
-    [data, scope, totalDays, closedDay, year, monthNum]
+    () => computeScopeStats(effectiveData, scope, totalDays, closedDay, year, monthNum),
+    [effectiveData, scope, totalDays, closedDay, year, monthNum]
   );
 
   // Load prev year data + closing data (margem, encomendas)
@@ -751,13 +815,23 @@ function DashboardWrapper({
 
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
-    // Prev year billing
-    supabase.from("billing_months").select("entries").eq("month_key", prevKey).maybeSingle()
+    // Prev year billing — also try revenda-daily for prev year if applicable
+    const prevUseReg = (year - 1 > 2026) || (year - 1 === 2026 && monthNum >= 4);
+    const prevDataKey = prevUseReg
+      ? `revenda-daily-${year - 1}-${String(monthNum + 1).padStart(2, "0")}`
+      : prevKey;
+
+    supabase.from("billing_months").select("entries").eq("month_key", prevDataKey).maybeSingle()
       .then(({ data: row }) => {
         if (!row?.entries) { setPrevYearActual(null); return; }
-        const days = Object.keys(row.entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
+        let entries = row.entries;
+        if (prevUseReg) {
+          // Convert daily to cumulative to extract final value
+          entries = dailyToCumulative(entries, TEAMS);
+        }
+        const days = Object.keys(entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
         if (!days.length) { setPrevYearActual(null); return; }
-        const lastEntry = row.entries[String(days[days.length - 1])] || {};
+        const lastEntry = entries[String(days[days.length - 1])] || {};
         if (scope === "total") {
           const val = lastEntry.total ?? Object.entries(lastEntry)
             .filter(([k]) => k !== "supersales" && k !== "total")
@@ -834,6 +908,15 @@ function DashboardWrapper({
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
+
+      {useRevendaReg && (
+        <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+          <span className="font-semibold">📋 Fonte:</span> Registo Revenda (valores diários)
+          {revendaEntries && Object.keys(revendaEntries).filter(k => !isNaN(Number(k))).length === 0 && (
+            <span className="ml-1 text-orange-600 font-medium">— ainda sem dados registados</span>
+          )}
+        </div>
+      )}
 
       {/* Comparação vs ano anterior — faturação */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -1366,14 +1449,16 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
   return (
     <>
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 text-sm">
-        <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-blue-900">
-          <strong>{scopeLabel}</strong> · {month} {year} ·{" "}
-          {noClosedDays ? "Ainda não há dias fechados para analisar." : (
-            <>Análise sobre <strong>{closedDay}</strong> {closedDay === 1 ? "dia fechado" : "dias fechados"}{" "}
-            {isCurrentMonth && "(até ontem)"} de {totalDays}.</>
-          )}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start justify-between gap-2 text-sm">
+        <div className="flex items-start gap-2">
+          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-blue-900">
+            <strong>{scopeLabel}</strong> · {month} {year} ·{" "}
+            {noClosedDays ? "Ainda não há dias fechados para analisar." : (
+              <>Análise sobre <strong>{closedDay}</strong> {closedDay === 1 ? "dia fechado" : "dias fechados"}{" "}
+              {isCurrentMonth && "(até ontem)"} de {totalDays}.</>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2228,6 +2313,167 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+// ── EntryRevenda — registo por valor do DIA (não acumulado) ──
+function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) {
+  const [entries, setEntries] = useState({}); // { day: { PT:"", IT:"", ... , supersales: false } }
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const RKEY = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
+  const today = new Date();
+  const todayDay = isCurrentMonth ? today.getDate() : null;
+
+  useEffect(() => {
+    setLoading(true);
+    supabase.from("billing_months").select("entries").eq("month_key", RKEY).maybeSingle()
+      .then(({ data: row }) => {
+        setEntries(row?.entries || {});
+        setLoading(false);
+      });
+  }, [RKEY]);
+
+  const setField = (day, field, val) => {
+    setEntries(prev => ({
+      ...prev,
+      [day]: {
+        ...(prev[day] || {}),
+        [field]: typeof val === "boolean" ? val : val === "" ? "" : Number(val),
+      },
+    }));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await supabase.from("billing_months").upsert(
+      { month_key: RKEY, total_goal: 0, team_goals: {}, entries, updated_at: new Date().toISOString() },
+      { onConflict: "month_key" }
+    );
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  // Compute totals per column (sum of all filled days)
+  const totals = useMemo(() => {
+    const t = { total: 0 };
+    TEAMS.forEach(tm => { t[tm] = 0; });
+    Object.values(entries).forEach(row => {
+      if (!row || typeof row !== "object") return;
+      TEAMS.forEach(tm => { t[tm] += Number(row[tm]) || 0; });
+    });
+    t.total = TEAMS.reduce((s, tm) => s + t[tm], 0);
+    return t;
+  }, [entries]);
+
+  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
+
+  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const MONTH_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][monthNum];
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Introduz o valor <strong>faturado no próprio dia</strong> (não acumulado)
+            para cada mercado. O total é calculado automaticamente.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {saved && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 disabled:opacity-60"
+          >
+            {saving ? "A guardar…" : "💾 Guardar"}
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+            <tr>
+              <th className="px-3 py-2 text-left sticky left-0 bg-slate-50">Dia</th>
+              <th className="px-3 py-2 text-right font-bold text-slate-900">Total dia</th>
+              {TEAMS.map(t => (
+                <th key={t} className="px-3 py-2 text-right" style={{ color: TEAM_COLORS[t] }}>{t}</th>
+              ))}
+              <th className="px-3 py-2 text-center text-amber-700">SS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map(d => {
+              const row = entries[d] || {};
+              const isToday = todayDay === d;
+              const isClosed = d <= closedDay;
+              const isSupersales = row.supersales === true;
+              // Compute day total from sum of team fields
+              const dayTotal = TEAMS.reduce((s, t) => s + (Number(row[t]) || 0), 0);
+              const rowBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : isClosed ? "" : "bg-slate-50/40";
+              const stickyBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : "bg-white";
+              return (
+                <tr key={d} className={`border-t border-slate-100 ${rowBg}`}>
+                  <td className={`px-3 py-2 font-medium sticky left-0 align-top ${stickyBg}`}>
+                    {d}
+                    {isToday && <span className="ml-1 text-xs text-blue-600">(hoje)</span>}
+                    {isClosed && !isToday && <span className="ml-1 text-xs text-green-600">✓</span>}
+                  </td>
+                  {/* Total dia — calculado automaticamente */}
+                  <td className="px-2 py-1 text-right align-top">
+                    <div className="w-28 text-right px-2 py-1.5 font-bold text-slate-800">
+                      {dayTotal > 0 ? fmtEur(dayTotal) : <span className="text-slate-300">—</span>}
+                    </div>
+                  </td>
+                  {TEAMS.map(t => (
+                    <td key={t} className="px-2 py-1 text-right align-top">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={row[t] ?? ""}
+                        onChange={e => setField(d, t, e.target.value)}
+                        placeholder="0"
+                        className="w-24 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                      />
+                    </td>
+                  ))}
+                  <td className="px-2 py-1 text-center align-top">
+                    <label className="inline-flex items-center justify-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSupersales}
+                        onChange={e => setField(d, "supersales", e.target.checked)}
+                        className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-2 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                      />
+                    </label>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Linha total */}
+            <tr className="border-t-2 border-slate-400 bg-slate-50 font-bold">
+              <td className="px-3 py-3 sticky left-0 bg-slate-50 text-slate-700 text-xs uppercase tracking-wide">Total</td>
+              <td className="px-2 py-3 text-right text-slate-900">{fmtEur(totals.total)}</td>
+              {TEAMS.map(t => (
+                <td key={t} className="px-2 py-3 text-right" style={{ color: TEAM_COLORS[t] }}>
+                  {totals[t] > 0 ? fmtEur(totals[t]) : <span className="text-slate-300">—</span>}
+                </td>
+              ))}
+              <td />
+            </tr>
           </tbody>
         </table>
       </div>
