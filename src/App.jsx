@@ -106,7 +106,7 @@ function MainApp() {
 
   // If user loses admin status, force back to a public tab
   useEffect(() => {
-    if (!isAdmin && !["analise","dashboard","afiliacao","encomendas","leads","history"].includes(tab)) setTab("analise");
+    if (!isAdmin && !["analise","dashboard","history"].includes(tab)) setTab("analise");
   }, [isAdmin, tab]);
 
   // --- Load annual goal when year changes ---
@@ -251,22 +251,16 @@ function MainApp() {
   const availableTabs = isAdmin
     ? [
         { id: "analise", label: "Análise comercial" },
-        { id: "dashboard", label: "Revenda" },
-        { id: "afiliacao", label: "Afiliação" },
-        { id: "encomendas", label: "Encomendas" },
-        { id: "leads", label: "Leads / Parcerias" },
+        { id: "dashboard", label: "Resumo" },
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo Diário" },
-        { id: "revenda_reg", label: "Registo Revenda" },
+        { id: "revenda_reg", label: "Registo" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
         { id: "analise", label: "Análise comercial" },
-        { id: "dashboard", label: "Revenda" },
-        { id: "afiliacao", label: "Afiliação" },
-        { id: "encomendas", label: "Encomendas" },
-        { id: "leads", label: "Leads / Parcerias" },
+        { id: "dashboard", label: "Resumo" },
         { id: "history", label: "Histórico" },
       ];
 
@@ -377,23 +371,7 @@ function MainApp() {
               />
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
-            {tab === "afiliacao" && (
-              <AfiliacaoDashboard
-                totalDays={totalDays}
-                closedDay={closedDay}
-                month={MONTH_NAMES[month]}
-                monthNum={month}
-                year={year}
-                isCurrentMonth={isCurrentMonth}
-                isAdmin={isAdmin}
-              />
-            )}
-            {tab === "encomendas" && (
-              <Encomendas monthNum={month} year={year} isAdmin={isAdmin} />
-            )}
-            {tab === "leads" && (
-              <LeadsParcerias monthNum={month} year={year} isAdmin={isAdmin} />
-            )}
+
             {tab === "relatorio" && isAdmin && (
               <Relatorio monthNum={month} year={year} />
             )}
@@ -407,12 +385,13 @@ function MainApp() {
               />
             )}
             {tab === "revenda_reg" && isAdmin && (
-              <EntryRevenda
+              <RegistoHub
                 monthNum={month}
                 year={year}
                 totalDays={totalDays}
                 closedDay={closedDay}
                 isCurrentMonth={isCurrentMonth}
+                isAdmin={isAdmin}
               />
             )}
             {tab === "setup" && isAdmin && (
@@ -1644,80 +1623,76 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           })()}
         </div>
 
-        {/* Faturação por dia de semana */}
+        {/* Faturação por dia de semana — horizontal bars */}
         {(() => {
           const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-          const DAYS_FULL = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
-          // Aggregate daily data by weekday (exclude supersales days from avg)
           const byWeekday = Array.from({length:7}, (_,i) => ({
-            label: DAYS_PT[i], full: DAYS_FULL[i],
-            total: 0, count: 0, ssTotal: 0, ssCount: 0,
+            label: DAYS_PT[i], total: 0, count: 0, ssTotal: 0, ssCount: 0,
           }));
           daily.forEach(d => {
             if (d.day > closedDay) return;
             const val = d.value;
             if (val == null || val === 0) return;
             const wd = d.weekday !== undefined ? d.weekday : new Date(year, monthNum, d.day).getDay();
-            if (d.supersales) {
-              byWeekday[wd].ssTotal += val;
-              byWeekday[wd].ssCount++;
-            } else {
-              byWeekday[wd].total += val;
-              byWeekday[wd].count++;
-            }
+            if (d.supersales) { byWeekday[wd].ssTotal += val; byWeekday[wd].ssCount++; }
+            else { byWeekday[wd].total += val; byWeekday[wd].count++; }
           });
-          // Reorder Mon–Sun (1–0)
           const ordered = [1,2,3,4,5,6,0].map(i => ({
             ...byWeekday[i],
             avg: byWeekday[i].count > 0 ? Math.round(byWeekday[i].total / byWeekday[i].count) : null,
-            cumTotal: byWeekday[i].total + byWeekday[i].ssTotal,
           }));
           const maxAvg = Math.max(...ordered.map(d => d.avg || 0));
+          const barColor = TEAM_COLORS[scope] || "#2563eb";
           return (
             <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="font-semibold text-slate-900 mb-1">Faturação por dia de semana</h3>
-              <p className="text-xs text-slate-500 mb-4">Média e cumulado por dia de semana · dias de Supersales excluídos da média</p>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">
+                    Média por dia da semana
+                    <span className="ml-2 text-xs font-normal text-slate-400 normal-case">(excl. Supersales)</span>
+                  </h3>
+                </div>
+              </div>
+              <div className="space-y-3">
                 {ordered.map((d, i) => {
-                  const barPct = maxAvg > 0 && d.avg ? Math.round((d.avg / maxAvg) * 100) : 0;
+                  const barPct = maxAvg > 0 && d.avg ? (d.avg / maxAvg) * 100 : 0;
                   const isWeekend = i >= 5;
                   return (
-                    <div key={d.label} className={`flex flex-col items-center rounded-xl p-2 ${isWeekend ? "bg-slate-50" : "bg-white"} border border-slate-100`}>
-                      <p className={`text-xs font-bold mb-2 ${isWeekend ? "text-slate-400" : "text-slate-700"}`}>{d.label}</p>
-                      {/* Bar */}
-                      <div className="w-full h-16 bg-slate-100 rounded-lg overflow-hidden flex items-end mb-2">
+                    <div key={d.label} className="flex items-center gap-3">
+                      {/* Day label */}
+                      <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">
+                        {d.label}
+                      </div>
+                      {/* Bar track */}
+                      <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
                         <div
-                          className="w-full rounded-lg transition-all"
+                          className="h-full rounded-full transition-all duration-500"
                           style={{
-                            height: `${barPct}%`,
-                            backgroundColor: isWeekend ? "#94a3b8" : (TEAM_COLORS[scope] || "#2563eb"),
-                            minHeight: barPct > 0 ? "4px" : "0"
+                            width: `${barPct}%`,
+                            backgroundColor: isWeekend ? "#94a3b8" : barColor,
+                            minWidth: barPct > 0 ? "8px" : "0",
                           }}
                         />
                       </div>
-                      {/* Avg */}
-                      <p className="text-xs font-bold text-slate-800 text-center leading-tight">
-                        {d.avg != null ? `${(d.avg/1000).toFixed(0)}k` : "—"}
-                      </p>
-                      <p className="text-[10px] text-slate-400 text-center">média</p>
-                      {/* Count */}
-                      <p className="text-[10px] text-slate-500 mt-1">{d.count} dia{d.count !== 1 ? "s" : ""}</p>
-                      {/* Cumulated */}
-                      <p className="text-[10px] text-slate-700 font-semibold mt-1 text-center">
-                        {d.cumTotal > 0 ? `${(d.cumTotal/1000).toFixed(0)}k` : "—"}
-                      </p>
-                      <p className="text-[10px] text-slate-400 text-center">total</p>
-                      {d.ssCount > 0 && (
-                        <span className="mt-1 text-[9px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>
-                      )}
+                      {/* Value */}
+                      <div className="w-36 flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-bold text-slate-800">
+                          {d.avg != null
+                            ? new Intl.NumberFormat("fr-FR").format(d.avg) + " €/dia"
+                            : "—"}
+                        </span>
+                        {d.count > 0 && (
+                          <span className="text-xs text-slate-400">({d.count}x)</span>
+                        )}
+                        {d.ssCount > 0 && (
+                          <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-center gap-4 text-xs text-slate-400">
-                <span>Média = valor diário médio excluindo Supersales</span>
-                <span>Total = cumulado do mês</span>
-              </div>
+              <p className="mt-4 text-xs text-slate-400">Média = valor diário médio excluindo dias de Supersales · (Nx) = nº de dias</p>
             </div>
           );
         })()}
@@ -4013,6 +3988,137 @@ function TabVazia({ titulo }) {
       </div>
       <h3 className="text-lg font-semibold text-slate-500">{titulo}</h3>
       <p className="text-sm mt-1">Brevemente disponível</p>
+    </div>
+  );
+}
+
+
+// ── RegistoHub — separador "Registo" com sub-tabs ──
+function MargemRegisto({ monthNum, year, isAdmin }) {
+  const [data, setData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const dataRef = React.useRef(null);
+  const saveTimer = React.useRef(null);
+
+  useEffect(() => {
+    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
+    setSaved(false);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [year, monthNum]);
+
+  const triggerAutoSave = (latest) => {
+    dataRef.current = latest;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await saveClosing(year, monthNum, dataRef.current);
+      setSaving(false); setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
+  const upField = (field, val) =>
+    setData(p => {
+      const next = { ...p, [field]: val };
+      triggerAutoSave(next);
+      return next;
+    });
+
+  const upMkt = (code, field, val) =>
+    setData(p => {
+      const next = { ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } };
+      triggerAutoSave(next);
+      return next;
+    });
+
+  if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-slate-500">Margem mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+        <div className="text-xs">
+          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+        </div>
+      </div>
+
+      <MCCard title="Margem global — Revenda">
+        <div className="grid grid-cols-2 gap-3">
+          <MCField label={`Margem ${year-1} %`} value={data.revenda_margin_prev||""} onChange={v => upField("revenda_margin_prev", v)} />
+          <MCField label={`Margem ${year} %`} value={data.revenda_margin||""} onChange={v => upField("revenda_margin", v)} />
+        </div>
+      </MCCard>
+
+      <MCCard title="Margem por mercado">
+        {MC_MARKETS.map(m => (
+          <div key={m.code} className="mb-4">
+            <p className="text-sm font-semibold text-slate-700 mb-2">{m.name}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
+              <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
+            </div>
+          </div>
+        ))}
+      </MCCard>
+    </div>
+  );
+}
+
+function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAdmin }) {
+  const [subTab, setSubTab] = useState("revenda");
+
+  const subTabs = [
+    { id: "revenda",    label: "Revenda",          color: "bg-blue-500" },
+    { id: "afiliacao",  label: "Afiliação",         color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",        color: "bg-blue-600" },
+    { id: "leads",      label: "Leads / Parcerias", color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",            color: "bg-green-600" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tab bar */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {subTabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+              subTab === t.id
+                ? `${t.color} text-white`
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {subTab === "revenda" && (
+        <EntryRevenda
+          monthNum={monthNum}
+          year={year}
+          totalDays={totalDays}
+          closedDay={closedDay}
+          isCurrentMonth={isCurrentMonth}
+        />
+      )}
+      {subTab === "afiliacao" && (
+        <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "encomendas" && (
+        <Encomendas monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "leads" && (
+        <LeadsParcerias monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "margem" && (
+        <MargemRegisto monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
     </div>
   );
 }
