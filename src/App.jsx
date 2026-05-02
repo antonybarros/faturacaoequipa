@@ -2323,7 +2323,7 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
 
 // ── EntryRevenda — registo por valor do DIA (não acumulado) ──
 function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) {
-  const [entries, setEntries] = useState({}); // { day: { PT:"", IT:"", ... , supersales: false } }
+  const [entries, setEntries] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2331,6 +2331,10 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
   const RKEY = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
   const today = new Date();
   const todayDay = isCurrentMonth ? today.getDate() : null;
+
+  // Keep a ref to the latest entries so the debounced save always uses fresh data
+  const entriesRef = React.useRef(entries);
+  entriesRef.current = entries;
 
   useEffect(() => {
     setLoading(true);
@@ -2341,6 +2345,27 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
       });
   }, [RKEY]);
 
+  // Debounced auto-save — fires 800ms after the last change
+  const saveTimer = React.useRef(null);
+  const triggerAutoSave = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    setSaving(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await supabase.from("billing_months").upsert(
+        { month_key: RKEY, total_goal: 0, team_goals: {}, entries: entriesRef.current, updated_at: new Date().toISOString() },
+        { onConflict: "month_key" }
+      );
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
+  // Clear timer on unmount
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
   const setField = (day, field, val) => {
     setEntries(prev => ({
       ...prev,
@@ -2349,18 +2374,7 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
         [field]: typeof val === "boolean" ? val : val === "" ? "" : Number(val),
       },
     }));
-    setSaved(false);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    await supabase.from("billing_months").upsert(
-      { month_key: RKEY, total_goal: 0, team_goals: {}, entries, updated_at: new Date().toISOString() },
-      { onConflict: "month_key" }
-    );
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    triggerAutoSave();
   };
 
   // Compute totals per column (sum of all filled days)
@@ -2387,18 +2401,12 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
           <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
           <p className="text-xs text-slate-500 mt-1">
             Introduz o valor <strong>faturado no próprio dia</strong> (não acumulado)
-            para cada mercado. O total é calculado automaticamente.
+            para cada mercado. Guardado automaticamente.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {saved && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 disabled:opacity-60"
-          >
-            {saving ? "A guardar…" : "💾 Guardar"}
-          </button>
+        <div className="flex items-center gap-2 shrink-0 text-xs">
+          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
         </div>
       </div>
 
