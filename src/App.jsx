@@ -4059,11 +4059,10 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
         <MCCard key={m.code} title={m.name} accent="text-green-700">
           <div className="grid grid-cols-2 gap-3">
             <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
-              <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
-            </div>
+            <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
           </div>
-        ))}
-      </MCCard>
+        </MCCard>
+      ))}
     </div>
   );
 }
