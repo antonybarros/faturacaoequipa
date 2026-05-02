@@ -3008,36 +3008,58 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const dataRef = React.useRef(null);
+  const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => setData(d));
+    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
     setSaved(false);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
+  const triggerAutoSave = (latest) => {
+    dataRef.current = latest;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await saveClosing(year, monthNum, dataRef.current);
+      setSaving(false); setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
+  const upField = (updater) => {
+    setData(p => {
+      const next = updater(p);
+      triggerAutoSave(next);
+      return next;
+    });
+  };
+
   const upMkt = (code, field, val) =>
-    setData(p => ({ ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } }));
+    upField(p => ({ ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } }));
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
-  const onSave = async () => {
-    setSaving(true);
-    await saveClosing(year, monthNum, data);
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-orange-500"/>
-        <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-orange-500"/>
+          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+        </div>
+        <div className="text-xs">
+          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+        </div>
       </div>
 
       <MCCard title="Afiliação — Resultados globais">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => setData(p => ({...p, afil_objective: v}))} />
-          <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => setData(p => ({...p, afil_prev: v}))} />
-          <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => setData(p => ({...p, afil_result: v}))} />
+          <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
+          <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => upField(p => ({...p, afil_prev: v}))} />
+          <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => upField(p => ({...p, afil_result: v}))} />
         </div>
       </MCCard>
 
@@ -3052,8 +3074,6 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
           </div>
         ))}
       </MCCard>
-
-      {isAdmin && <SaveBar saving={saving} saved={saved} onSave={onSave} />}
     </div>
   );
 }
@@ -3064,29 +3084,47 @@ function Encomendas({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const dataRef = React.useRef(null);
+  const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => setData(d));
+    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
     setSaved(false);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
+  const triggerAutoSave = (latest) => {
+    dataRef.current = latest;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await saveClosing(year, monthNum, dataRef.current);
+      setSaving(false); setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
   const upMkt = (code, field, val) =>
-    setData(p => ({ ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } }));
+    setData(p => {
+      const next = { ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } };
+      triggerAutoSave(next);
+      return next;
+    });
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
-  const onSave = async () => {
-    setSaving(true);
-    await saveClosing(year, monthNum, data);
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-blue-500"/>
-        <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-blue-500"/>
+          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+        </div>
+        <div className="text-xs">
+          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+        </div>
       </div>
 
       {MC_MARKETS.map(m => (
@@ -3110,8 +3148,6 @@ function Encomendas({ monthNum, year, isAdmin }) {
           </div>
         </MCCard>
       ))}
-
-      {isAdmin && <SaveBar saving={saving} saved={saved} onSave={onSave} />}
     </div>
   );
 }
@@ -3122,29 +3158,47 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const dataRef = React.useRef(null);
+  const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => setData(d));
+    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
     setSaved(false);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
+  const triggerAutoSave = (latest) => {
+    dataRef.current = latest;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await saveClosing(year, monthNum, dataRef.current);
+      setSaving(false); setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
   const upMkt = (code, field, val) =>
-    setData(p => ({ ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } }));
+    setData(p => {
+      const next = { ...p, markets: { ...p.markets, [code]: { ...p.markets[code], [field]: val } } };
+      triggerAutoSave(next);
+      return next;
+    });
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
-  const onSave = async () => {
-    setSaving(true);
-    await saveClosing(year, monthNum, data);
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-purple-500"/>
-        <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-purple-500"/>
+          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+        </div>
+        <div className="text-xs">
+          {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+          {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+        </div>
       </div>
 
       {MC_MARKETS.map(m => (
@@ -3155,8 +3209,6 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
           </div>
         </MCCard>
       ))}
-
-      {isAdmin && <SaveBar saving={saving} saved={saved} onSave={onSave} />}
     </div>
   );
 }
