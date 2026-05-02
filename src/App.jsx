@@ -3405,244 +3405,454 @@ function Relatorio({ monthNum, year }) {
 
   async function generatePptx() {
     setGenerating(true);
-    await saveDraft(); // auto-save before generating
+    await saveDraft();
     try {
       const pptxgenjs = await import("pptxgenjs");
       const PptxGenJS = pptxgenjs.default || pptxgenjs;
       const prs = new PptxGenJS();
       prs.layout = "LAYOUT_WIDE";
       prs.title = `Apresentação de Resultados – ${MC_MONTHS_PT[monthNum+1]} ${year}`;
-      const C = { black:"1A1A1A", white:"FFFFFF", gray:"F2F2F2", grayDark:"6B6B6B",
-        accent:"FF6B00", blue:"0D3B66", green:"00A86B", red:"E53935",
-        tableHead:"1A1A1A", r1:"FFFFFF", r2:"F7F7F7" };
-      const W=13.33, H=7.5;
+
+      // ── Design system (Prozis Partners template) ──
+      const C = {
+        cream:   "F2F0EB",  // background
+        white:   "FFFFFF",
+        black:   "1A1A1A",
+        teal:    "3A9E8F",  // primary accent
+        tealDk:  "2E7D71",  // dark teal
+        tealLt:  "D6EDE9",  // light teal card bg
+        gray:    "E8E6E1",  // divider
+        grayDk:  "888888",  // muted text
+        grayLt:  "F7F5F1",  // subtle card bg
+        green:   "2E7D71",
+        red:     "C0392B",
+      };
+      const W = 13.33, H = 7.5;
+      const FF = "Calibri";
       const mLabel = MONTHS_UPPER[monthNum+1];
 
-      function addSep(dept, num) {
-        const s = prs.addSlide(); s.background={color:C.blue};
-        s.addText("DEPARTAMENTO",{x:1,y:2.2,w:11,h:0.6,fontSize:14,color:C.white,fontFace:"Calibri",charSpacing:6,transparency:30});
-        s.addText(dept,{x:1,y:2.9,w:9,h:1.4,fontSize:72,bold:true,color:C.white,fontFace:"Calibri"});
-        s.addText(num,{x:11.5,y:5.8,w:1.5,h:1.2,fontSize:80,bold:true,color:C.accent,fontFace:"Calibri",align:"right"});
+      // Format helpers
+      const fmtN = n => n == null ? "—" : new Intl.NumberFormat("fr-FR").format(Math.round(n));
+      const fmtE2 = n => n == null ? "—" : fmtN(n) + " €";
+      const fmtP2 = (n, sign=false) => {
+        if (n == null || isNaN(n)) return "—";
+        const s = Math.abs(n).toFixed(2) + "%";
+        return sign ? (n>=0?"+":"-")+s : s;
+      };
+      const evo2 = (prev, curr) => {
+        if (!prev || !curr) return "—";
+        const e = ((curr-prev)/prev*100);
+        return fmtP2(e, true);
+      };
+      const N2 = s => parseFloat(s)||0;
+
+      // ── Slide helpers ──
+
+      // Cream background on every slide
+      function bgCream(s) { s.background = {color: C.cream}; }
+
+      // Section separator slide (design: teal circle badge + bordered box label)
+      function addSep(num, title) {
+        const s = prs.addSlide(); bgCream(s);
+        // Diagonal stripe watermark
+        s.addShape(prs.ShapeType.rect, {x:4.5,y:-1,w:12,h:10, rotate:15,
+          fill:{color:"E8E6E1",transparency:70}, line:{color:"E8E6E1",transparency:70}});
+        s.addShape(prs.ShapeType.rect, {x:5.5,y:-1,w:12,h:10, rotate:15,
+          fill:{color:"E8E6E1",transparency:80}, line:{color:"E8E6E1",transparency:80}});
+        // Teal circle with number
+        s.addShape(prs.ShapeType.ellipse, {x:3.9, y:3.1, w:0.9, h:0.9,
+          fill:{color:C.teal}, line:{color:C.teal}});
+        s.addText(String(num), {x:3.9,y:3.05,w:0.9,h:0.9,
+          fontSize:28, bold:true, color:C.white, align:"center", fontFace:FF});
+        // Bordered label box
+        s.addShape(prs.ShapeType.rect, {x:4.95,y:2.85,w:7.2,h:0.85,
+          fill:{color:C.white,transparency:100}, line:{color:C.teal,pt:1.5}});
+        s.addText("DEPARTAMENTO", {x:5.1,y:2.88,w:7,h:0.25,
+          fontSize:10, bold:true, color:C.teal, fontFace:FF, charSpacing:3});
+        s.addText(title, {x:5.1,y:3.18,w:7,h:0.45,
+          fontSize:26, bold:false, color:C.black, fontFace:FF});
       }
 
+      // Result slide (3 cards + detail row + progress bar)
       function addResult(dept, subtitle, prevYear, objective, result) {
-        const s = prs.addSlide(); s.background={color:C.white};
-        const evoPct = prevYear?((result-prevYear)/prevYear*100):0;
-        const objPct = objective?(result/objective*100):0;
-        s.addText(dept,{x:0.4,y:0.15,w:6,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-        s.addText(subtitle,{x:0.4,y:0.48,w:9,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-        s.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-        [{label:"RESULTADO "+(year-1),value:fmtE(prevYear)},
-         {label:"OBJETIVO "+year,value:fmtE(objective)},
-         {label:"RESULTADO "+year,value:fmtE(result),sub:fmtP(evoPct,true)+" vs "+(year-1)}]
-        .forEach((item,i)=>{
-          const y2=1.1+i*1.6, isLast=i===2;
-          s.addText(item.label,{x:0.4,y:y2,w:5.5,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-          s.addText(item.value,{x:0.4,y:y2+0.28,w:5.5,h:0.7,fontSize:isLast?36:28,bold:true,color:isLast?C.accent:C.black,fontFace:"Calibri"});
-          if(item.sub) s.addText(item.sub,{x:0.4,y:y2+0.98,w:5.5,h:0.3,fontSize:13,color:evoPct>=0?C.green:C.red,fontFace:"Calibri",bold:true});
+        const s = prs.addSlide(); bgCream(s);
+        // Title
+        s.addText(dept, {x:0.5,y:0.25,w:12,h:0.5, fontSize:32,bold:true,color:C.black,fontFace:FF});
+        s.addText(subtitle, {x:0.5,y:0.75,w:12,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
+
+        // 3 KPI cards
+        const cards = [
+          {label:`RESULTADO ${mLabel} ${year-1}`, val: fmtE2(prevYear), big:false, bordered:false},
+          {label:`OBJETIVO ${mLabel} ${year}`,   val: fmtE2(objective),
+           sub: objective&&prevYear ? fmtP2((objective-prevYear)/prevYear*100,true)+" vs resultado "+mLabel.toLowerCase()+" "+(year-1) : "",
+           big:false, bordered:false, teal:true},
+          {label:`RESULTADO ${mLabel} ${year}`,  val: fmtE2(result),
+           sub: result&&prevYear ? fmtP2((result-prevYear)/prevYear*100,true)+" vs "+(year-1) : "",
+           big:true, bordered:true, teal:true},
+        ];
+        cards.forEach((c,i) => {
+          const x = 0.5 + i*4.15;
+          s.addShape(prs.ShapeType.roundRect, {x, y:1.15, w:3.95, h:1.55,
+            fill:{color:C.tealLt}, line:{color: c.bordered ? C.teal : C.tealLt, pt: c.bordered?2:1},
+            rectRadius:0.12});
+          s.addText(c.label, {x:x+0.18,y:1.22,w:3.6,h:0.28, fontSize:9,color:C.grayDk,fontFace:FF,bold:false});
+          s.addText(c.val, {x:x+0.18,y:1.52,w:3.6,h:0.55,
+            fontSize: c.big?28:22, bold:c.big, color: c.teal?C.teal:C.black, fontFace:FF});
+          if (c.sub) s.addText(c.sub, {x:x+0.18,y:2.12,w:3.6,h:0.22,
+            fontSize:10, bold:c.big, color:C.teal, fontFace:FF});
         });
-        [{label:"Evolução vs "+(year-1),value:fmtP(evoPct,true)},
-         {label:"Ganho absoluto",value:(result-prevYear>=0?"+":"")+fmtE(result-prevYear)},
-         {label:"Acima do objetivo",value:(result-objective>=0?"+":"")+fmtE(result-objective)},
-         {label:"% do objetivo",value:fmtP(objPct)}]
-        .forEach((m2,i)=>{
-          const x2=6.8+(i%2)*3.0,y2=1.8+Math.floor(i/2)*1.6;
-          s.addText(m2.label,{x:x2,y:y2,w:2.8,h:0.3,fontSize:8,color:C.grayDark,fontFace:"Calibri"});
-          s.addText(m2.value,{x:x2,y:y2+0.28,w:2.8,h:0.7,fontSize:22,bold:true,color:C.blue,fontFace:"Calibri"});
+
+        // Detail row
+        const evoPct = prevYear ? ((result-prevYear)/prevYear*100) : 0;
+        const evoAbs = result - (prevYear||0);
+        const aboveObj = result - (objective||0);
+        const pctObj = objective ? (result/objective*100) : 0;
+        const details = [
+          {label:"Evolução vs "+(year-1), val: fmtP2(evoPct,true)},
+          {label:"Ganho absoluto",          val: (evoAbs>=0?"+":"")+fmtE2(evoAbs)},
+          {label:"Acima do objetivo",       val: fmtE2(aboveObj)},
+          {label:"% do objetivo",           val: fmtP2(pctObj)},
+        ];
+        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:2.88,w:12.33,h:1.0,
+          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
+        s.addText("DETALHE DO RESULTADO", {x:0.72,y:2.93,w:4,h:0.22,
+          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
+        details.forEach((d,i) => {
+          const x = 0.72 + i*3.08;
+          if (i>0) s.addShape(prs.ShapeType.line, {x:x-0.05,y:3.05,w:0,h:0.65,
+            line:{color:C.gray,pt:1}});
+          s.addText(d.label, {x:x+0.05,y:3.06,w:2.9,h:0.22, fontSize:11,color:C.black,fontFace:FF});
+          const pos = !d.val.startsWith("-");
+          s.addText(d.val, {x:x+0.05,y:3.32,w:2.9,h:0.42,
+            fontSize:22, bold:true, color: i===0||i===3 ? C.teal : C.black, fontFace:FF});
         });
+
+        // Progress bar
+        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:4.08,w:12.33,h:1.75,
+          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
+        s.addText("CONCRETIZAÇÃO DO OBJETIVO", {x:0.72,y:4.13,w:6,h:0.24,
+          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
+        const barW = 11.5;
+        const barX = 0.72;
+        const barY = 4.52;
+        const barH = 0.28;
+        const clampPct = Math.min(pctObj/100, 1);
+        const excessPct = Math.max(0, pctObj/100 - 1);
+        // Bar track
+        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW,h:barH,
+          fill:{color:C.gray}, line:{color:C.gray,pt:0.5}, rectRadius:0.05});
+        // Main bar (up to objective)
+        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW*clampPct,h:barH,
+          fill:{color:C.teal}, line:{color:C.teal}, rectRadius:0.05});
+        // Excess bar
+        if (excessPct>0) {
+          s.addShape(prs.ShapeType.roundRect, {x:barX+barW*clampPct,y:barY,w:barW*excessPct,h:barH,
+            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.05});
+        }
+        // Objective line
+        s.addShape(prs.ShapeType.line, {x:barX+barW*clampPct,y:barY-0.05,w:0,h:barH+0.1,
+          line:{color:C.black,pt:2}});
+        // Labels
+        s.addText("% do objetivo", {x:barX,y:barY+0.35,w:2,h:0.24, fontSize:9,color:C.grayDk,fontFace:FF});
+        s.addText(fmtP2(pctObj), {x:barX,y:barY+0.57,w:2,h:0.38, fontSize:22,bold:true,color:C.teal,fontFace:FF});
+        if (aboveObj>0) {
+          s.addShape(prs.ShapeType.roundRect, {x:barX+7.5,y:barY+0.42,w:4,h:0.32,
+            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.08});
+          s.addText(`✓  +${fmtE2(aboveObj)} acima do objetivo`, {x:barX+7.6,y:barY+0.46,w:3.8,h:0.24,
+            fontSize:9, color:C.teal, bold:true, fontFace:FF});
+        }
+        // Legend
+        const legends = [
+          {color:C.teal, label:`Realizado até objetivo (${fmtE2(objective)})`},
+          {color:C.tealLt, label:`Excedente (+${fmtE2(aboveObj)})`},
+        ];
+        legends.forEach((l,i) => {
+          const lx = barX + i*4.5;
+          s.addShape(prs.ShapeType.rect, {x:lx,y:6.08,w:0.18,h:0.12,fill:{color:l.color},line:{color:l.color}});
+          s.addText(l.label, {x:lx+0.25,y:6.05,w:4,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
+        });
+        s.addShape(prs.ShapeType.line, {x:barX+9,y:6.08,w:0,h:0.12,line:{color:C.black,pt:1.5}});
+        s.addText("Linha de objetivo", {x:barX+9.1,y:6.05,w:3,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
       }
 
-      function mktTable(slide, rows) {
-        slide.addTable(rows,{x:0.4,y:1.1,w:12.4,colW:[3,1.8,1.8,1.6,1.6,1.1,1.5],
+      // Market distribution table slide
+      function addMktTable(dept, subtitle, rows) {
+        const s = prs.addSlide(); bgCream(s);
+        s.addText(dept, {x:0.5,y:0.25,w:8,h:0.45, fontSize:28,bold:true,color:C.black,fontFace:FF});
+        s.addText(subtitle, {x:0.5,y:0.72,w:9,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
+        // Table
+        const tRows = [
+          [{text:"MERCADO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10}},
+           {text:"FATURAÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10,align:"right"}}],
+          ...rows.map((r,i)=>[
+            {text:r[0],options:{fontSize:10,fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
+            {text:r[1],options:{fontSize:10,bold:true,align:"right",fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
+          ])
+        ];
+        s.addTable(tRows, {x:0.5,y:1.15,w:5.5,colW:[4,1.5],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
+      }
+
+      // ─────────────────────────────────────────────
+      // SLIDE 1: CAPA
+      // ─────────────────────────────────────────────
+      const s1 = prs.addSlide(); bgCream(s1);
+      // Diagonal stripe left
+      s1.addShape(prs.ShapeType.rect, {x:-1,y:-0.5,w:4,h:9,rotate:5,
+        fill:{color:"ECEAE4",transparency:30},line:{color:"ECEAE4",transparency:30}});
+      // Teal bar left edge
+      s1.addShape(prs.ShapeType.rect, {x:0,y:0,w:0.35,h:H,fill:{color:C.teal},line:{color:C.teal}});
+      // Logo area
+      s1.addText("PROZIS PARTNERS", {x:0.6,y:0.4,w:6,h:0.5,
+        fontSize:16,bold:true,color:C.teal,fontFace:FF,charSpacing:2});
+      // Title
+      s1.addText("Apresentação\nde resultados", {x:0.6,y:2.5,w:7,h:2.2,
+        fontSize:52,bold:true,color:C.black,fontFace:FF,breakLine:true});
+      s1.addText(`${mLabel} ${year}`, {x:0.6,y:4.7,w:7,h:0.8,
+        fontSize:36,bold:true,color:C.teal,fontFace:FF});
+
+      // ─────────────────────────────────────────────
+      // REVENDA
+      // ─────────────────────────────────────────────
+      addSep(1, "REVENDA");
+      addResult("REVENDA", `${mLabel} ${year} – em comparação ao ano anterior`,
+        N2(rev.prev_year), N2(rev.objective), N2(rev.result));
+
+      // Trimestre (only if quarter month)
+      if (isQuarterMonth) {
+        const qPrev=N2(rev.q_result_prev_year), qObj=N2(rev.q_objective), qRes=N2(rev.q_result);
+        const qEvo = qPrev?((qRes-qPrev)/qPrev*100):0;
+        const sq = prs.addSlide(); bgCream(sq);
+        sq.addText("REVENDA", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+        sq.addText("Mensal", {x:0.5,y:0.72,w:9,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+        const qCards = [
+          {label:`1º TRIMESTRE ${year-1}`, val:fmtE2(qPrev)},
+          {label:`OBJETIVO TRIMESTRE ${year}`, val:fmtE2(qObj),
+           sub:qPrev?fmtP2((qObj-qPrev)/qPrev*100,true)+" vs resultado 1º trimestre "+(year-1):""},
+          {label:`RESULTADO TRIMESTRE ${year}`, val:fmtE2(qRes),
+           sub:qPrev?fmtP2(qEvo,true)+" vs "+(year-1):"", big:true},
+        ];
+        qCards.forEach((c,i)=>{
+          const x=0.5+i*4.15;
+          sq.addShape(prs.ShapeType.roundRect,{x,y:1.15,w:3.95,h:c.big?1.8:1.55,
+            fill:{color:C.tealLt},line:{color:c.big?C.teal:C.tealLt,pt:c.big?2:1},rectRadius:0.12});
+          sq.addText(c.label,{x:x+0.18,y:1.22,w:3.6,h:0.28,fontSize:9,color:C.grayDk,fontFace:FF});
+          sq.addText(c.val,{x:x+0.18,y:1.52,w:3.6,h:0.55,
+            fontSize:c.big?26:20,bold:c.big,color:C.teal,fontFace:FF});
+          if(c.sub) sq.addText(c.sub,{x:x+0.18,y:2.1,w:3.6,h:0.22,fontSize:10,bold:c.big,color:C.teal,fontFace:FF});
+        });
+        const qMonthNums = monthNum<3?[1,2,3]:monthNum<6?[4,5,6]:monthNum<9?[7,8,9]:[10,11,12];
+        const qTblRows = [
+          [{text:"MÉTRICA",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9}},
+           ...qMonthNums.map(mn=>({text:MONTHS_UPPER[mn],options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9,align:"right"}}))],
+          [{text:"FATURAÇÃO",options:{fontSize:9}},
+           {text:fmtN(N2(rev.q_month1_revenue)),options:{fontSize:9,bold:true,align:"right"}},
+           {text:fmtN(N2(rev.q_month2_revenue)),options:{fontSize:9,bold:true,align:"right"}},
+           {text:fmtN(N2(rev.q_month3_revenue)),options:{fontSize:9,bold:true,align:"right"}}],
+          [{text:"EVOLUÇÃO FACE AO ANO ANTERIOR",options:{fontSize:9}},
+           {text:fmtP2(N2(rev.q_month1_evolution),true),options:{fontSize:9,color:N2(rev.q_month1_evolution)>=0?C.teal:C.red,align:"right"}},
+           {text:fmtP2(N2(rev.q_month2_evolution),true),options:{fontSize:9,color:N2(rev.q_month2_evolution)>=0?C.teal:C.red,align:"right"}},
+           {text:fmtP2(N2(rev.q_month3_evolution),true),options:{fontSize:9,color:N2(rev.q_month3_evolution)>=0?C.teal:C.red,align:"right"}}],
+          [{text:"MARGEM",options:{fontSize:9}},
+           {text:fmtP2(N2(rev.q_month1_margin)),options:{fontSize:9,align:"right"}},
+           {text:fmtP2(N2(rev.q_month2_margin)),options:{fontSize:9,align:"right"}},
+           {text:fmtP2(N2(rev.q_month3_margin)),options:{fontSize:9,align:"right"}}],
+        ];
+        sq.addTable(qTblRows,{x:0.5,y:3.2,w:12.3,colW:[5,2.1,2.1,2.1],
           border:{type:"solid",color:C.gray,pt:0.5},rowH:0.48});
       }
 
-      // ── Slide 1: Capa ──
-      const s1=prs.addSlide(); s1.background={color:C.black};
-      s1.addShape(prs.ShapeType.rect,{x:0,y:0,w:0.18,h:H,fill:{color:C.accent}});
-      s1.addText(MONTHS_UPPER[monthNum+1]+" "+year,{x:0.5,y:1.8,w:6,h:0.8,fontSize:28,bold:true,color:C.accent,fontFace:"Calibri"});
-      s1.addText("Apresentação\nde resultados",{x:0.5,y:2.5,w:8,h:2,fontSize:54,bold:true,color:C.white,fontFace:"Calibri",breakLine:true});
-      s1.addText("PROZIS PARTNERS",{x:0.5,y:5.2,w:6,h:0.5,fontSize:18,bold:true,color:C.grayDark,fontFace:"Calibri",charSpacing:4});
+      // Market distribution — revenda
+      const revMktRows = MC_MARKETS
+        .filter(m=>N2(rev.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(rev.byMarket[b.code]?.curr)-N2(rev.byMarket[a.code]?.curr))
+        .map(m=>[m.name, fmtE2(N2(rev.byMarket[m.code]?.curr))]);
+      if (revMktRows.length) addMktTable("REVENDA","Distribuição da faturação por mercado", revMktRows);
 
-      // ── Slides REVENDA ──
-      addSep("REVENDA","1");
-      addResult("REVENDA",mLabel+" "+year+" – em comparação ao ano anterior",N(rev.prev_year),N(rev.objective),N(rev.result));
+      // Programs
+      const progRows = MC_PROGRAMS.filter(p=>N2(programs[p]?.curr)>0)
+        .sort((a,b)=>N2(programs[b]?.curr)-N2(programs[a]?.curr))
+        .map(p=>[p, fmtE2(N2(programs[p]?.curr))]);
+      if (progRows.length) addMktTable("REVENDA","Distribuição da faturação por programa", progRows);
 
-      // Trimestre
-      const sQ=prs.addSlide(); sQ.background={color:C.white};
-      sQ.addText("REVENDA",{x:0.4,y:0.15,w:5,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-      sQ.addText("Trimestre",{x:0.4,y:0.48,w:9,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sQ.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-      const qPrev=N(rev.q_result_prev_year),qObj=N(rev.q_objective),qRes=N(rev.q_result),qEvo=qPrev?((qRes-qPrev)/qPrev*100):0;
-      sQ.addText("RESULTADO TRIMESTRE "+(year-1),{x:0.4,y:1.0,w:5,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sQ.addText(fmtE(qPrev),{x:0.4,y:1.28,w:5,h:0.55,fontSize:24,bold:true,color:C.black,fontFace:"Calibri"});
-      sQ.addText("OBJETIVO TRIMESTRE "+year,{x:0.4,y:2.0,w:5,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sQ.addText(fmtE(qObj),{x:0.4,y:2.28,w:5,h:0.55,fontSize:24,bold:true,color:C.black,fontFace:"Calibri"});
-      sQ.addText("RESULTADO TRIMESTRE "+year,{x:0.4,y:3.3,w:5,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sQ.addText(fmtE(qRes),{x:0.4,y:3.58,w:5.5,h:0.7,fontSize:32,bold:true,color:C.accent,fontFace:"Calibri"});
-      sQ.addText(fmtP(qEvo,true)+" vs "+(year-1),{x:0.4,y:4.25,w:5,h:0.3,fontSize:13,bold:true,color:qEvo>=0?C.green:C.red,fontFace:"Calibri"});
-      const qMonths=(m=>{if(m<3)return[1,2,3];if(m<6)return[4,5,6];if(m<9)return[7,8,9];return[10,11,12]})(monthNum);
-      const qRows=[
-        [{text:"MÉTRICA",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}},
-         ...qMonths.map(mn=>({text:MONTHS_UPPER[mn],options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}}))],
-        [{text:"FATURAÇÃO",options:{fontSize:9}},
-         {text:String(N(rev.q_month1_revenue)),options:{fontSize:9,bold:true}},
-         {text:String(N(rev.q_month2_revenue)),options:{fontSize:9,bold:true}},
-         {text:String(N(rev.q_month3_revenue)),options:{fontSize:9,bold:true}}],
-        [{text:"EVOLUÇÃO vs ANO ANTERIOR",options:{fontSize:9}},
-         {text:fmtP(N(rev.q_month1_evolution),true),options:{fontSize:9,color:N(rev.q_month1_evolution)>=0?C.green:C.red}},
-         {text:fmtP(N(rev.q_month2_evolution),true),options:{fontSize:9,color:N(rev.q_month2_evolution)>=0?C.green:C.red}},
-         {text:fmtP(N(rev.q_month3_evolution),true),options:{fontSize:9,color:N(rev.q_month3_evolution)>=0?C.green:C.red}}],
-        [{text:"MARGEM",options:{fontSize:9}},
-         {text:fmtP(N(rev.q_month1_margin)),options:{fontSize:9}},
-         {text:fmtP(N(rev.q_month2_margin)),options:{fontSize:9}},
-         {text:fmtP(N(rev.q_month3_margin)),options:{fontSize:9}}],
-      ];
-      sQ.addTable(qRows,{x:6.8,y:1.0,w:6.1,colW:[2.5,1.2,1.2,1.2],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.5});
+      // ─────────────────────────────────────────────
+      // AFILIAÇÃO
+      // ─────────────────────────────────────────────
+      addSep(2, "AFILIAÇÃO");
+      addResult("AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
+        N2(afil.prev_year), N2(afil.objective), N2(afil.result));
 
-      // Revenda por mercado
-      const sRM=prs.addSlide(); sRM.background={color:C.white};
-      sRM.addText("REVENDA",{x:0.4,y:0.15,w:5,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-      sRM.addText("Distribuição por mercado",{x:0.4,y:0.48,w:9,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sRM.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-      const rmRows=[
-        [{text:"MERCADO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}},
-         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}}],
-        ...MC_MARKETS.map((m,i)=>{
-          const curr=N(rev.byMarket[m.code]?.curr),prev=N(rev.byMarket[m.code]?.prev);
-          const e=evo(prev,curr); const bg=i%2===0?C.r1:C.r2;
-          return [{text:m.name,options:{fontSize:9,fill:{color:bg}}},
-            {text:fmtE(curr),options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
-            {text:fmtE(prev),options:{fontSize:9,align:"right",fill:{color:bg}}},
-            {text:e,options:{fontSize:9,align:"right",fill:{color:bg},color:e.startsWith("+")?C.green:C.red}}];
-        }),
-      ];
-      sRM.addTable(rmRows,{x:0.4,y:1.1,w:8,colW:[3,2,2,1],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
+      const afilMktRows = MC_MARKETS
+        .filter(m=>N2(afil.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(afil.byMarket[b.code]?.curr)-N2(afil.byMarket[a.code]?.curr))
+        .map(m=>[m.name, fmtE2(N2(afil.byMarket[m.code]?.curr))]);
+      if (afilMktRows.length) addMktTable("AFILIAÇÃO","Distribuição da afiliação por mercado", afilMktRows);
 
-      // Programas
-      const sProg=prs.addSlide(); sProg.background={color:C.white};
-      sProg.addText("REVENDA",{x:0.4,y:0.15,w:5,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-      sProg.addText("Distribuição por programa",{x:0.4,y:0.48,w:9,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sProg.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-      const progRows=[
-        [{text:"PROGRAMA",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}},
-         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}}],
-        ...MC_PROGRAMS
-          .filter(p=>N(programs[p]?.curr)>0||N(programs[p]?.prev)>0)
-          .sort((a,b)=>N(programs[b]?.curr)-N(programs[a]?.curr))
-          .map((p,i)=>{
-            const curr=N(programs[p]?.curr),prev=N(programs[p]?.prev);
-            const e=evo(prev,curr); const bg=i%2===0?C.r1:C.r2;
-            return [{text:p,options:{fontSize:9,fill:{color:bg}}},
-              {text:fmtE(curr),options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
-              {text:fmtE(prev),options:{fontSize:9,align:"right",fill:{color:bg}}},
-              {text:e,options:{fontSize:9,align:"right",fill:{color:bg},color:e.startsWith("+")?C.green:C.red}}];
-          }),
-      ];
-      sProg.addTable(progRows,{x:0.4,y:1.1,w:8,colW:[3,2,2,1],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
+      // ─────────────────────────────────────────────
+      // TOTAL
+      // ─────────────────────────────────────────────
+      addSep(3, "TOTAL");
+      const totResult = N2(rev.result)+N2(afil.result);
+      const totPrev   = N2(rev.prev_year)+N2(afil.prev_year);
+      const totObj    = N2(rev.objective)+N2(afil.objective);
+      addResult("REVENDA + AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
+        totPrev, totObj, totResult);
 
-      // ── Slides AFILIAÇÃO ──
-      addSep("AFILIAÇÃO","2");
-      addResult("AFILIAÇÃO",mLabel+" "+year+" – em comparação ao ano anterior",N(afil.prev_year),N(afil.objective),N(afil.result));
-
-      const sAM=prs.addSlide(); sAM.background={color:C.white};
-      sAM.addText("AFILIAÇÃO",{x:0.4,y:0.15,w:5,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-      sAM.addText("Distribuição por mercado",{x:0.4,y:0.48,w:9,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sAM.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-      const amRows=[
-        [{text:"MERCADO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}},
-         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}}],
-        ...MC_MARKETS.map((m,i)=>{
-          const curr=N(afil.byMarket[m.code]?.curr),prev=N(afil.byMarket[m.code]?.prev);
-          const e=evo(prev,curr); const bg=i%2===0?C.r1:C.r2;
-          return [{text:m.name,options:{fontSize:9,fill:{color:bg}}},
-            {text:fmtE(curr),options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
-            {text:fmtE(prev),options:{fontSize:9,align:"right",fill:{color:bg}}},
-            {text:e,options:{fontSize:9,align:"right",fill:{color:bg},color:e.startsWith("+")?C.green:C.red}}];
-        }),
-      ];
-      sAM.addTable(amRows,{x:0.4,y:1.1,w:8,colW:[3,2,2,1],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
-
-      // ── Slides TOTAL ──
-      addSep("TOTAL","3");
-      const totalResult=N(rev.result)+N(afil.result);
-      const totalPrev=N(rev.prev_year)+N(afil.prev_year);
-      const totalObj=N(rev.objective)+N(afil.objective);
-      addResult("REVENDA + AFILIAÇÃO",mLabel+" "+year+" – em comparação ao ano anterior",totalPrev,totalObj,totalResult);
-
-      // Total breakdown
-      const sT=prs.addSlide(); sT.background={color:C.white};
-      sT.addText("REVENDA + AFILIAÇÃO",{x:0.4,y:0.15,w:8,h:0.35,fontSize:11,bold:true,color:C.accent,fontFace:"Calibri",charSpacing:3});
-      sT.addShape(prs.ShapeType.line,{x:0.4,y:0.82,w:W-0.8,h:0,line:{color:C.gray,width:1}});
-      sT.addText("TOTAL "+year,{x:0.4,y:1.0,w:5,h:0.3,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-      sT.addText(fmtE(totalResult),{x:0.4,y:1.28,w:7,h:0.8,fontSize:40,bold:true,color:C.accent,fontFace:"Calibri"});
-      const revPct=totalResult>0?N(rev.result)/totalResult*100:0;
-      const afPct=totalResult>0?N(afil.result)/totalResult*100:0;
-      [{label:"REVENDA",color:C.blue,val:N(rev.result),pct:revPct},
-       {label:"AFILIAÇÃO",color:C.accent,val:N(afil.result),pct:afPct}]
-      .forEach((item,i)=>{
-        const x2=0.4+i*5;
-        sT.addShape(prs.ShapeType.rect,{x:x2,y:2.5,w:4.5,h:2.5,fill:{color:item.color},line:{color:item.color}});
-        sT.addText(item.label,{x:x2,y:2.6,w:4.5,h:0.4,fontSize:11,bold:true,color:C.white,fontFace:"Calibri",align:"center"});
-        sT.addText(fmtE(item.val),{x:x2,y:3.1,w:4.5,h:0.7,fontSize:26,bold:true,color:C.white,fontFace:"Calibri",align:"center"});
-        sT.addText(item.pct.toFixed(0)+"%",{x:x2,y:3.85,w:4.5,h:0.8,fontSize:40,bold:true,color:C.white,fontFace:"Calibri",align:"center"});
+      // Total breakdown slide
+      const st = prs.addSlide(); bgCream(st);
+      st.addText("REVENDA + AFILIAÇÃO", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      st.addText(`${mLabel} ${year} – Histórico em gráficos`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      const revPct = totResult>0?Math.round(N2(rev.result)/totResult*100):0;
+      const afPct  = totResult>0?Math.round(N2(afil.result)/totResult*100):0;
+      st.addShape(prs.ShapeType.roundRect,{x:0.5,y:1.2,w:3.5,h:2.5,
+        fill:{color:C.tealLt},line:{color:C.teal,pt:1},rectRadius:0.12});
+      st.addText("TOTAL", {x:0.6,y:1.28,w:3.3,h:0.28,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
+      st.addText(fmtE2(totResult), {x:0.6,y:1.6,w:3.3,h:0.65,fontSize:24,bold:true,color:C.black,fontFace:FF});
+      // Revenda / Afil boxes
+      [{label:"REVENDA",val:N2(rev.result),pct:revPct,y:3.95},{label:"AFILIAÇÃO",val:N2(afil.result),pct:afPct,y:5.1}]
+      .forEach((item)=>{
+        st.addShape(prs.ShapeType.roundRect,{x:0.5,y:item.y,w:3.5,h:0.95,
+          fill:{color:C.tealLt},line:{color:C.teal,pt:0.5},rectRadius:0.1});
+        st.addText(item.label,{x:0.65,y:item.y+0.08,w:2,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
+        st.addText(fmtE2(item.val),{x:0.65,y:item.y+0.35,w:2.8,h:0.42,fontSize:18,bold:true,color:C.teal,fontFace:FF});
+        st.addText(`${item.pct}%`,{x:3.1,y:item.y+0.25,w:0.9,h:0.45,fontSize:22,bold:true,color:C.teal,fontFace:FF,align:"right"});
       });
 
-      // ── Slides POR MERCADO ──
-      addSep("POR MERCADO","4");
+      // ─────────────────────────────────────────────
+      // ENCOMENDAS
+      // ─────────────────────────────────────────────
+      addSep(4, "ENCOMENDAS");
+      const encTotCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_curr)),0);
+      const encTotPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_prev)),0);
+      const enc1stCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_curr)),0);
+      const enc1stPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_prev)),0);
+      const encRev1Curr = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_curr)),0);
+      const encRev1Prev = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_prev)),0);
+
+      const se = prs.addSlide(); bgCream(se);
+      se.addText("ENCOMENDAS", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      se.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      se.addText("DETALHE POR MÉTRICA", {x:0.5,y:1.12,w:12,h:0.25,fontSize:8,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
+      const encMetrics = [
+        [`ENCOMENDAS TOTAIS`, fmtN(encTotPrev), fmtN(encTotCurr), evo2(encTotPrev,encTotCurr)],
+        [`PRIMEIRAS ENCOMENDAS`, fmtN(enc1stPrev), fmtN(enc1stCurr), evo2(enc1stPrev,enc1stCurr)],
+        [`FATURAÇÃO 1ªs ENC.`, fmtE2(encRev1Prev), fmtE2(encRev1Curr), evo2(encRev1Prev,encRev1Curr)],
+      ];
+      const encHdr = [
+        [{text:"",options:{fill:{color:C.teal}}},{text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
+         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
+         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}}],
+        ...encMetrics.map((r,i)=>{
+          const bg=i%2===0?C.white:C.grayLt;
+          const pos=r[3].startsWith("+");
+          return [{text:r[0],options:{fontSize:10,fill:{color:bg},bold:true}},
+            {text:r[1],options:{fontSize:10,align:"right",fill:{color:bg}}},
+            {text:r[2],options:{fontSize:10,bold:true,align:"right",fill:{color:bg}}},
+            {text:r[3],options:{fontSize:10,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}}];
+        })
+      ];
+      se.addTable(encHdr,{x:0.5,y:1.4,w:12.3,colW:[4.5,2.5,2.5,2.8],
+        border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
+
+      // ─────────────────────────────────────────────
+      // LEADS
+      // ─────────────────────────────────────────────
+      addSep(5, "LEADS E NOVAS PARCERIAS");
+      const leadsTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.curr),0);
+      const leadsPrevTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.prev),0);
+      const partnersTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_curr),0);
+      const partnersPrevT = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_prev),0);
+
+      // Leads by market table
+      const leadsRows = MC_MARKETS
+        .filter(m=>N2(leads.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(leads.byMarket[b.code]?.curr)-N2(leads.byMarket[a.code]?.curr))
+        .map(m=>[m.name, String(Math.round(N2(leads.byMarket[m.code]?.curr)))]);
+      if (leadsRows.length) addMktTable("LEADS","BE A PARTNER – por mercado", leadsRows);
+
+      // Leads summary slide
+      const sl = prs.addSlide(); bgCream(sl);
+      sl.addText("LEADS", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      sl.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:8,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      const lSummary = [
+        ["TOTAL DE LEADS", leadsPrevTotal, leadsTotal],
+        ["NOVAS PARCERIAS", partnersPrevT, partnersTotal],
+      ];
+      lSummary.forEach((row,i)=>{
+        const y = 1.2+i*1.4;
+        sl.addShape(prs.ShapeType.roundRect,{x:0.5,y,w:12.3,h:1.2,
+          fill:{color:i===0?C.tealLt:C.white},line:{color:C.teal,pt:0.5},rectRadius:0.1});
+        sl.addText(row[0],{x:0.7,y:y+0.08,w:4,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF,charSpacing:1});
+        sl.addText(fmtN(row[2]),{x:0.7,y:y+0.42,w:3,h:0.55,fontSize:30,bold:true,color:C.teal,fontFace:FF});
+        if (row[1]>0) {
+          const e=(row[2]-row[1])/row[1]*100;
+          sl.addText(`${e>=0?"+":""}${e.toFixed(2)}% vs ${mLabel.toLowerCase()} ${year-1}`,
+            {x:4,y:y+0.52,w:4,h:0.3,fontSize:12,bold:true,color:e>=0?C.teal:C.red,fontFace:FF});
+        }
+      });
+
+      // ─────────────────────────────────────────────
+      // RESULTADOS POR MERCADO
+      // ─────────────────────────────────────────────
+      addSep(6, "RESULTADOS POR MERCADO");
+
       MC_MARKETS.forEach(m=>{
         const rd=rev.byMarket[m.code]||{}, ad=afil.byMarket[m.code]||{};
-        const od=orders.byMarket[m.code]||{}, ld=leads.byMarket[m.code]||{};
-        const rCurr=N(rd.curr),rPrev=N(rd.prev),aCurr=N(ad.curr),aPrev=N(ad.prev);
+        const od=orders.byMarket[m.code]||{};
+        const rCurr=N2(rd.curr),rPrev=N2(rd.prev),aCurr=N2(ad.curr),aPrev=N2(ad.prev);
         if(!rCurr&&!aCurr) return;
         const tCurr=rCurr+aCurr, tPrev=rPrev+aPrev;
-        const sm2=prs.addSlide(); sm2.background={color:C.white};
-        sm2.addText(m.name.toUpperCase(),{x:0.4,y:0.15,w:10,h:0.45,fontSize:20,bold:true,color:C.blue,fontFace:"Calibri",charSpacing:2});
-        sm2.addText("DETALHE POR MÉTRICA",{x:0.4,y:0.58,w:6,h:0.25,fontSize:9,color:C.grayDark,fontFace:"Calibri"});
-        sm2.addShape(prs.ShapeType.line,{x:0.4,y:0.85,w:W-0.8,h:0,line:{color:C.gray,width:1}});
+        const mDiff=N2(closingCurr?.markets?.[m.code]?.margin_curr)-N2(closingCurr?.markets?.[m.code]?.margin_prev||closingPrev?.markets?.[m.code]?.margin_curr);
+
+        const sm = prs.addSlide(); bgCream(sm);
+        sm.addText(m.name.toUpperCase(),{x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+        sm.addText("DETALHE POR MÉTRICA",{x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+
+        // KPI indicators (4 cards)
         const rEvo=rPrev?((rCurr-rPrev)/rPrev*100):0;
-        const oEvo=N(od.orders_prev)?((N(od.orders_curr)-N(od.orders_prev))/N(od.orders_prev)*100):0;
-        const mDiff=N(rd.margin_curr||rev.margin_pct)-N(rd.margin_prev||rev.margin_pct_prev);
-        [{label:"Revenda",value:fmtE(rCurr),sub:fmtP(rEvo,true),color:rEvo>=0?C.green:C.red},
-         {label:"Margem",value:fmtP(N(rev.margin_pct)),sub:fmtP(mDiff,true)+"pp",color:mDiff>=0?C.green:C.red},
-         {label:"Encomendas",value:String(N(od.orders_curr)||"–"),sub:fmtP(oEvo,true),color:oEvo>=0?C.green:C.red},
-         {label:"Total "+year,value:fmtE(tCurr),sub:evo(tPrev,tCurr),color:C.blue}]
-        .forEach((k,i)=>{
-          const x2=0.4+i*3.2;
-          sm2.addText(k.label,{x:x2,y:1.0,w:3,h:0.25,fontSize:8,color:C.grayDark,fontFace:"Calibri"});
-          sm2.addText(k.value,{x:x2,y:1.22,w:3,h:0.55,fontSize:20,bold:true,color:C.black,fontFace:"Calibri"});
-          sm2.addText(k.sub,{x:x2,y:1.75,w:3,h:0.3,fontSize:11,bold:true,color:k.color,fontFace:"Calibri"});
+        const oEvo=N2(od.orders_prev)?((N2(od.orders_curr)-N2(od.orders_prev))/N2(od.orders_prev)*100):0;
+        const kpis=[
+          {label:"Revenda",val:fmtE2(rCurr),sub:fmtP2(rEvo,true),pos:rEvo>=0},
+          {label:"Margem",val:fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)),sub:fmtP2(mDiff,true)+"pp",pos:mDiff>=0},
+          {label:"Encomendas",val:fmtN(N2(od.orders_curr)),sub:fmtP2(oEvo,true),pos:oEvo>=0},
+          {label:`Total ${year}`,val:fmtE2(tCurr),sub:evo2(tPrev,tCurr),pos:tCurr>=tPrev},
+        ];
+        kpis.forEach((k,i)=>{
+          const x=0.5+i*3.2;
+          sm.addShape(prs.ShapeType.roundRect,{x,y:1.18,w:3.0,h:1.1,
+            fill:{color:C.white},line:{color:C.gray,pt:0.8},rectRadius:0.1});
+          sm.addText("INDICADORES PRINCIPAIS",{x:0.5,y:1.1,w:12,h:0.2,fontSize:7,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
+          sm.addText(k.label,{x:x+0.12,y:1.22,w:2.8,h:0.22,fontSize:9,color:C.grayDk,fontFace:FF});
+          sm.addText(k.val,{x:x+0.12,y:1.46,w:2.8,h:0.45,fontSize:18,bold:true,color:C.black,fontFace:FF});
+          sm.addText(k.sub,{x:x+0.12,y:1.92,w:2.8,h:0.22,fontSize:9,bold:true,color:k.pos?C.teal:C.red,fontFace:FF});
         });
-        const detRows=[
-          [{text:"",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9}},
-           {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-           {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}},
-           {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.tableHead},fontSize:9,align:"right"}}],
+
+        // Detail table
+        const dtRows=[
+          [{text:"",options:{fill:{color:C.teal}}},
+           {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
+           {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
+           {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}}],
           ...([
-            ["Revenda",fmtE(rPrev),fmtE(rCurr),evo(rPrev,rCurr)],
-            ["Afiliação",fmtE(aPrev),fmtE(aCurr),evo(aPrev,aCurr)],
-            ["Total",fmtE(tPrev),fmtE(tCurr),evo(tPrev,tCurr)],
-            ["Margem",fmtP(N(rev.margin_pct_prev)),fmtP(N(rev.margin_pct)),fmtP(mDiff,true)+"pp"],
-            ["Encomendas",String(N(od.orders_prev)),String(N(od.orders_curr)),evo(N(od.orders_prev),N(od.orders_curr))],
-            ["1ªs enc.",String(N(od.first_prev)),String(N(od.first_curr)),evo(N(od.first_prev),N(od.first_curr))],
-            ["Fat. 1ªs enc.",fmtE(N(od.first_rev_prev)),fmtE(N(od.first_rev_curr)),evo(N(od.first_rev_prev),N(od.first_rev_curr))],
-            ["Leads",String(N(ld.prev)),String(N(ld.curr)),evo(N(ld.prev),N(ld.curr))],
+            ["Revenda", fmtE2(rPrev), fmtE2(rCurr), evo2(rPrev,rCurr)],
+            ["Afiliação", fmtE2(aPrev), fmtE2(aCurr), evo2(aPrev,aCurr)],
+            ["Total (rev + afil)", fmtE2(tPrev), fmtE2(tCurr), evo2(tPrev,tCurr)],
+            ["Margem", fmtP2(N2(closingPrev?.markets?.[m.code]?.margin_curr)), fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)), fmtP2(mDiff,true)+"pp"],
+            ["Encomendas", fmtN(N2(od.orders_prev)), fmtN(N2(od.orders_curr)), evo2(N2(od.orders_prev),N2(od.orders_curr))],
+            ["1ªs enc.", fmtN(N2(od.first_prev)), fmtN(N2(od.first_curr)), evo2(N2(od.first_prev),N2(od.first_curr))],
+            ["Faturação 1ªs enc.", fmtE2(N2(od.first_rev_prev)), fmtE2(N2(od.first_rev_curr)), evo2(N2(od.first_rev_prev),N2(od.first_rev_curr))],
           ].map((r,i)=>{
-            const bg=i%2===0?C.r1:C.r2;
-            const ec=r[3].startsWith("+")?C.green:C.red;
-            return [{text:r[0],options:{fontSize:9,fill:{color:bg}}},
+            const bg=i%2===0?C.white:C.grayLt;
+            const pos=r[3].startsWith("+");
+            return [
+              {text:r[0],options:{fontSize:9,fill:{color:bg},bold:i===2}},
               {text:r[1],options:{fontSize:9,align:"right",fill:{color:bg}}},
               {text:r[2],options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
-              {text:r[3],options:{fontSize:9,align:"right",fill:{color:bg},color:ec}}];
-          })),
+              {text:r[3],options:{fontSize:9,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}},
+            ];
+          }))
         ];
-        sm2.addTable(detRows,{x:0.4,y:2.2,w:12.5,colW:[4,2.5,2.5,2],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.46});
+        sm.addTable(dtRows,{x:0.5,y:2.45,w:12.3,colW:[4.2,2.5,2.5,2.6],
+          border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
       });
 
       await prs.writeFile({fileName:`Relatorio-${MC_MONTHS_PT[monthNum+1]}-${year}.pptx`});
