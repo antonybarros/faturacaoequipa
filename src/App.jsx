@@ -1379,35 +1379,53 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
       {!noClosedDays && (<>
 
-        {/* Média diária sem Supersales */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
-            <Calendar className="w-4 h-4" />
-            Média diária (sem Supersales)
-          </div>
-          {closedDay === 0 ? (
-            <div className="mt-2 text-2xl font-bold text-slate-400">—</div>
-          ) : !hasSuperDays ? (
-            <>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{fmtEur(avgWithoutSuper)}/dia</div>
-              <div className="mt-1 text-xs text-slate-500">Sem dias de Supersales no período analisado</div>
-            </>
-          ) : (
-            <>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{fmtEur(avgWithoutSuper)}/dia</div>
-              <div className="mt-1 text-xs text-slate-600">
-                Excluindo dias de Supersales ·{" "}
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  campanha de descontos
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Margem % */}
+        {/* Margem % — logo após Faturação vs ano anterior */}
         <YoYCard title="Margem %" curr={marginCurr} prev={marginPrev} isEur={false} isPct={true} />
+
+        {/* 3 cards lado a lado: Média sem SS · Média com SS · % SS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Média sem Supersales */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
+              <Calendar className="w-4 h-4" />
+              Média/dia (sem SS)
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {fmtEur(avgWithoutSuper)}/dia
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {hasSuperDays ? "Excluindo dias de Supersales" : "Sem dias de Supersales"}
+            </div>
+          </div>
+
+          {/* Média com Supersales */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
+              <Calendar className="w-4 h-4" />
+              Média/dia (com SS)
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {fmtEur(closedDay > 0 ? Math.round(actual / closedDay) : 0)}/dia
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {hasSuperDays ? `Inclui ${superDaysCount} dia${superDaysCount > 1 ? "s" : ""} de Supersales` : "Sem Supersales no período"}
+            </div>
+          </div>
+
+          {/* % Supersales */}
+          <div className={`rounded-xl border p-5 ${hasSuperDays ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide ${hasSuperDays ? "text-amber-700" : "text-slate-600"}`}>
+              <TrendingUp className="w-4 h-4" />
+              % Supersales / total
+            </div>
+            <div className={`mt-2 text-2xl font-bold ${hasSuperDays ? "text-amber-800" : "text-slate-400"}`}>
+              {hasSuperDays && actual > 0 ? `${((superDaysTotal / actual) * 100).toFixed(1)}%` : "0%"}
+            </div>
+            <div className="mt-1 text-xs text-slate-600">
+              {hasSuperDays ? `${fmtEur(superDaysTotal)} em ${superDaysCount} dia${superDaysCount > 1 ? "s" : ""}` : "Sem Supersales"}
+            </div>
+          </div>
+        </div>
 
         {/* Encomendas */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -1454,45 +1472,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             </div>
           </div>
         </div>
-
-        {/* Média diária COM Supersales */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide mb-2">
-            <Calendar className="w-4 h-4" />
-            Média diária (com Supersales)
-          </div>
-          {closedDay === 0 ? (
-            <div className="mt-2 text-2xl font-bold text-slate-400">—</div>
-          ) : (
-            <>
-              <div className="mt-2 text-2xl font-bold text-slate-900">
-                {fmtEur(closedDay > 0 ? Math.round(actual / closedDay) : 0)}/dia
-              </div>
-              {hasSuperDays && (
-                <div className="mt-1 text-xs text-slate-500">
-                  Inclui {superDaysCount} dia{superDaysCount > 1 ? "s" : ""} de Supersales
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* % Supersales na faturação total */}
-        {hasSuperDays && (
-          <div className="bg-amber-50 rounded-xl border border-amber-200 p-5">
-            <div className="flex items-center gap-2 text-amber-700 text-xs font-medium uppercase tracking-wide mb-2">
-              <TrendingUp className="w-4 h-4" />
-              % Supersales na faturação total
-            </div>
-            <div className="mt-1 text-2xl font-bold text-amber-800">
-              {actual > 0 ? ((superDaysTotal / actual) * 100).toFixed(1) : "0"}%
-            </div>
-            <div className="mt-1 text-xs text-slate-600">
-              {fmtEur(superDaysTotal)} em Supersales de {fmtEur(actual)} total ·{" "}
-              {superDaysCount} dia{superDaysCount > 1 ? "s" : ""} de campanha
-            </div>
-          </div>
-        )}
 
         {/* Leads / Parcerias */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -1567,6 +1546,84 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             );
           })()}
         </div>
+
+        {/* Faturação por dia de semana */}
+        {(() => {
+          const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+          const DAYS_FULL = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+          // Aggregate daily data by weekday (exclude supersales days from avg)
+          const byWeekday = Array.from({length:7}, (_,i) => ({
+            label: DAYS_PT[i], full: DAYS_FULL[i],
+            total: 0, count: 0, ssTotal: 0, ssCount: 0,
+          }));
+          daily.forEach(d => {
+            if (d.day > closedDay) return;
+            const val = d.value;
+            if (val == null || val === 0) return;
+            const wd = d.weekday !== undefined ? d.weekday : new Date(year, monthNum, d.day).getDay();
+            if (d.supersales) {
+              byWeekday[wd].ssTotal += val;
+              byWeekday[wd].ssCount++;
+            } else {
+              byWeekday[wd].total += val;
+              byWeekday[wd].count++;
+            }
+          });
+          // Reorder Mon–Sun (1–0)
+          const ordered = [1,2,3,4,5,6,0].map(i => ({
+            ...byWeekday[i],
+            avg: byWeekday[i].count > 0 ? Math.round(byWeekday[i].total / byWeekday[i].count) : null,
+            cumTotal: byWeekday[i].total + byWeekday[i].ssTotal,
+          }));
+          const maxAvg = Math.max(...ordered.map(d => d.avg || 0));
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <h3 className="font-semibold text-slate-900 mb-1">Faturação por dia de semana</h3>
+              <p className="text-xs text-slate-500 mb-4">Média e cumulado por dia de semana · dias de Supersales excluídos da média</p>
+              <div className="grid grid-cols-7 gap-2">
+                {ordered.map((d, i) => {
+                  const barPct = maxAvg > 0 && d.avg ? Math.round((d.avg / maxAvg) * 100) : 0;
+                  const isWeekend = i >= 5;
+                  return (
+                    <div key={d.label} className={`flex flex-col items-center rounded-xl p-2 ${isWeekend ? "bg-slate-50" : "bg-white"} border border-slate-100`}>
+                      <p className={`text-xs font-bold mb-2 ${isWeekend ? "text-slate-400" : "text-slate-700"}`}>{d.label}</p>
+                      {/* Bar */}
+                      <div className="w-full h-16 bg-slate-100 rounded-lg overflow-hidden flex items-end mb-2">
+                        <div
+                          className="w-full rounded-lg transition-all"
+                          style={{
+                            height: `${barPct}%`,
+                            backgroundColor: isWeekend ? "#94a3b8" : (TEAM_COLORS[scope] || "#2563eb"),
+                            minHeight: barPct > 0 ? "4px" : "0"
+                          }}
+                        />
+                      </div>
+                      {/* Avg */}
+                      <p className="text-xs font-bold text-slate-800 text-center leading-tight">
+                        {d.avg != null ? `${(d.avg/1000).toFixed(0)}k` : "—"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 text-center">média</p>
+                      {/* Count */}
+                      <p className="text-[10px] text-slate-500 mt-1">{d.count} dia{d.count !== 1 ? "s" : ""}</p>
+                      {/* Cumulated */}
+                      <p className="text-[10px] text-slate-700 font-semibold mt-1 text-center">
+                        {d.cumTotal > 0 ? `${(d.cumTotal/1000).toFixed(0)}k` : "—"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 text-center">total</p>
+                      {d.ssCount > 0 && (
+                        <span className="mt-1 text-[9px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-xs text-slate-400">
+                <span>Média = valor diário médio excluindo Supersales</span>
+                <span>Total = cumulado do mês</span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Gráfico acumulado */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
