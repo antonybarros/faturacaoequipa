@@ -9,18 +9,22 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["PT", "IT", "ES", "FR", "DEAT"];
+const TEAMS = ["PT", "IT", "ES", "FR", "CH-BNL-DEAT", "CZ", "USA", "OT"];
 const SCOPES = [
   { id: "total", label: "Total" },
   { id: "PT", label: "Portugal" },
   { id: "IT", label: "Itália" },
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
-  { id: "DEAT", label: "DEAT-CH-BNL" },
+  { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
+  { id: "CZ", label: "Chéquia" },
+  { id: "USA", label: "USA" },
+  { id: "OT", label: "Outros" },
 ];
 const TEAM_COLORS = {
   PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
-  FR: "#9333ea", DEAT: "#d97706", total: "#0f172a",
+  FR: "#9333ea", "CH-BNL-DEAT": "#d97706",
+  CZ: "#0891b2", USA: "#7c3aed", OT: "#64748b", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -39,7 +43,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
+  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
   entries: {},
 });
 
@@ -52,7 +56,7 @@ function MainApp() {
   const [selectedMonth, setSelectedMonth] = useState(monthKey(today));
   const [data, setData] = useState(emptyMonth());
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState("analise");
   const [scope, setScope] = useState("total");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
@@ -87,7 +91,7 @@ function MainApp() {
 
   // If user loses admin status, force back to a public tab
   useEffect(() => {
-    if (!isAdmin && !["dashboard","afiliacao","encomendas","leads","history"].includes(tab)) setTab("dashboard");
+    if (!isAdmin && !["analise","dashboard","afiliacao","encomendas","leads","history"].includes(tab)) setTab("analise");
   }, [isAdmin, tab]);
 
   // --- Load annual goal when year changes ---
@@ -196,7 +200,7 @@ function MainApp() {
       const each = Math.round((Number(prev.totalGoal) || 0) / TEAMS.length);
       return {
         ...prev,
-        teamGoals: { PT: each, IT: each, ES: each, FR: each, DEAT: each },
+        teamGoals: { PT: each, IT: each, ES: each, FR: each, "CH-BNL-DEAT": each, CZ: each, USA: each, OT: each },
       };
     });
 
@@ -232,6 +236,7 @@ function MainApp() {
 
   const availableTabs = isAdmin
     ? [
+        { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Revenda" },
         { id: "afiliacao", label: "Afiliação" },
         { id: "encomendas", label: "Encomendas" },
@@ -242,6 +247,7 @@ function MainApp() {
         { id: "setup", label: "Objetivos" },
       ]
     : [
+        { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Revenda" },
         { id: "afiliacao", label: "Afiliação" },
         { id: "encomendas", label: "Encomendas" },
@@ -329,7 +335,7 @@ function MainApp() {
           <div className="text-center py-12 text-slate-500">A carregar…</div>
         ) : (
           <>
-            {tab === "dashboard" && (
+            {(tab === "analise" || tab === "dashboard") && (
               <DashboardWrapper
                 data={data}
                 totalDays={totalDays}
@@ -340,6 +346,7 @@ function MainApp() {
                 scope={scope}
                 setScope={setScope}
                 isCurrentMonth={isCurrentMonth}
+                tabLabel={tab === "analise" ? "Análise comercial" : "Revenda"}
               />
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
@@ -1990,11 +1997,14 @@ const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
 // ─── CONSTANTES PARTILHADAS ───────────────────────────────────────────────────
 
 const MC_MARKETS = [
-  { code: "PT",   name: "Portugal" },
-  { code: "IT",   name: "Itália" },
-  { code: "ES",   name: "Espanha" },
-  { code: "FR",   name: "França" },
-  { code: "DEAT", name: "DEAT-CH-BNL" },
+  { code: "PT",          name: "Portugal" },
+  { code: "IT",          name: "Itália" },
+  { code: "ES",          name: "Espanha" },
+  { code: "FR",          name: "França" },
+  { code: "CH-BNL-DEAT", name: "CH-BNL-DEAT" },
+  { code: "CZ",          name: "Chéquia" },
+  { code: "USA",         name: "USA" },
+  { code: "OT",          name: "Outros" },
 ];
 
 const MC_PROGRAMS = [
@@ -2179,13 +2189,22 @@ function Encomendas({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <MCField label={`Encomendas ${year}`} value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
-            <MCField label={`Encomendas ${year-1}`} value={data.markets[m.code]?.orders_prev||""} onChange={v => upMkt(m.code,"orders_prev",v)} />
-            <MCField label={`1ªs enc. ${year}`} value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
-            <MCField label={`1ªs enc. ${year-1}`} value={data.markets[m.code]?.first_orders_prev||""} onChange={v => upMkt(m.code,"first_orders_prev",v)} />
-            <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
-            <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={data.markets[m.code]?.first_orders_rev_prev||""} onChange={v => upMkt(m.code,"first_orders_rev_prev",v)} />
+          <div className="grid grid-cols-3 gap-4">
+            {/* Col 1: Encomendas */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`Encomendas ${year-1}`} value={data.markets[m.code]?.orders_prev||""} onChange={v => upMkt(m.code,"orders_prev",v)} />
+              <MCField label={`Encomendas ${year}`} value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
+            </div>
+            {/* Col 2: 1ªs enc. */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`1ªs enc. ${year-1}`} value={data.markets[m.code]?.first_orders_prev||""} onChange={v => upMkt(m.code,"first_orders_prev",v)} />
+              <MCField label={`1ªs enc. ${year}`} value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
+            </div>
+            {/* Col 3: Fat. 1ªs enc. */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={data.markets[m.code]?.first_orders_rev_prev||""} onChange={v => upMkt(m.code,"first_orders_rev_prev",v)} />
+              <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
+            </div>
           </div>
         </MCCard>
       ))}
@@ -2904,14 +2923,17 @@ const AFILIACAO_SCOPES = [
   { id: "IT", label: "Itália" },
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
-  { id: "DEAT", label: "DEAT-CH-BNL" },
+  { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
+  { id: "CZ", label: "Chéquia" },
+  { id: "USA", label: "USA" },
+  { id: "OT", label: "Outros" },
 ];
 
 function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth, isAdmin }) {
   const [afilScope, setAfilScope] = useState("total");
   const [afilData, setAfilData] = useState({
     totalGoal: 0,
-    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
+    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
     entries: {},
   });
   const [loading, setLoading] = useState(true);
@@ -2932,11 +2954,11 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
       if (row) {
         setAfilData({
           totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 },
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
           entries: row.entries || {},
         });
       } else {
-        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, DEAT: 0 }, entries: {} });
+        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 }, entries: {} });
       }
       setLoading(false);
     })();
@@ -2948,14 +2970,13 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
     [afilData, afilScope, totalDays, closedDay, year, monthNum]
   );
   const teamStats = useMemo(
-    () => ["PT","IT","ES","FR","DEAT"].map((t) => ({
+    () => ["PT","IT","ES","FR","CH-BNL-DEAT","CZ","USA","OT"].map((t) => ({
       team: t,
       ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
     })),
     [afilData, totalDays, closedDay, year, monthNum]
   );
 
-  const [afilView, setAfilView] = useState("dashboard");
   if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
 
   const scopeColor = TEAM_COLORS[afilScope] || "#0f172a";
@@ -2963,17 +2984,8 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
 
   return (
     <div className="space-y-5">
-      {/* Sub-tabs */}
-      <div className="flex gap-2 mb-1">
-        {["dashboard","fecho"].map(v => (
-          <button key={v} onClick={() => setAfilView(v)}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${afilView===v?"bg-orange-500 text-white":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-            {v==="dashboard"?"📊 Acompanhamento":"📋 Fecho mensal"}
-          </button>
-        ))}
-      </div>
-      {afilView==="fecho" && <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />}
-      {afilView==="dashboard" && <div className="space-y-5">
+      <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      <div className="space-y-5">
       {/* Scope tabs */}
       <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
         {AFILIACAO_SCOPES.map((s) => {
@@ -3018,7 +3030,7 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
           teamStats={teamStats}
         />
       )}
-    </div>}
+    </div>
     </div>
   );
 }
