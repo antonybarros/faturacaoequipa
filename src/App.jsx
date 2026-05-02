@@ -212,11 +212,10 @@ function MainApp() {
   };
   const distributeEqually = () =>
     save((prev) => {
-      const each = Math.round((Number(prev.totalGoal) || 0) / TEAMS.length);
-      return {
-        ...prev,
-        teamGoals: { PT: each, IT: each, ES: each, FR: each, "CH-BNL-DEAT": each, CZ: each, USA: each, OT: each },
-      };
+      const each = Math.round((Number(prev.totalGoal) || 0) / (ANALISE_TEAMS.length - 1)); // excl. total
+      const goals = {};
+      ANALISE_TEAMS.filter(t => t.id !== "total").forEach(t => { goals[t.id] = each; });
+      return { ...prev, teamGoals: goals };
     });
 
   const saveAnnualGoal = async (val) => {
@@ -588,8 +587,8 @@ function computeTeamScopeStats(data, teamDef, totalDays, closedDay, year, month)
   }
   const markets = teamDef.markets;
 
-  // Goal = soma dos objetivos dos mercados da equipa
-  const goal = markets.reduce((s, m) => s + (Number(data.teamGoals[m]) || 0), 0);
+  // Goal = objetivo definido para a equipa
+  const goal = Number(data.teamGoals[teamDef.id]) || 0;
   const dailyAvg = totalDays > 0 ? Math.round(goal / totalDays) : 0;
 
   const daily = [];
@@ -1756,27 +1755,22 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
 }
 
 function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal, saveAnnualGoal, year }) {
-  const sumTeams = TEAMS.reduce(
-    (s, t) => s + (Number(data.teamGoals[t]) || 0),
-    0
-  );
+  const equipas = ANALISE_TEAMS.filter(t => t.id !== "total");
+  const sumEquipas = equipas.reduce((s, t) => s + (Number(data.teamGoals[t.id]) || 0), 0);
   const totalGoal = Number(data.totalGoal) || 0;
-  const diff = totalGoal - sumTeams;
+  const diff = totalGoal - sumEquipas;
   const [annualInput, setAnnualInput] = useState(annualGoal || "");
 
-  // Sync input when annualGoal loads
   React.useEffect(() => { setAnnualInput(annualGoal || ""); }, [annualGoal]);
 
   return (
     <div className="space-y-4">
-      {/* Annual goal */}
+      {/* Objetivo anual */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
           <Target className="w-4 h-4" /> Objetivo anual — {year}
         </h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Objetivo total de faturação para o ano {year}.
-        </p>
+        <p className="text-xs text-slate-500 mt-1">Objetivo total de faturação para o ano {year}.</p>
         <div className="mt-3 flex items-center gap-2">
           <span className="text-slate-500">€</span>
           <input
@@ -1790,65 +1784,59 @@ function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal,
         </div>
       </div>
 
+      {/* Objetivo total do mês */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-          <Target className="w-4 h-4" /> Objetivo geral do mês
+          <Target className="w-4 h-4" /> Objetivo total do mês
         </h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Definido pelo team leader. Inclui todos os mercados (mesmo os que
-          não são analisados aqui).
-        </p>
+        <p className="text-xs text-slate-500 mt-1">Soma de todas as equipas. Usado no sub-tab "Total".</p>
         <div className="mt-3 flex items-center gap-2">
           <span className="text-slate-500">€</span>
           <input
             type="number"
             value={data.totalGoal || ""}
             onChange={(e) => setTotalGoal(e.target.value)}
-            placeholder="90000"
+            placeholder="ex: 1300000"
             className="flex-1 max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-lg font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
       </div>
 
+      {/* Objetivos por equipa */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
           <div>
-            <h3 className="font-semibold text-slate-900">
-              Objetivos por equipa (PT, IT, ES, FR)
-            </h3>
+            <h3 className="font-semibold text-slate-900">Objetivos por equipa</h3>
             <p className="text-xs text-slate-500 mt-1">
-              A soma destas 4 equipas pode ser inferior ao objetivo total — a
-              diferença corresponde às outras equipas não analisadas.
+              Equipa PT = Portugal + Outros · Equipa FR = França + CH-BNL-DEAT · Equipa NA = Chéquia + USA
             </p>
           </div>
           <button
             onClick={distributeEqually}
             className="text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
           >
-            Distribuir total / 4
+            Distribuir igualmente (÷5)
           </button>
         </div>
 
-        <div className="mt-4 grid sm:grid-cols-2 gap-3">
-          {TEAMS.map((t) => (
-            <div
-              key={t}
-              className="flex items-center gap-3 border border-slate-200 rounded-lg p-3"
-            >
+        <div className="grid sm:grid-cols-2 gap-3">
+          {equipas.map((t) => (
+            <div key={t.id} className="flex items-center gap-3 border border-slate-200 rounded-lg p-3">
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white"
-                style={{ backgroundColor: TEAM_COLORS[t] }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white text-xs text-center leading-tight px-1"
+                style={{ backgroundColor: ANALISE_COLORS[t.id] }}
               >
-                {t}
+                {t.label.replace("Equipa ","")}
               </div>
               <div className="flex-1">
-                <label className="text-xs text-slate-500">Objetivo {t}</label>
-                <div className="flex items-center gap-1">
+                <label className="text-xs text-slate-500">{t.label}</label>
+                <p className="text-xs text-slate-400">{t.markets.join(" + ")}</p>
+                <div className="flex items-center gap-1 mt-1">
                   <span className="text-slate-400 text-sm">€</span>
                   <input
                     type="number"
-                    value={data.teamGoals[t] || ""}
-                    onChange={(e) => setTeamGoal(t, e.target.value)}
+                    value={data.teamGoals[t.id] || ""}
+                    onChange={(e) => setTeamGoal(t.id, e.target.value)}
                     placeholder="0"
                     className="w-full px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
@@ -1859,15 +1847,11 @@ function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal,
         </div>
 
         <div className="mt-4 p-3 rounded-lg text-sm bg-slate-50 border border-slate-200 flex items-center justify-between flex-wrap gap-2">
-          <span>
-            Soma das 4 equipas: <strong>{fmtEur(sumTeams)}</strong>
-          </span>
-          <span>
-            Objetivo total: <strong>{fmtEur(totalGoal)}</strong>
-          </span>
-          {totalGoal > 0 && (
-            <span className="text-slate-600">
-              Outras equipas: <strong>{fmtEur(Math.max(diff, 0))}</strong>
+          <span>Soma das equipas: <strong>{fmtEur(sumEquipas)}</strong></span>
+          <span>Objetivo total: <strong>{fmtEur(totalGoal)}</strong></span>
+          {totalGoal > 0 && Math.abs(diff) > 0 && (
+            <span className={diff < 0 ? "text-red-600" : "text-slate-600"}>
+              Diferença: <strong>{diff > 0 ? "+" : ""}{fmtEur(diff)}</strong>
             </span>
           )}
         </div>
