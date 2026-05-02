@@ -21,6 +21,20 @@ const SCOPES = [
   { id: "USA", label: "USA" },
   { id: "OT", label: "Outros" },
 ];
+// Equipas para "Análise comercial" — cada equipa agrega vários mercados
+const ANALISE_TEAMS = [
+  { id: "total",      label: "Total",      markets: ["PT","IT","ES","FR","CH-BNL-DEAT","CZ","USA","OT"] },
+  { id: "equipa_pt",  label: "Equipa PT",  markets: ["PT","OT"] },
+  { id: "equipa_it",  label: "Equipa IT",  markets: ["IT"] },
+  { id: "equipa_es",  label: "Equipa ES",  markets: ["ES"] },
+  { id: "equipa_fr",  label: "Equipa FR",  markets: ["FR","CH-BNL-DEAT"] },
+  { id: "equipa_na",  label: "Equipa NA",  markets: ["CZ","USA"] },
+];
+const ANALISE_COLORS = {
+  total: "#0f172a", equipa_pt: "#16a34a", equipa_it: "#2563eb",
+  equipa_es: "#dc2626", equipa_fr: "#9333ea", equipa_na: "#0891b2",
+};
+
 const TEAM_COLORS = {
   PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
   FR: "#9333ea", "CH-BNL-DEAT": "#d97706",
@@ -57,6 +71,7 @@ function MainApp() {
   const [data, setData] = useState(emptyMonth());
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("analise");
+  const [analiseScope, setAnaliseScope] = useState("total");
   const [scope, setScope] = useState("total");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
@@ -335,7 +350,20 @@ function MainApp() {
           <div className="text-center py-12 text-slate-500">A carregar…</div>
         ) : (
           <>
-            {(tab === "analise" || tab === "dashboard") && (
+            {tab === "analise" && (
+              <AnaliseDashboardWrapper
+                data={data}
+                totalDays={totalDays}
+                closedDay={closedDay}
+                month={MONTH_NAMES[month]}
+                monthNum={month}
+                year={year}
+                scope={analiseScope}
+                setScope={setAnaliseScope}
+                isCurrentMonth={isCurrentMonth}
+              />
+            )}
+            {tab === "dashboard" && (
               <DashboardWrapper
                 data={data}
                 totalDays={totalDays}
@@ -346,7 +374,6 @@ function MainApp() {
                 scope={scope}
                 setScope={setScope}
                 isCurrentMonth={isCurrentMonth}
-                tabLabel={tab === "analise" ? "Análise comercial" : "Revenda"}
               />
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
@@ -552,6 +579,162 @@ function computeScopeStats(data, scope, totalDays, closedDay, year, month) {
     avgWithoutSuper, hasSuperDays, projectionWithoutSuper,
     nonSuperCount, nonSuperTotalDays, superDaysCount, superDaysTotal,
   };
+}
+
+// Agrega múltiplos mercados num único scope virtual para Análise comercial
+function computeTeamScopeStats(data, teamDef, totalDays, closedDay, year, month) {
+  if (teamDef.id === "total") {
+    return computeScopeStats(data, "total", totalDays, closedDay, year, month);
+  }
+  const markets = teamDef.markets;
+
+  // Goal = soma dos objetivos dos mercados da equipa
+  const goal = markets.reduce((s, m) => s + (Number(data.teamGoals[m]) || 0), 0);
+  const dailyAvg = totalDays > 0 ? Math.round(goal / totalDays) : 0;
+
+  const daily = [];
+  let lastCumulativeByMkt = {};
+  markets.forEach(m => { lastCumulativeByMkt[m] = 0; });
+
+  for (let d = 1; d <= totalDays; d++) {
+    const entry = data.entries[d] || {};
+    let dayCumulative = 0;
+    let anyValue = false;
+    markets.forEach(m => {
+      const raw = entry[m];
+      const hasValue = raw !== undefined && raw !== "" && raw !== null && !Number.isNaN(Number(raw));
+      if (hasValue) {
+        lastCumulativeByMkt[m] = Number(raw);
+        anyValue = true;
+      }
+      dayCumulative += lastCumulativeByMkt[m];
+    });
+    const prevDayEntry = daily[d - 2];
+    const prevCumulative = prevDayEntry ? prevDayEntry._cumRaw : 0;
+    daily.push({
+      day: d,
+      value: dayCumulative - prevCumulative,
+      cumulative: anyValue ? dayCumulative : null,
+      _cumRaw: dayCumulative,
+      expected: dailyAvg * d,
+      supersales: entry.supersales === true,
+      weekday: year && month !== undefined ? new Date(year, month, d).getDay() : undefined,
+    });
+  }
+
+  let actual = 0;
+  let lastHasValue = 0;
+  for (let d = 1; d <= closedDay; d++) {
+    if (daily[d-1].cumulative !== null) actual = daily[d-1].cumulative;
+  }
+
+  const expectedToDate = dailyAvg * closedDay;
+  const diff = actual - expectedToDate;
+  const pctOfGoal = goal > 0 ? (actual / goal) * 100 : 0;
+  const pctVsExpected = expectedToDate > 0 ? (actual / expectedToDate) * 100 : 0;
+  const avgSoFar = closedDay > 0 ? actual / closedDay : 0;
+  const projection = avgSoFar * totalDays;
+  const remainingDays = totalDays - closedDay;
+  const remaining = goal - actual;
+  const neededPerDay = remainingDays > 0 ? Math.ceil(remaining / remainingDays) : 0;
+
+  let nonSuperTotal = 0, nonSuperCount = 0, superDaysCount = 0, superDaysTotal = 0;
+  for (let d = 1; d <= closedDay; d++) {
+    const entry = daily[d - 1];
+    if (entry.supersales) { superDaysCount++; superDaysTotal += entry.value; }
+    else if (entry.cumulative !== null) { nonSuperTotal += entry.value; nonSuperCount++; }
+  }
+  const avgWithoutSuper = nonSuperCount > 0 ? Math.round(nonSuperTotal / nonSuperCount) : 0;
+  const hasSuperDays = superDaysCount > 0;
+  const nonSuperTotalDays = totalDays - superDaysCount;
+  const projectionWithoutSuper = avgWithoutSuper > 0
+    ? avgWithoutSuper * nonSuperTotalDays + superDaysTotal : projection;
+
+  return {
+    goal, dailyAvg, actual, expectedToDate, diff,
+    pctOfGoal, pctVsExpected, projection, daily,
+    remainingDays, remaining, neededPerDay,
+    avgWithoutSuper, hasSuperDays, projectionWithoutSuper,
+    nonSuperCount, nonSuperTotalDays, superDaysCount, superDaysTotal,
+  };
+}
+
+function AnaliseScopeTabs({ scope, setScope }) {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
+      {ANALISE_TEAMS.map((s) => {
+        const active = scope === s.id;
+        const color = ANALISE_COLORS[s.id];
+        return (
+          <button
+            key={s.id}
+            onClick={() => setScope(s.id)}
+            className={`flex-1 min-w-[80px] px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+              active ? "text-white" : "text-slate-600 hover:bg-slate-100"
+            }`}
+            style={active ? { backgroundColor: color } : undefined}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnaliseDashboardWrapper({
+  data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
+}) {
+  const teamDef = ANALISE_TEAMS.find(t => t.id === scope) || ANALISE_TEAMS[0];
+
+  const stats = useMemo(
+    () => computeTeamScopeStats(data, teamDef, totalDays, closedDay, year, monthNum),
+    [data, teamDef, totalDays, closedDay, year, monthNum]
+  );
+
+  // Team stats for breakdown — one per equipa (excluding total)
+  const teamStats = useMemo(
+    () => ANALISE_TEAMS.filter(t => t.id !== "total").map(t => ({
+      team: t.label,
+      ...computeTeamScopeStats(data, t, totalDays, closedDay, year, monthNum),
+    })),
+    [data, totalDays, closedDay, year, monthNum]
+  );
+
+  if (stats.goal === 0) {
+    return (
+      <>
+        <AnaliseScopeTabs scope={scope} setScope={setScope} />
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center mt-4">
+          <Target className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <h3 className="font-semibold text-slate-900">
+            {scope === "total"
+              ? "Sem objetivo total definido para este mês"
+              : `Sem objetivo definido para ${teamDef.label}`}
+          </h3>
+          <p className="text-sm text-slate-600 mt-1">
+            O administrador ainda não configurou este âmbito.
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <AnaliseScopeTabs scope={scope} setScope={setScope} />
+      <Dashboard
+        stats={stats}
+        scope={teamDef.label}
+        month={month}
+        year={year}
+        totalDays={totalDays}
+        closedDay={closedDay}
+        isCurrentMonth={isCurrentMonth}
+        teamStats={teamStats}
+      />
+    </div>
+  );
 }
 
 function DashboardWrapper({
@@ -2794,8 +2977,8 @@ function Relatorio({ monthNum, year }) {
         <>
           <MCCard title="Afiliação — Resultados mensais">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <MCField label={`Objetivo ${year} (€) ✦`} value={String(afil.objective)} onChange={v=>setAfil(p=>({...p,objective:v}))} />
               <MCField label={`Resultado ${year-1} (€)`} value={afil.prev_year} onChange={v=>setAfil(p=>({...p,prev_year:v}))} />
+              <MCField label={`Objetivo ${year} (€) ✦`} value={String(afil.objective)} onChange={v=>setAfil(p=>({...p,objective:v}))} />
               <MCField label={`Resultado ${year} (€) ✦`} value={String(afil.result)} onChange={v=>setAfil(p=>({...p,result:v}))} />
             </div>
           </MCCard>
