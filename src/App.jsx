@@ -3035,24 +3035,21 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Afiliação — Resultados globais">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
+        <div className="grid grid-cols-3 gap-3">
           <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => upField(p => ({...p, afil_prev: v}))} />
+          <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
           <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => upField(p => ({...p, afil_result: v}))} />
         </div>
       </MCCard>
 
-      <MCCard title="Afiliação — Por mercado">
-        {MC_MARKETS.map(m => (
-          <div key={m.code} className="mb-4">
-            <p className="text-sm font-semibold text-slate-700 mb-2">{m.name}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
-              <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
-            </div>
+      {MC_MARKETS.map(m => (
+        <MCCard key={m.code} title={m.name} accent="text-orange-600">
+          <div className="grid grid-cols-2 gap-3">
+            <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
+            <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
           </div>
-        ))}
-      </MCCard>
+        </MCCard>
+      ))}
     </div>
   );
 }
@@ -3182,9 +3179,15 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
-          <div className="grid grid-cols-2 gap-3">
-            <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
-            <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-3">
+              <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
+              <MCField label={`Novos parceiros ${year-1}`} value={data.markets[m.code]?.partners_prev||""} onChange={v => upMkt(m.code,"partners_prev",v)} />
+            </div>
+            <div className="flex flex-col gap-3">
+              <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
+              <MCField label={`Novos parceiros ${year}`} value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
+            </div>
           </div>
         </MCCard>
       ))}
@@ -4052,12 +4055,10 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
         </div>
       </MCCard>
 
-      <MCCard title="Margem por mercado">
-        {MC_MARKETS.map(m => (
-          <div key={m.code} className="mb-4">
-            <p className="text-sm font-semibold text-slate-700 mb-2">{m.name}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
+      {MC_MARKETS.map(m => (
+        <MCCard key={m.code} title={m.name} accent="text-green-700">
+          <div className="grid grid-cols-2 gap-3">
+            <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
               <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
             </div>
           </div>
