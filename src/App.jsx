@@ -3202,6 +3202,8 @@ function Relatorio({ monthNum, year }) {
   const [step, setStep] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [closingCurr, setClosingCurr] = useState(null);
+  const [closingPrev, setClosingPrev] = useState(null);
 
   // All form state
   const [rev, setRev] = useState({
@@ -3335,6 +3337,10 @@ function Relatorio({ monthNum, year }) {
           prev: closing.programs[p]?.prev || "",
         }])));
       }
+
+      // Load closing data for margin/orders in PPTX
+      loadClosing(year, monthNum).then(setClosingCurr);
+      loadClosing(year - 1, monthNum).then(setClosingPrev);
 
       setLoading(false);
     })();
