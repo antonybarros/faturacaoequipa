@@ -3407,7 +3407,7 @@ function Relatorio({ monthNum, year }) {
     setGenerating(true);
     await saveDraft(); // auto-save before generating
     try {
-      const { default: PptxGenJS } = await import("https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js");
+      const PptxGenJS = (await import("pptxgenjs")).default;
       const prs = new PptxGenJS();
       prs.layout = "LAYOUT_WIDE";
       prs.title = `Apresentação de Resultados – ${MC_MONTHS_PT[monthNum+1]} ${year}`;
