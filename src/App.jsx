@@ -797,8 +797,8 @@ function AnaliseDashboardWrapper({
 function DashboardWrapper({
   data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
 }) {
-  // From May 2026 onwards, use Registo Revenda (daily values) as data source
-  const useRevendaReg = (year > 2026) || (year === 2026 && monthNum >= 4);
+  // From January 2025 onwards, use Registo Revenda (daily values) as data source
+  const useRevendaReg = year >= 2025;
   const revendaKey = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
 
   const [revendaEntries, setRevendaEntries] = useState(null);
@@ -832,7 +832,7 @@ function DashboardWrapper({
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
     // Prev year billing — also try revenda-daily for prev year if applicable
-    const prevUseReg = (year - 1 > 2026) || (year - 1 === 2026 && monthNum >= 4);
+    const prevUseReg = (year - 1) >= 2025;
     const prevDataKey = prevUseReg
       ? `revenda-daily-${year - 1}-${String(monthNum + 1).padStart(2, "0")}`
       : prevKey;
@@ -1722,59 +1722,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           );
         })()}
 
-        {/* Gráfico acumulado */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="font-semibold text-slate-900 mb-4">
-            Evolução acumulada — {scopeLabel}
-          </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={daily}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v) => fmtEur(v)} labelFormatter={(l) => {
-                  const e = daily.find(x => x.day === l);
-                  return `Dia ${l}${e?.supersales ? " · Supersales" : ""}`;
-                }} />
-                <Legend />
-                {daily.filter(d => d.supersales).map(d => (
-                  <ReferenceLine key={`ss-${d.day}`} x={d.day} stroke="#f59e0b" strokeWidth={2} strokeDasharray="2 2" ifOverflow="extendDomain" />
-                ))}
-                <Line type="monotone" dataKey="expected" name="Esperado" stroke="#94a3b8" strokeDasharray="5 5" dot={false} />
-                <Line type="monotone" dataKey="cumulative" name="Acumulado real" stroke={color} strokeWidth={2} connectNulls
-                  dot={(props) => {
-                    const { cx, cy, payload, index } = props;
-                    if (cy == null || cx == null) return null;
-                    return payload.supersales
-                      ? <circle key={`dot-${index}`} cx={cx} cy={cy} r={6} fill="#f59e0b" stroke="#fff" strokeWidth={2} />
-                      : <circle key={`dot-${index}`} cx={cx} cy={cy} r={3} fill={color} />;
-                  }}
-                />
-                {closedDay > 0 && closedDay < totalDays && (
-                  <ReferenceLine x={closedDay} stroke="#dc2626" strokeDasharray="3 3"
-                    label={{ value: "Último fechado", fontSize: 11, fill: "#dc2626" }} />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          {daily.some(d => d.supersales) && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-              <span className="inline-block w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-1 ring-amber-500" />
-              Dia de Supersales (campanha de descontos)
-            </div>
-          )}
-        </div>
-
-        <ProjectionAccordion
-          projection={projection} projectionWithoutSuper={projectionWithoutSuper}
-          goal={goal} closedDay={closedDay} totalDays={totalDays} dailyAvg={dailyAvg}
-          actual={actual} daily={daily} hasSuperDays={hasSuperDays}
-          avgWithoutSuper={avgWithoutSuper} nonSuperCount={nonSuperCount}
-          nonSuperTotalDays={nonSuperTotalDays} superDaysCount={superDaysCount}
-          superDaysTotal={superDaysTotal}
-        />
-
         {modal && (
           <DailyModal mode={modal} daily={daily} closedDay={closedDay} goal={goal}
             dailyAvg={dailyAvg} scope={scope} onClose={() => setModal(null)} />
@@ -2421,7 +2368,9 @@ function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
+            <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}
+            <span className="ml-2 text-xs font-normal text-slate-400">→ alimenta o separador <span className="text-blue-700 font-semibold">Revenda</span></span>
+          </h3>
             <p className="text-xs text-slate-500 mt-1">
               Insere o <strong>total mensal</strong> de faturação por mercado para {year}. Guardado automaticamente.
             </p>
