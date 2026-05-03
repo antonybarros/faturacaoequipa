@@ -894,16 +894,28 @@ function DashboardWrapper({
   const leadsPrev     = sumField(closingPrev, "leads_curr");
   // Afiliação
   const afilCurr = (() => {
-    if (!closingCurr?.markets) return null;
-    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-    const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_result)||0), 0);
-    return t > 0 ? t : null;
+    if (!closingCurr) return null;
+    // Try per-market sum first
+    if (closingCurr.markets) {
+      const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+      const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_result)||0), 0);
+      if (t > 0) return t;
+    }
+    // Fallback: global afil_result field
+    const global = parseFloat(closingCurr.afil_result);
+    return global > 0 ? global : null;
   })();
   const afilPrev = (() => {
-    if (!closingPrev?.markets) return null;
-    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-    const t = markets.reduce((s,m) => s + (parseFloat(closingPrev.markets[m]?.afil_result)||0), 0);
-    return t > 0 ? t : null;
+    if (!closingCurr) return null; // prev year stored in current closing as afil_prev
+    // Try per-market afil_prev
+    if (closingCurr.markets) {
+      const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+      const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_prev)||0), 0);
+      if (t > 0) return t;
+    }
+    // Fallback: global afil_prev field
+    const global = parseFloat(closingCurr.afil_prev);
+    return global > 0 ? global : null;
   })();
 
   // Fallback: if billing data is empty, try to read total from Registo Revenda closing
@@ -1573,7 +1585,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
   const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
   const COLORS_AFIL = ["#7C3AED","#6D28D9","#A78BFA","#C4B5FD","#8B5CF6","#DDD6FE","#4C1D95","#EDE9FE"];
   const revendaByMkt = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:getLastMktVal(m.code)})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
-  const afilByMkt    = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:Number(closingCurr?.markets?.[m.code]?.afil_result)||0})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
+  const afilByMkt    = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:Number(closingCurr?.markets?.[m.code]?.afil_result||closingCurr?.markets?.[m.code]?.afil_curr)||0})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
 
   return (
     <>
@@ -1692,7 +1704,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
       {/* ── CARD: AFILIAÇÃO ── */}
       {afilCurr != null && (
-        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0} objective={0}>
+        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
+          objective={parseFloat(closingCurr?.afil_objective)||0}>
           {afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
           )}
