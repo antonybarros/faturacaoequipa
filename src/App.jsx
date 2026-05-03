@@ -932,104 +932,6 @@ function DashboardWrapper({
         </div>
       )}
 
-      {/* Faturação — Revenda (card completo tipo template) */}
-      {(() => {
-        const result  = stats.actual;
-        const prev    = prevYearActual;
-        const obj     = stats.goal;
-        const evoPct2 = prev > 0 ? ((result - prev) / prev * 100) : null;
-        const evoAbs2 = prev != null ? result - prev : null;
-        const aboveObj = obj > 0 ? result - obj : null;
-        const pctObj   = obj > 0 ? (result / obj * 100) : null;
-        const pos = evoPct2 != null && evoPct2 >= 0;
-        const clampPct = pctObj != null ? Math.min(pctObj / 100, 1) : 0;
-        const excessPct = pctObj != null ? Math.max(0, pctObj / 100 - 1) : 0;
-        const scopeLabel2 = scope === "total" ? "Total" : SCOPES.find(s=>s.id===scope)?.label || scope;
-        return (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">FATURAÇÃO — REVENDA</h2>
-            <p className="text-sm font-semibold text-slate-500 -mt-3">{month} {year} – em comparação ao ano anterior · {scopeLabel2}</p>
-
-            {/* 3 KPI cards */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">RESULTADO {month.toUpperCase()} {year-1}</p>
-                <p className="text-2xl font-bold text-slate-700">{prev != null ? fmtEur(prev) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
-              </div>
-              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">OBJETIVO {month.toUpperCase()} {year}</p>
-                <p className="text-2xl font-bold text-emerald-600">{obj > 0 ? fmtEur(obj) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
-                {obj > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{((obj-prev)/prev*100).toFixed(2)}% vs resultado {month.toLowerCase()} {year-1}</p>}
-              </div>
-              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 ring-2 ring-emerald-400">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">RESULTADO {month.toUpperCase()} {year}</p>
-                <p className="text-3xl font-bold text-emerald-700">{result > 0 ? fmtEur(result) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
-                {evoPct2 != null && <p className="text-sm font-bold text-emerald-700 mt-1">{pos?"+":""}{evoPct2.toFixed(2)}% vs {year-1}</p>}
-              </div>
-            </div>
-
-            {/* Detalhe row */}
-            <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">DETALHE DO RESULTADO</p>
-              <div className="grid grid-cols-4 gap-0 divide-x divide-slate-200">
-                {[
-                  {label:"Evolução vs "+(year-1), val: evoPct2!=null?`${pos?"+":""}${evoPct2.toFixed(2)}%`:"—", color: pos?"text-emerald-600":"text-red-600"},
-                  {label:"Ganho absoluto",         val: evoAbs2!=null?`${evoAbs2>=0?"+":""}${fmtEur(evoAbs2)}`:"—", color:"text-slate-900"},
-                  {label:"Acima do objetivo",      val: aboveObj!=null?fmtEur(aboveObj):"—", color:"text-emerald-600"},
-                  {label:"% do objetivo",          val: pctObj!=null?`${pctObj.toFixed(2)}%`:"—", color:"text-emerald-600"},
-                ].map((d,i) => (
-                  <div key={i} className="px-4 first:pl-0 last:pr-0">
-                    <p className="text-xs text-slate-500 mb-1">{d.label}</p>
-                    <p className={`text-xl font-bold ${d.color}`}>{d.val}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            {obj > 0 && result > 0 && (
-              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">CONCRETIZAÇÃO DO OBJETIVO</p>
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                  <span>0 €</span>
-                  <span>Objetivo: {fmtEur(obj)}{aboveObj > 0 ? ` +${fmtEur(aboveObj)}` : ""}</span>
-                </div>
-                {/* Bar — uses a flex row so widths are relative to each other */}
-                <div className="relative h-7 rounded-full overflow-hidden flex">
-                  {/* Main bar up to 100% of objective */}
-                  <div className="h-full bg-emerald-600" style={{width:`${(clampPct*100).toFixed(2)}%`, minWidth: clampPct>0?"4px":"0"}}/>
-                  {/* Excess bar beyond objective */}
-                  {excessPct > 0 && (
-                    <div className="h-full bg-emerald-300" style={{width:`${(excessPct*100).toFixed(2)}%`, minWidth:"4px"}}/>
-                  )}
-                  {/* Remaining unfilled */}
-                  <div className="h-full bg-slate-200 flex-1"/>
-                  {/* Objective line — positioned absolutely */}
-                  <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10"
-                    style={{left:`${(clampPct*100).toFixed(2)}%`}}/>
-                </div>
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                    <p className="text-xs text-slate-500">% do objetivo</p>
-                    <p className="text-2xl font-bold text-emerald-700">{pctObj.toFixed(2)}%</p>
-                  </div>
-                  {aboveObj > 0 && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5 text-xs font-bold text-emerald-700">
-                      ✓ +{fmtEur(aboveObj)} acima do objetivo
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500 flex-wrap">
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>Realizado até objetivo ({fmtEur(obj)})</span>
-                  {excessPct > 0 && <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-300"/>Excedente (+{fmtEur(aboveObj)})</span>}
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-0.5 h-3 bg-slate-900"/>Linha de objetivo</span>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       <RevDashboard
         stats={stats}
         scope={scope}
@@ -1518,465 +1420,410 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     })();
   }, [year, scope]);
 
-  function YoYCard({ title, curr, prev, isEur = true, isPct = false }) {
-    const fmt = v => v == null ? "—" : isPct ? `${v.toFixed(2)}%` : isEur ? fmtEur(v) : String(Math.round(v));
-    const evo = (prev > 0 && curr != null) ? ((curr - prev) / prev * 100) : null;
-    const diff = (curr != null && prev != null) ? curr - prev : null;
-    const pos = evo != null && evo >= 0;
-    const diffLabel = isPct
-      ? (diff != null ? `${diff >= 0 ? "+" : ""}${diff.toFixed(2)}pp` : "—")
-      : isEur
-        ? (diff != null ? `${diff >= 0 ? "+" : ""}${fmtEur(diff)}` : "—")
-        : (diff != null ? `${diff >= 0 ? "+" : ""}${Math.round(diff)}` : "—");
+  // ── Design helpers ──────────────────────────────────────────────────────────
+  const DS = {
+    card: "bg-white rounded-2xl border border-slate-200 p-5 space-y-4",
+    title: "text-2xl font-bold text-slate-900 tracking-tight",
+    subtitle: "text-sm font-semibold text-slate-500",
+    kpiBox: "bg-emerald-50 rounded-2xl p-4 border border-emerald-100",
+    kpiBoxHL: "bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-400",
+    kpiLabel: "text-xs text-slate-500 uppercase tracking-wide mb-2",
+    kpiVal: "text-2xl font-bold text-slate-700",
+    kpiValGreen: "text-2xl font-bold text-emerald-700",
+    kpiValBig: "text-3xl font-bold text-emerald-700",
+    detailBox: "bg-slate-50 rounded-xl border border-slate-200 p-4",
+    detailLabel: "text-xs font-bold text-slate-400 uppercase tracking-widest mb-3",
+    divider: "divide-x divide-slate-200",
+    col: "px-4 first:pl-0 last:pr-0",
+    tag: "text-xs text-slate-500",
+    val: "text-xl font-bold",
+  };
+
+  function BigCard({ name, result, prev, objective, children }) {
+    const evoPct = prev > 0 ? ((result - prev) / prev * 100) : null;
+    const evoAbs = prev != null ? result - prev : null;
+    const aboveObj = objective > 0 ? result - objective : null;
+    const pctObj   = objective > 0 ? (result / objective * 100) : null;
+    const pos = evoPct != null && evoPct >= 0;
+    const clampPct  = pctObj != null ? Math.min(pctObj / 100, 1) : 0;
+    const excessPct = pctObj != null ? Math.max(0, pctObj / 100 - 1) : 0;
+    const fmtE = v => v != null ? fmtEur(v) : "—";
+    const fmtP = (v, sign=false) => v == null ? "—" : `${sign&&v>=0?"+":""}${v.toFixed(2)}%`;
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">{title}</p>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <p className="text-xs text-slate-400 mb-1">{year - 1}</p>
-            <p className="text-base font-semibold text-slate-600">{fmt(prev)}</p>
+      <div className={DS.card}>
+        <div>
+          <h2 className={DS.title}>{name}</h2>
+          <p className={DS.subtitle}>{month} {year} – em comparação ao ano anterior · {scopeLabel}</p>
+        </div>
+        {/* 3 KPI cards */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className={DS.kpiBox}>
+            <p className={DS.kpiLabel}>RESULTADO {month.toUpperCase()} {year-1}</p>
+            <p className={DS.kpiVal}>{prev > 0 ? fmtE(prev) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-400 mb-1">{year}</p>
-            <p className="text-lg font-bold text-slate-900">{fmt(curr)}</p>
+          <div className={DS.kpiBox}>
+            <p className={DS.kpiLabel}>OBJETIVO {month.toUpperCase()} {year}</p>
+            <p className="text-2xl font-bold text-emerald-600">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
+            {objective > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{fmtP((objective-prev)/prev*100,true)} vs {month.toLowerCase()} {year-1}</p>}
           </div>
-          <div>
-            <p className="text-xs text-slate-400 mb-1">Evolução</p>
-            <p className={`text-sm font-bold ${evo == null ? "text-slate-400" : pos ? "text-green-600" : "text-red-600"}`}>
-              {evo == null ? "—" : `${pos ? "+" : ""}${evo.toFixed(1)}%`}
-            </p>
-            <p className={`text-xs ${diff == null ? "text-slate-400" : pos ? "text-green-600" : "text-red-600"}`}>
-              {diffLabel}
-            </p>
+          <div className={DS.kpiBoxHL}>
+            <p className={DS.kpiLabel}>RESULTADO {month.toUpperCase()} {year}</p>
+            <p className={DS.kpiValBig}>{result > 0 ? fmtE(result) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
+            {evoPct != null && <p className="text-sm font-bold text-emerald-700 mt-1">{fmtP(evoPct,true)} vs {year-1}</p>}
+          </div>
+        </div>
+        {/* Detail row */}
+        <div className={DS.detailBox}>
+          <p className={DS.detailLabel}>DETALHE DO RESULTADO</p>
+          <div className={`grid grid-cols-4 gap-0 ${DS.divider}`}>
+            {[
+              {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
+              {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
+              {label:"Acima do objetivo",      val: aboveObj!=null?fmtE(aboveObj):"—", color:"text-emerald-600"},
+              {label:"% do objetivo",          val: pctObj!=null?fmtP(pctObj):"—", color:"text-emerald-600"},
+            ].map((d,i) => (
+              <div key={i} className={DS.col}>
+                <p className="text-xs text-slate-500 mb-1">{d.label}</p>
+                <p className={`text-xl font-bold ${d.color}`}>{d.val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Progress bar */}
+        {objective > 0 && result > 0 && (
+          <div className={DS.detailBox}>
+            <p className={DS.detailLabel}>CONCRETIZAÇÃO DO OBJETIVO</p>
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span>0 €</span>
+              <span>Objetivo: {fmtE(objective)}{aboveObj > 0 ? ` +${fmtE(aboveObj)}` : ""}</span>
+            </div>
+            <div className="relative h-7 rounded-full overflow-hidden flex">
+              <div className="h-full bg-emerald-600" style={{width:`${(clampPct*100).toFixed(2)}%`,minWidth:clampPct>0?"4px":"0"}}/>
+              {excessPct > 0 && <div className="h-full bg-emerald-300" style={{width:`${(excessPct*100).toFixed(2)}%`,minWidth:"4px"}}/>}
+              <div className="h-full bg-slate-200 flex-1"/>
+              <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10" style={{left:`${(clampPct*100).toFixed(2)}%`}}/>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <div>
+                <p className="text-xs text-slate-500">% do objetivo</p>
+                <p className="text-2xl font-bold text-emerald-700">{pctObj!=null?fmtP(pctObj):"—"}</p>
+              </div>
+              {aboveObj > 0 && <div className="bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5 text-xs font-bold text-emerald-700">✓ +{fmtE(aboveObj)} acima do objetivo</div>}
+            </div>
+            <div className="flex items-center gap-5 mt-2 text-xs text-slate-500 flex-wrap">
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>Realizado até objetivo ({fmtE(objective)})</span>
+              {excessPct > 0 && <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-300"/>Excedente (+{fmtE(aboveObj)})</span>}
+              <span className="flex items-center gap-1.5"><span className="inline-block w-0.5 h-3 bg-slate-900"/>Linha de objetivo</span>
+            </div>
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  // ── Market distribution donut (inline) ─────────────────────────────────────
+  function MktDonut({ data, colors, title }) {
+    if (!data.length) return null;
+    const total = data.reduce((s,d)=>s+d.val,0);
+    if (!total) return null;
+    const size=180, cx=90, cy=90, r=68, ri=38;
+    let a=-Math.PI/2;
+    const slices = data.map((d,i)=>{
+      const angle=(d.val/total)*2*Math.PI, ea=a+angle;
+      const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
+      a=ea; return {...d,path,pct:(d.val/total*100).toFixed(1),color:colors[i%colors.length]};
+    });
+    return (
+      <div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{title}</p>
+        <div className="flex items-center gap-4">
+          <svg width={size} height={size} className="shrink-0">
+            {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
+            <text x={cx} y={cy-6} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
+            <text x={cx} y={cy+9} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">
+              {new Intl.NumberFormat("fr-FR").format(Math.round(total/1000))}k€
+            </text>
+          </svg>
+          <div className="flex-1 space-y-1.5">
+            {slices.map((s,i)=>(
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{backgroundColor:s.color}}/>
+                <span className="w-20 text-xs text-slate-600 truncate shrink-0">{s.name}</span>
+                <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+                  <div className="h-full rounded-full" style={{width:`${s.pct}%`,backgroundColor:s.color}}/>
+                </div>
+                <span className="text-xs font-bold text-slate-700 w-9 text-right shrink-0">{s.pct}%</span>
+                <span className="text-xs text-slate-400 w-20 text-right shrink-0 hidden sm:block">{new Intl.NumberFormat("fr-FR").format(Math.round(s.val))} €</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Data for charts ─────────────────────────────────────────────────────────
+  const getLastMktVal = (code) => {
+    if (!effectiveData?.entries) return 0;
+    const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    if (!days.length) return 0;
+    return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
+  };
+  const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+  const COLORS_AFIL = ["#7C3AED","#6D28D9","#A78BFA","#C4B5FD","#8B5CF6","#DDD6FE","#4C1D95","#EDE9FE"];
+  const revendaByMkt = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:getLastMktVal(m.code)})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
+  const afilByMkt    = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:Number(closingCurr?.markets?.[m.code]?.afil_result)||0})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
+
   return (
     <>
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start justify-between gap-2 text-sm">
-        <div className="flex items-start gap-2">
-          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-blue-900">
-            <strong>{scopeLabel}</strong> · {month} {year} ·{" "}
-            {noClosedDays ? "Ainda não há dias fechados para analisar." : (
-              <>Análise sobre <strong>{closedDay}</strong> {closedDay === 1 ? "dia fechado" : "dias fechados"}{" "}
-              {isCurrentMonth && "(até ontem)"} de {totalDays}.</>
-            )}
-          </div>
+      {/* Info bar */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2 text-sm">
+        <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-blue-900">
+          <strong>{scopeLabel}</strong> · {month} {year} ·{" "}
+          {noClosedDays ? "Ainda não há dias fechados para analisar." : (
+            <>Análise sobre <strong>{closedDay}</strong> {closedDay === 1 ? "dia fechado" : "dias fechados"}{" "}
+            {isCurrentMonth && "(até ontem)"} de {totalDays}.</>
+          )}
         </div>
       </div>
 
-      {(closedDay > 0 || marginCurr || ordersCurr || leadsCurr || afilCurr) && (<>
-
-        {/* Margem % — logo após Faturação vs ano anterior */}
-        <YoYCard title="Margem %" curr={marginCurr} prev={marginPrev} isEur={false} isPct={true} />
-
-        {/* 3 cards lado a lado: Média sem SS · Média com SS · % SS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Média sem Supersales */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
-              <Calendar className="w-4 h-4" />
-              Média/dia (sem SS)
-            </div>
-            <div className="mt-2 text-2xl font-bold text-slate-900">
-              {fmtEur(avgWithoutSuper)}/dia
-            </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {hasSuperDays ? "Excluindo dias de Supersales" : "Sem dias de Supersales"}
-            </div>
-          </div>
-
-          {/* Média com Supersales */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
-              <Calendar className="w-4 h-4" />
-              Média/dia (com SS)
-            </div>
-            <div className="mt-2 text-2xl font-bold text-slate-900">
-              {fmtEur(closedDay > 0 ? Math.round(actual / closedDay) : 0)}/dia
-            </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {hasSuperDays ? `Inclui ${superDaysCount} dia${superDaysCount > 1 ? "s" : ""} de Supersales` : "Sem Supersales no período"}
-            </div>
-          </div>
-
-          {/* % Supersales */}
-          <div className={`rounded-xl border p-5 ${hasSuperDays ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
-            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide ${hasSuperDays ? "text-amber-700" : "text-slate-600"}`}>
-              <TrendingUp className="w-4 h-4" />
-              % Supersales / total
-            </div>
-            <div className={`mt-2 text-2xl font-bold ${hasSuperDays ? "text-amber-800" : "text-slate-400"}`}>
-              {hasSuperDays && actual > 0 ? `${((superDaysTotal / actual) * 100).toFixed(1)}%` : "0%"}
-            </div>
-            <div className="mt-1 text-xs text-slate-600">
-              {hasSuperDays ? `${fmtEur(superDaysTotal)} em ${superDaysCount} dia${superDaysCount > 1 ? "s" : ""}` : "Sem Supersales"}
-            </div>
-          </div>
-        </div>
-
-        {/* Encomendas */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Encomendas</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-slate-400 mb-2 font-medium">Total encomendas</p>
-              <div className="grid grid-cols-3 gap-1 text-sm">
-                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{ordersPrev != null ? Math.round(ordersPrev) : "—"}</p></div>
-                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{ordersCurr != null ? Math.round(ordersCurr) : "—"}</p></div>
-                <div>
-                  <p className="text-xs text-slate-400">Evo.</p>
-                  {ordersCurr != null && ordersPrev > 0
-                    ? (() => { const e=(ordersCurr-ordersPrev)/ordersPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
-                    : <p className="text-xs text-slate-400">—</p>}
-                </div>
+      {/* ── CARD: REVENDA ── */}
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal}>
+        {/* Distribuição por mercado — dentro do card Revenda */}
+        {revendaByMkt.length > 0 && (
+          <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
+        )}
+        {/* Médias diárias */}
+        {closedDay > 0 && (
+          <div className={DS.detailBox}>
+            <p className={DS.detailLabel}>MÉDIAS DIÁRIAS</p>
+            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-500 mb-1">Média/dia (sem SS)</p>
+                <p className="text-xl font-bold text-slate-900">{fmtEur(avgWithoutSuper)}</p>
+                <p className="text-xs text-slate-400">{hasSuperDays?"excl. Supersales":"sem SS no período"}</p>
               </div>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-2 font-medium">1ªs encomendas</p>
-              <div className="grid grid-cols-3 gap-1 text-sm">
-                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{firstPrev != null ? Math.round(firstPrev) : "—"}</p></div>
-                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{firstCurr != null ? Math.round(firstCurr) : "—"}</p></div>
-                <div>
-                  <p className="text-xs text-slate-400">Evo.</p>
-                  {firstCurr != null && firstPrev > 0
-                    ? (() => { const e=(firstCurr-firstPrev)/firstPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
-                    : <p className="text-xs text-slate-400">—</p>}
-                </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-500 mb-1">Média/dia (com SS)</p>
+                <p className="text-xl font-bold text-slate-900">{fmtEur(closedDay>0?Math.round(actual/closedDay):0)}</p>
+                <p className="text-xs text-slate-400">{hasSuperDays?`${superDaysCount} dia${superDaysCount>1?"s":""} de SS`:"sem SS"}</p>
               </div>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-2 font-medium">Fat. 1ªs enc.</p>
-              <div className="grid grid-cols-3 gap-1 text-sm">
-                <div><p className="text-xs text-slate-400">{year-1}</p><p className="font-semibold text-slate-600">{firstRevPrev != null ? fmtEur(firstRevPrev) : "—"}</p></div>
-                <div><p className="text-xs text-slate-400">{year}</p><p className="font-bold text-slate-900">{firstRevCurr != null ? fmtEur(firstRevCurr) : "—"}</p></div>
-                <div>
-                  <p className="text-xs text-slate-400">Evo.</p>
-                  {firstRevCurr != null && firstRevPrev > 0
-                    ? (() => { const e=(firstRevCurr-firstRevPrev)/firstRevPrev*100; return <p className={`font-bold text-xs ${e>=0?"text-green-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>; })()
-                    : <p className="text-xs text-slate-400">—</p>}
-                </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-500 mb-1">% Supersales / total</p>
+                <p className={`text-xl font-bold ${hasSuperDays?"text-amber-700":"text-slate-400"}`}>
+                  {hasSuperDays&&actual>0?`${((superDaysTotal/actual)*100).toFixed(1)}%`:"0%"}
+                </p>
+                <p className="text-xs text-slate-400">{hasSuperDays?`${fmtEur(superDaysTotal)}`:"sem Supersales"}</p>
               </div>
             </div>
           </div>
-        </div>
+        )}
+      </BigCard>
 
-        {/* Leads / Parcerias */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Leads / Parcerias</p>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-slate-400 mb-1">{year - 1}</p>
-              <p className="text-xl font-semibold text-slate-600">
-                {leadsPrev != null ? Math.round(leadsPrev) : "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-1">{year}</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {leadsCurr != null ? Math.round(leadsCurr) : "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Evolução</p>
-              {leadsCurr != null && leadsPrev > 0 ? (() => {
-                const e = (leadsCurr - leadsPrev) / leadsPrev * 100;
-                return (
-                  <>
-                    <p className={`text-lg font-bold ${e >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {e >= 0 ? "+" : ""}{e.toFixed(1)}%
-                    </p>
-                    <p className={`text-xs ${e >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {leadsCurr - leadsPrev >= 0 ? "+" : ""}{Math.round(leadsCurr - leadsPrev)} leads
-                    </p>
-                  </>
-                );
-              })() : <p className="text-slate-400 text-sm">—</p>}
-            </div>
+      {/* ── CARD: MARGEM ── */}
+      {(marginCurr || marginPrev) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>MARGEM</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
           </div>
-        </div>
-
-        {/* Total Revenda + Afiliação */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-3">Total (Revenda + Afiliação)</p>
-          {(() => {
-            const totalCurr = actual + (afilCurr || 0);
-            const totalPrev = (prevYearActual || 0) + (afilPrev || 0);
-            const evo = totalPrev > 0 ? ((totalCurr - totalPrev) / totalPrev * 100) : null;
-            const diff = totalPrev > 0 ? totalCurr - totalPrev : null;
-            const pos = evo != null && evo >= 0;
-            return (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 mb-1">Revenda {year}</p>
-                  <p className="text-lg font-bold text-slate-700">{fmtEur(actual)}</p>
-                </div>
-                <div className="bg-purple-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 mb-1">Afiliação {year}</p>
-                  <p className="text-lg font-bold text-purple-700">{afilCurr != null ? fmtEur(afilCurr) : <span className="text-slate-400 text-sm">Sem dados</span>}</p>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <p className="text-xs text-slate-500 mb-1">Total {year}</p>
-                  <p className="text-xl font-bold text-blue-700">{fmtEur(totalCurr)}</p>
-                </div>
-                <div className={`rounded-xl p-4 ${evo == null ? "bg-slate-50" : pos ? "bg-green-50" : "bg-red-50"}`}>
-                  <p className="text-xs text-slate-500 mb-1">vs {year - 1}</p>
-                  <p className={`text-xl font-bold ${evo == null ? "text-slate-400" : pos ? "text-green-700" : "text-red-700"}`}>
-                    {evo == null ? "—" : `${pos ? "+" : ""}${evo.toFixed(1)}%`}
+          <div className="grid grid-cols-3 gap-3">
+            <div className={DS.kpiBox}>
+              <p className={DS.kpiLabel}>MARGEM {year-1}</p>
+              <p className={DS.kpiVal}>{marginPrev!=null?`${marginPrev.toFixed(2)}%`:"—"}</p>
+            </div>
+            <div className={DS.kpiBoxHL}>
+              <p className={DS.kpiLabel}>MARGEM {year}</p>
+              <p className={DS.kpiValBig}>{marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—"}</p>
+              {marginCurr!=null&&marginPrev!=null&&(
+                <p className="text-sm font-bold text-emerald-700 mt-1">
+                  {(marginCurr-marginPrev)>=0?"+":""}{(marginCurr-marginPrev).toFixed(2)}pp vs {year-1}
+                </p>
+              )}
+            </div>
+            <div className={DS.kpiBox}>
+              <p className={DS.kpiLabel}>EVOLUÇÃO</p>
+              {marginCurr!=null&&marginPrev!=null?(
+                <>
+                  <p className={`text-2xl font-bold ${marginCurr>=marginPrev?"text-emerald-600":"text-red-600"}`}>
+                    {(marginCurr-marginPrev)>=0?"+":""}{(marginCurr-marginPrev).toFixed(2)}pp
                   </p>
-                  {diff != null && (
-                    <p className={`text-xs ${pos ? "text-green-600" : "text-red-600"}`}>
-                      {diff >= 0 ? "+" : ""}{fmtEur(diff)}
+                  <p className="text-xs text-slate-400 mt-1">pontos percentuais</p>
+                </>
+              ):<p className={DS.kpiVal}>—</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CARD: ENCOMENDAS ── */}
+      {(ordersCurr || ordersPrev) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>ENCOMENDAS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          {[
+            {label:"Total encomendas", prev:ordersPrev, curr:ordersCurr, fmt:v=>v!=null?Math.round(v).toString():"—"},
+            {label:"1ªs encomendas",   prev:firstPrev,  curr:firstCurr,  fmt:v=>v!=null?Math.round(v).toString():"—"},
+            {label:"Fat. 1ªs enc. (€)",prev:firstRevPrev, curr:firstRevCurr, fmt:v=>v!=null?fmtEur(v):"—"},
+          ].map((row,i)=>{
+            const evo=row.prev>0&&row.curr!=null?((row.curr-row.prev)/row.prev*100):null;
+            const pos=evo!=null&&evo>=0;
+            return (
+              <div key={i} className={DS.detailBox}>
+                <p className={DS.detailLabel}>{row.label}</p>
+                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{row.fmt(row.prev)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{row.fmt(row.curr)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
+                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
                     </p>
-                  )}
+                  </div>
                 </div>
               </div>
             );
-          })()}
+          })}
         </div>
+      )}
 
-        {/* ── Gráficos de distribuição + histórico (só sub-tab Total) ── */}
-        {scope === "total" && (() => {
-          // Market values from last entry
-          const getLastMktVal = (code) => {
-            if (!effectiveData?.entries) return 0;
-            const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
-            if (!days.length) return 0;
-            return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
-          };
-          const revendaByMkt = MC_MARKETS.map(m => ({
-            name: m.name, code: m.code, val: getLastMktVal(m.code),
-          })).filter(m => m.val > 0).sort((a,b)=>b.val-a.val);
-          const afilByMkt = MC_MARKETS.map(m => ({
-            name: m.name, code: m.code, val: Number(closingCurr?.markets?.[m.code]?.afil_result)||0,
-          })).filter(m => m.val > 0).sort((a,b)=>b.val-a.val);
+      {/* ── CARD: AFILIAÇÃO ── */}
+      {afilCurr != null && (
+        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0} objective={0}>
+          {afilByMkt.length > 0 && (
+            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
+          )}
+        </BigCard>
+      )}
 
-          const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-          const COLORS_AFIL = ["#7C3AED","#6D28D9","#A78BFA","#C4B5FD","#8B5CF6","#DDD6FE","#4C1D95","#EDE9FE"];
+      {/* ── CARD: LEADS ── */}
+      {(leadsCurr || leadsPrev) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>LEADS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          <div className={DS.detailBox}>
+            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{leadsPrev!=null?Math.round(leadsPrev):"—"}</p></div>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{leadsCurr!=null?Math.round(leadsCurr):"—"}</p></div>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-          // Donut helper
-          const Donut = ({data, colors, label, totalVal}) => {
-            if (!data.length) return <div className="text-xs text-slate-400 text-center py-8">Sem dados</div>;
-            const size=200, cx=100, cy=100, r=75, ri=42;
-            let a=-Math.PI/2;
-            const total = data.reduce((s,d)=>s+d.val,0);
-            const slices = data.map((d,i)=>{
-              const angle=(d.val/total)*2*Math.PI;
-              const ea=a+angle;
-              const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-              const s={path,color:colors[i%colors.length],...d,pct:(d.val/total*100).toFixed(1)};
-              a=ea; return s;
-            });
-            return (
-              <svg width={size} height={size}>
-                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
-                <text x={cx} y={cy-7} textAnchor="middle" fontSize={10} fill="#94a3b8">{label}</text>
-                <text x={cx} y={cy+8} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">
-                  {new Intl.NumberFormat("fr-FR").format(Math.round(total/1000))}k€
-                </text>
-              </svg>
-            );
-          };
+      {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
+      {afilCurr != null && scope === "total" && (() => {
+        const totalCurr = actual + (afilCurr||0);
+        const totalPrev = (prevYearActual||0) + (afilPrev||0);
+        const revPct = totalCurr>0?Math.round(actual/totalCurr*100):0;
+        const afPct  = totalCurr>0?Math.round((afilCurr||0)/totalCurr*100):0;
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>TOTAL (REVENDA + AFILIAÇÃO)</h2>
+              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className={DS.kpiBox}><p className={DS.kpiLabel}>REVENDA {year}</p><p className={DS.kpiVal}>{fmtEur(actual)}</p><p className="text-xs text-emerald-700 font-semibold mt-1">{revPct}% do total</p></div>
+              <div className={DS.kpiBox}><p className={DS.kpiLabel}>AFILIAÇÃO {year}</p><p className={DS.kpiVal}>{fmtEur(afilCurr||0)}</p><p className="text-xs text-purple-700 font-semibold mt-1">{afPct}% do total</p></div>
+              <div className={DS.kpiBoxHL}><p className={DS.kpiLabel}>TOTAL {year}</p><p className={DS.kpiValBig}>{fmtEur(totalCurr)}</p>
+                {totalPrev>0&&<p className="text-sm font-bold text-emerald-700 mt-1">{totalCurr>=totalPrev?"+":""}{((totalCurr-totalPrev)/totalPrev*100).toFixed(1)}% vs {year-1}</p>}
+              </div>
+            </div>
+            {/* Split bar */}
+            <div className="relative h-7 rounded-full overflow-hidden flex">
+              <div className="h-full bg-emerald-600" style={{width:`${revPct}%`}}/>
+              <div className="h-full bg-purple-500 flex-1"/>
+            </div>
+            <div className="flex items-center gap-6 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>Revenda ({revPct}%)</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-purple-500"/>Afiliação ({afPct}%)</span>
+            </div>
+          </div>
+        );
+      })()}
 
-          // Legend helper
-          const Legend = ({data, colors}) => (
-            <div className="space-y-1.5 flex-1 min-w-0">
-              {data.map((d,i)=>{
-                const total=data.reduce((s,x)=>s+x.val,0);
-                const pct=(d.val/total*100).toFixed(1);
+      {/* ── CARD: FATURAÇÃO POR DIA DE SEMANA ── */}
+      {closedDay > 0 && (() => {
+        const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+        const byWeekday = Array.from({length:7},(_,i)=>({label:DAYS_PT[i],total:0,count:0,ssTotal:0,ssCount:0}));
+        daily.forEach(d=>{
+          if(d.day>closedDay) return;
+          const val=d.value;
+          if(val==null||val===0) return;
+          const wd=d.weekday!==undefined?d.weekday:new Date(year,monthNum,d.day).getDay();
+          if(d.supersales){byWeekday[wd].ssTotal+=val;byWeekday[wd].ssCount++;}
+          else{byWeekday[wd].total+=val;byWeekday[wd].count++;}
+        });
+        const ordered=[1,2,3,4,5,6,0].map(i=>({...byWeekday[i],avg:byWeekday[i].count>0?Math.round(byWeekday[i].total/byWeekday[i].count):null}));
+        const maxAvg=Math.max(...ordered.map(d=>d.avg||0));
+        if(!maxAvg) return null;
+        const barColor=TEAM_COLORS[scope]||"#2563eb";
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>MÉDIA POR DIA DA SEMANA</h2>
+              <p className={DS.subtitle}>Excluindo dias de Supersales · (Nx) = nº de dias</p>
+            </div>
+            <div className="space-y-3">
+              {ordered.map((d,i)=>{
+                const barPct=maxAvg>0&&d.avg?(d.avg/maxAvg*100):0;
+                const isWeekend=i>=5;
                 return (
-                  <div key={d.code} className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{backgroundColor:colors[i%colors.length]}}/>
-                    <div className="w-20 text-xs text-slate-600 truncate shrink-0">{d.name}</div>
-                    <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
-                      <div className="h-full rounded-full" style={{width:`${pct}%`,backgroundColor:colors[i%colors.length]}}/>
+                  <div key={d.label} className="flex items-center gap-3">
+                    <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
+                    <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":barColor,minWidth:barPct>0?"8px":"0"}}/>
                     </div>
-                    <div className="text-xs font-bold text-slate-700 w-9 text-right shrink-0">{pct}%</div>
-                    <div className="text-xs text-slate-400 w-20 text-right shrink-0 hidden sm:block">{new Intl.NumberFormat("fr-FR").format(Math.round(d.val))} €</div>
+                    <div className="w-36 flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
+                      {d.count>0&&<span className="text-xs text-slate-400">({d.count}x)</span>}
+                      {d.ssCount>0&&<span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          );
+            <p className="text-xs text-slate-400">Média = valor diário médio excluindo dias de Supersales</p>
+          </div>
+        );
+      })()}
 
-          // Rev total + afil total for split chart
-          const revTotal = revendaByMkt.reduce((s,m)=>s+m.val,0);
-          const afTotal  = afilByMkt.reduce((s,m)=>s+m.val,0);
-          const grandTot = revTotal+afTotal;
+      {/* ── CARD: HISTÓRICO 2025 vs 2026 (só Total) ── */}
+      {scope === "total" && histData.some(r=>r[year-1]||r[year]) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
+            <p className={DS.subtitle}>Faturação mensal comparativa · actualiza automaticamente</p>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={histData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
+                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
-          return (<>
-            {/* 1. Revenda vs Afiliação no total */}
-            {grandTot > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900 mb-1">Revenda vs Afiliação</h3>
-                <p className="text-xs text-slate-500 mb-4">Distribuição da faturação total por departamento</p>
-                <div className="flex items-center gap-6">
-                  {(() => {
-                    const size=200,cx=100,cy=100,r=75,ri=42;
-                    const splitData=[{label:"Revenda",val:revTotal,color:"#3A9E8F"},{label:"Afiliação",val:afTotal,color:"#7C3AED"}];
-                    let a=-Math.PI/2;
-                    const slices=splitData.filter(d=>d.val>0).map(d=>{
-                      const angle=(d.val/grandTot)*2*Math.PI,ea=a+angle;
-                      const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-                      a=ea; return {...d,path,pct:(d.val/grandTot*100).toFixed(1)};
-                    });
-                    return (
-                      <svg width={size} height={size} className="shrink-0">
-                        {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={3}/>)}
-                        <text x={cx} y={cy-7} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
-                        <text x={cx} y={cy+8} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">{new Intl.NumberFormat("fr-FR").format(Math.round(grandTot/1000))}k€</text>
-                      </svg>
-                    );
-                  })()}
-                  <div className="space-y-4 flex-1">
-                    {[{label:"Revenda",val:revTotal,color:"#3A9E8F"},{label:"Afiliação",val:afTotal,color:"#7C3AED"}]
-                      .filter(d=>d.val>0).map(d=>(
-                      <div key={d.label} className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:d.color}}/>
-                        <span className="text-sm font-semibold text-slate-700 w-20">{d.label}</span>
-                        <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
-                          <div className="h-full rounded-full" style={{width:`${(d.val/grandTot*100).toFixed(1)}%`,backgroundColor:d.color}}/>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800 w-12 text-right">{(d.val/grandTot*100).toFixed(1)}%</span>
-                        <span className="text-sm text-slate-500 w-28 text-right hidden sm:block">{new Intl.NumberFormat("fr-FR").format(Math.round(d.val))} €</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 2. Revenda por mercado */}
-            {revendaByMkt.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900 mb-1">Revenda — Distribuição por mercado</h3>
-                <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação de revenda</p>
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <Donut data={revendaByMkt} colors={COLORS_REV} label="Revenda" />
-                  <Legend data={revendaByMkt} colors={COLORS_REV} />
-                </div>
-              </div>
-            )}
-
-            {/* 3. Afiliação por mercado */}
-            {afilByMkt.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900 mb-1">Afiliação — Distribuição por mercado</h3>
-                <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação de afiliação</p>
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <Donut data={afilByMkt} colors={COLORS_AFIL} label="Afiliação" />
-                  <Legend data={afilByMkt} colors={COLORS_AFIL} />
-                </div>
-              </div>
-            )}
-
-            {/* 4. Gráfico histórico mensal */}
-            {histData.some(r => r[year-1] || r[year]) && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900 mb-1">Revenda — Histórico {year-1} vs {year}</h3>
-                <p className="text-xs text-slate-500 mb-4">Faturação mensal comparativa · actualiza automaticamente com os dados registados</p>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={histData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                    <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-                    <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
-                      tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-                    <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €", name]}
-                      contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-                    <Legend iconType="square" iconSize={10}
-                      formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-                    <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
-                    <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </>);
-        })()}
-
-        {/* Faturação por dia de semana — horizontal bars */}
-        {(() => {
-          const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-          const byWeekday = Array.from({length:7}, (_,i) => ({
-            label: DAYS_PT[i], total: 0, count: 0, ssTotal: 0, ssCount: 0,
-          }));
-          daily.forEach(d => {
-            if (d.day > closedDay) return;
-            const val = d.value;
-            if (val == null || val === 0) return;
-            const wd = d.weekday !== undefined ? d.weekday : new Date(year, monthNum, d.day).getDay();
-            if (d.supersales) { byWeekday[wd].ssTotal += val; byWeekday[wd].ssCount++; }
-            else { byWeekday[wd].total += val; byWeekday[wd].count++; }
-          });
-          const ordered = [1,2,3,4,5,6,0].map(i => ({
-            ...byWeekday[i],
-            avg: byWeekday[i].count > 0 ? Math.round(byWeekday[i].total / byWeekday[i].count) : null,
-          }));
-          const maxAvg = Math.max(...ordered.map(d => d.avg || 0));
-          const barColor = TEAM_COLORS[scope] || "#2563eb";
-          return (
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wide">
-                    Média por dia da semana
-                    <span className="ml-2 text-xs font-normal text-slate-400 normal-case">(excl. Supersales)</span>
-                  </h3>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {ordered.map((d, i) => {
-                  const barPct = maxAvg > 0 && d.avg ? (d.avg / maxAvg) * 100 : 0;
-                  const isWeekend = i >= 5;
-                  return (
-                    <div key={d.label} className="flex items-center gap-3">
-                      {/* Day label */}
-                      <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">
-                        {d.label}
-                      </div>
-                      {/* Bar track */}
-                      <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${barPct}%`,
-                            backgroundColor: isWeekend ? "#94a3b8" : barColor,
-                            minWidth: barPct > 0 ? "8px" : "0",
-                          }}
-                        />
-                      </div>
-                      {/* Value */}
-                      <div className="w-36 flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-bold text-slate-800">
-                          {d.avg != null
-                            ? new Intl.NumberFormat("fr-FR").format(d.avg) + " €/dia"
-                            : "—"}
-                        </span>
-                        {d.count > 0 && (
-                          <span className="text-xs text-slate-400">({d.count}x)</span>
-                        )}
-                        {d.ssCount > 0 && (
-                          <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="mt-4 text-xs text-slate-400">Média = valor diário médio excluindo dias de Supersales · (Nx) = nº de dias</p>
-            </div>
-          );
-        })()}
-
-        {modal && (
-          <DailyModal mode={modal} daily={daily} closedDay={closedDay} goal={goal}
-            dailyAvg={dailyAvg} scope={scope} onClose={() => setModal(null)} />
-        )}
-      </>)}
+      {modal && (
+        <DailyModal mode={modal} daily={daily} closedDay={closedDay} goal={goal}
+          dailyAvg={dailyAvg} scope={scope} onClose={() => setModal(null)} />
+      )}
     </>
   );
 }
