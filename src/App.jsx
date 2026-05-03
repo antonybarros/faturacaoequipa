@@ -1491,8 +1491,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             {[
               {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
               {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
-              {label:"Acima do objetivo",      val: aboveObj!=null?fmtE(aboveObj):"—", color:"text-emerald-600"},
-              {label:"% do objetivo",          val: pctObj!=null?fmtP(pctObj):"—", color:"text-emerald-600"},
+              {label:"Acima do objetivo",      val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
+              {label:"% do objetivo",          val: pctObj!=null?fmtP(pctObj):"—", color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
             ].map((d,i) => (
               <div key={i} className={DS.col}>
                 <p className="text-xs text-slate-500 mb-1">{d.label}</p>
@@ -1583,7 +1583,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
   };
   const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-  const COLORS_AFIL = ["#7C3AED","#6D28D9","#A78BFA","#C4B5FD","#8B5CF6","#DDD6FE","#4C1D95","#EDE9FE"];
+  const COLORS_AFIL = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
   const revendaByMkt = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:getLastMktVal(m.code)})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
   const afilByMkt    = MC_MARKETS.map(m=>({name:m.name,code:m.code,val:Number(closingCurr?.markets?.[m.code]?.afil_result||closingCurr?.markets?.[m.code]?.afil_curr)||0})).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
 
@@ -1753,11 +1753,11 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             {/* Split bar */}
             <div className="relative h-7 rounded-full overflow-hidden flex">
               <div className="h-full bg-emerald-600" style={{width:`${revPct}%`}}/>
-              <div className="h-full bg-purple-500 flex-1"/>
+              <div className="h-full bg-emerald-400 flex-1"/>
             </div>
             <div className="flex items-center gap-6 text-xs text-slate-500">
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>Revenda ({revPct}%)</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-purple-500"/>Afiliação ({afPct}%)</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-400"/>Afiliação ({afPct}%)</span>
             </div>
           </div>
         );
@@ -1794,7 +1794,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                     <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
                     <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500"
-                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":barColor,minWidth:barPct>0?"8px":"0"}}/>
+                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#3A9E8F",minWidth:barPct>0?"8px":"0"}}/>
                     </div>
                     <div className="w-36 flex items-center gap-2 shrink-0">
                       <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
