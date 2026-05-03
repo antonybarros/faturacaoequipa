@@ -987,6 +987,8 @@ function DashboardWrapper({
         leadsPrev={leadsPrev}
         afilCurr={afilCurr}
         afilPrev={afilPrev}
+        effectiveData={effectiveData}
+        closingCurr={closingCurr}
       />
     </div>
   );
@@ -1414,7 +1416,8 @@ function Dashboard({
 // ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
-  firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev }) {
+  firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
+  effectiveData, closingCurr }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1647,6 +1650,95 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             );
           })()}
         </div>
+
+        {/* Gráfico circular — distribuição por mercado (só sub-tab Total) */}
+        {scope === "total" && (() => {
+          // Get last cumulative entry values per market
+          const mktValues = MC_MARKETS.map(m => {
+            let val = 0;
+            if (effectiveData?.entries) {
+              const days = Object.keys(effectiveData.entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
+              if (days.length > 0) {
+                const lastEntry = effectiveData.entries[String(days[days.length-1])] || {};
+                val = Number(lastEntry[m.code]) || 0;
+              }
+            }
+            // Also try afil from closing
+            const afilVal = Number(closingCurr?.markets?.[m.code]?.afil_result) || 0;
+            return { name: m.name, code: m.code, revenda: val, afil: afilVal, total: val + afilVal };
+          }).filter(m => m.total > 0).sort((a,b) => b.total - a.total);
+
+          if (mktValues.length === 0) return null;
+
+          const grandTotal = mktValues.reduce((s,m) => s + m.total, 0);
+          const PIE_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <h3 className="font-semibold text-slate-900 mb-1">Distribuição por mercado</h3>
+              <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação total (Revenda + Afiliação)</p>
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                {/* Pie chart via SVG */}
+                {(() => {
+                  const size = 220;
+                  const cx = size / 2, cy = size / 2, r = 80, rInner = 45;
+                  let startAngle = -Math.PI / 2;
+                  const slices = mktValues.map((m, i) => {
+                    const pct = m.total / grandTotal;
+                    const angle = pct * 2 * Math.PI;
+                    const endAngle = startAngle + angle;
+                    const x1 = cx + r * Math.cos(startAngle);
+                    const y1 = cy + r * Math.sin(startAngle);
+                    const x2 = cx + r * Math.cos(endAngle);
+                    const y2 = cy + r * Math.sin(endAngle);
+                    const xi1 = cx + rInner * Math.cos(startAngle);
+                    const yi1 = cy + rInner * Math.sin(startAngle);
+                    const xi2 = cx + rInner * Math.cos(endAngle);
+                    const yi2 = cy + rInner * Math.sin(endAngle);
+                    const largeArc = angle > Math.PI ? 1 : 0;
+                    const path = `M ${xi1} ${yi1} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${rInner} ${rInner} 0 ${largeArc} 0 ${xi1} ${yi1} Z`;
+                    const midAngle = startAngle + angle / 2;
+                    const lx = cx + (r + 14) * Math.cos(midAngle);
+                    const ly = cy + (r + 14) * Math.sin(midAngle);
+                    const slice = { path, color: PIE_COLORS[i % PIE_COLORS.length], pct, midAngle, lx, ly, ...m };
+                    startAngle = endAngle;
+                    return slice;
+                  });
+                  return (
+                    <svg width={size} height={size} className="shrink-0">
+                      {slices.map((s, i) => (
+                        <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2} />
+                      ))}
+                      {/* Center label */}
+                      <text x={cx} y={cy-6} textAnchor="middle" fontSize={11} fill="#64748b">Total</text>
+                      <text x={cx} y={cy+10} textAnchor="middle" fontSize={12} fontWeight="bold" fill="#1a1a1a">
+                        {new Intl.NumberFormat("fr-FR").format(Math.round(grandTotal/1000))}k€
+                      </text>
+                    </svg>
+                  );
+                })()}
+                {/* Legend */}
+                <div className="flex-1 space-y-2 w-full">
+                  {mktValues.map((m, i) => {
+                    const pct = (m.total / grandTotal * 100).toFixed(1);
+                    const barW = Math.round(m.total / grandTotal * 100);
+                    return (
+                      <div key={m.code} className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor: PIE_COLORS[i % PIE_COLORS.length]}} />
+                        <div className="w-20 text-xs text-slate-600 font-medium shrink-0 truncate">{m.name}</div>
+                        <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
+                          <div className="h-full rounded-full" style={{width:`${barW}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length]}} />
+                        </div>
+                        <div className="text-xs font-bold text-slate-700 w-10 text-right shrink-0">{pct}%</div>
+                        <div className="text-xs text-slate-500 w-24 text-right shrink-0">{new Intl.NumberFormat("fr-FR").format(Math.round(m.total))} €</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Faturação por dia de semana — horizontal bars */}
         {(() => {
