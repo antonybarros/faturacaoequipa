@@ -1651,93 +1651,230 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           })()}
         </div>
 
-        {/* Gráfico circular — distribuição por mercado (só sub-tab Total) */}
+        {/* ── Gráficos de distribuição + histórico (só sub-tab Total) ── */}
         {scope === "total" && (() => {
-          // Get last cumulative entry values per market
-          const mktValues = MC_MARKETS.map(m => {
-            let val = 0;
-            if (effectiveData?.entries) {
-              const days = Object.keys(effectiveData.entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
-              if (days.length > 0) {
-                const lastEntry = effectiveData.entries[String(days[days.length-1])] || {};
-                val = Number(lastEntry[m.code]) || 0;
-              }
-            }
-            // Also try afil from closing
-            const afilVal = Number(closingCurr?.markets?.[m.code]?.afil_result) || 0;
-            return { name: m.name, code: m.code, revenda: val, afil: afilVal, total: val + afilVal };
-          }).filter(m => m.total > 0).sort((a,b) => b.total - a.total);
+          // Market values from last entry
+          const getLastMktVal = (code) => {
+            if (!effectiveData?.entries) return 0;
+            const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            if (!days.length) return 0;
+            return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
+          };
+          const revendaByMkt = MC_MARKETS.map(m => ({
+            name: m.name, code: m.code, val: getLastMktVal(m.code),
+          })).filter(m => m.val > 0).sort((a,b)=>b.val-a.val);
+          const afilByMkt = MC_MARKETS.map(m => ({
+            name: m.name, code: m.code, val: Number(closingCurr?.markets?.[m.code]?.afil_result)||0,
+          })).filter(m => m.val > 0).sort((a,b)=>b.val-a.val);
 
-          if (mktValues.length === 0) return null;
+          const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+          const COLORS_AFIL = ["#7C3AED","#6D28D9","#A78BFA","#C4B5FD","#8B5CF6","#DDD6FE","#4C1D95","#EDE9FE"];
 
-          const grandTotal = mktValues.reduce((s,m) => s + m.total, 0);
-          const PIE_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+          // Donut helper
+          const Donut = ({data, colors, label, totalVal}) => {
+            if (!data.length) return <div className="text-xs text-slate-400 text-center py-8">Sem dados</div>;
+            const size=200, cx=100, cy=100, r=75, ri=42;
+            let a=-Math.PI/2;
+            const total = data.reduce((s,d)=>s+d.val,0);
+            const slices = data.map((d,i)=>{
+              const angle=(d.val/total)*2*Math.PI;
+              const ea=a+angle;
+              const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
+              const s={path,color:colors[i%colors.length],...d,pct:(d.val/total*100).toFixed(1)};
+              a=ea; return s;
+            });
+            return (
+              <svg width={size} height={size}>
+                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
+                <text x={cx} y={cy-7} textAnchor="middle" fontSize={10} fill="#94a3b8">{label}</text>
+                <text x={cx} y={cy+8} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">
+                  {new Intl.NumberFormat("fr-FR").format(Math.round(total/1000))}k€
+                </text>
+              </svg>
+            );
+          };
 
-          return (
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3 className="font-semibold text-slate-900 mb-1">Distribuição por mercado</h3>
-              <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação total (Revenda + Afiliação)</p>
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* Pie chart via SVG */}
-                {(() => {
-                  const size = 220;
-                  const cx = size / 2, cy = size / 2, r = 80, rInner = 45;
-                  let startAngle = -Math.PI / 2;
-                  const slices = mktValues.map((m, i) => {
-                    const pct = m.total / grandTotal;
-                    const angle = pct * 2 * Math.PI;
-                    const endAngle = startAngle + angle;
-                    const x1 = cx + r * Math.cos(startAngle);
-                    const y1 = cy + r * Math.sin(startAngle);
-                    const x2 = cx + r * Math.cos(endAngle);
-                    const y2 = cy + r * Math.sin(endAngle);
-                    const xi1 = cx + rInner * Math.cos(startAngle);
-                    const yi1 = cy + rInner * Math.sin(startAngle);
-                    const xi2 = cx + rInner * Math.cos(endAngle);
-                    const yi2 = cy + rInner * Math.sin(endAngle);
-                    const largeArc = angle > Math.PI ? 1 : 0;
-                    const path = `M ${xi1} ${yi1} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${rInner} ${rInner} 0 ${largeArc} 0 ${xi1} ${yi1} Z`;
-                    const midAngle = startAngle + angle / 2;
-                    const lx = cx + (r + 14) * Math.cos(midAngle);
-                    const ly = cy + (r + 14) * Math.sin(midAngle);
-                    const slice = { path, color: PIE_COLORS[i % PIE_COLORS.length], pct, midAngle, lx, ly, ...m };
-                    startAngle = endAngle;
-                    return slice;
-                  });
-                  return (
-                    <svg width={size} height={size} className="shrink-0">
-                      {slices.map((s, i) => (
-                        <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2} />
-                      ))}
-                      {/* Center label */}
-                      <text x={cx} y={cy-6} textAnchor="middle" fontSize={11} fill="#64748b">Total</text>
-                      <text x={cx} y={cy+10} textAnchor="middle" fontSize={12} fontWeight="bold" fill="#1a1a1a">
-                        {new Intl.NumberFormat("fr-FR").format(Math.round(grandTotal/1000))}k€
-                      </text>
-                    </svg>
-                  );
-                })()}
-                {/* Legend */}
-                <div className="flex-1 space-y-2 w-full">
-                  {mktValues.map((m, i) => {
-                    const pct = (m.total / grandTotal * 100).toFixed(1);
-                    const barW = Math.round(m.total / grandTotal * 100);
-                    return (
-                      <div key={m.code} className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor: PIE_COLORS[i % PIE_COLORS.length]}} />
-                        <div className="w-20 text-xs text-slate-600 font-medium shrink-0 truncate">{m.name}</div>
-                        <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                          <div className="h-full rounded-full" style={{width:`${barW}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length]}} />
-                        </div>
-                        <div className="text-xs font-bold text-slate-700 w-10 text-right shrink-0">{pct}%</div>
-                        <div className="text-xs text-slate-500 w-24 text-right shrink-0">{new Intl.NumberFormat("fr-FR").format(Math.round(m.total))} €</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+          // Legend helper
+          const Legend = ({data, colors}) => (
+            <div className="space-y-1.5 flex-1 min-w-0">
+              {data.map((d,i)=>{
+                const total=data.reduce((s,x)=>s+x.val,0);
+                const pct=(d.val/total*100).toFixed(1);
+                return (
+                  <div key={d.code} className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{backgroundColor:colors[i%colors.length]}}/>
+                    <div className="w-20 text-xs text-slate-600 truncate shrink-0">{d.name}</div>
+                    <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full" style={{width:`${pct}%`,backgroundColor:colors[i%colors.length]}}/>
+                    </div>
+                    <div className="text-xs font-bold text-slate-700 w-9 text-right shrink-0">{pct}%</div>
+                    <div className="text-xs text-slate-400 w-20 text-right shrink-0 hidden sm:block">{new Intl.NumberFormat("fr-FR").format(Math.round(d.val))} €</div>
+                  </div>
+                );
+              })}
             </div>
           );
+
+          // Rev total + afil total for split chart
+          const revTotal = revendaByMkt.reduce((s,m)=>s+m.val,0);
+          const afTotal  = afilByMkt.reduce((s,m)=>s+m.val,0);
+          const grandTot = revTotal+afTotal;
+
+          return (<>
+            {/* 1. Revenda vs Afiliação no total */}
+            {grandTot > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900 mb-1">Revenda vs Afiliação</h3>
+                <p className="text-xs text-slate-500 mb-4">Distribuição da faturação total por departamento</p>
+                <div className="flex items-center gap-6">
+                  {(() => {
+                    const size=200,cx=100,cy=100,r=75,ri=42;
+                    const splitData=[{label:"Revenda",val:revTotal,color:"#3A9E8F"},{label:"Afiliação",val:afTotal,color:"#7C3AED"}];
+                    let a=-Math.PI/2;
+                    const slices=splitData.filter(d=>d.val>0).map(d=>{
+                      const angle=(d.val/grandTot)*2*Math.PI,ea=a+angle;
+                      const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
+                      a=ea; return {...d,path,pct:(d.val/grandTot*100).toFixed(1)};
+                    });
+                    return (
+                      <svg width={size} height={size} className="shrink-0">
+                        {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={3}/>)}
+                        <text x={cx} y={cy-7} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
+                        <text x={cx} y={cy+8} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">{new Intl.NumberFormat("fr-FR").format(Math.round(grandTot/1000))}k€</text>
+                      </svg>
+                    );
+                  })()}
+                  <div className="space-y-4 flex-1">
+                    {[{label:"Revenda",val:revTotal,color:"#3A9E8F"},{label:"Afiliação",val:afTotal,color:"#7C3AED"}]
+                      .filter(d=>d.val>0).map(d=>(
+                      <div key={d.label} className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-sm shrink-0" style={{backgroundColor:d.color}}/>
+                        <span className="text-sm font-semibold text-slate-700 w-20">{d.label}</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+                          <div className="h-full rounded-full" style={{width:`${(d.val/grandTot*100).toFixed(1)}%`,backgroundColor:d.color}}/>
+                        </div>
+                        <span className="text-sm font-bold text-slate-800 w-12 text-right">{(d.val/grandTot*100).toFixed(1)}%</span>
+                        <span className="text-sm text-slate-500 w-28 text-right hidden sm:block">{new Intl.NumberFormat("fr-FR").format(Math.round(d.val))} €</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Revenda por mercado */}
+            {revendaByMkt.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900 mb-1">Revenda — Distribuição por mercado</h3>
+                <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação de revenda</p>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <Donut data={revendaByMkt} colors={COLORS_REV} label="Revenda" />
+                  <Legend data={revendaByMkt} colors={COLORS_REV} />
+                </div>
+              </div>
+            )}
+
+            {/* 3. Afiliação por mercado */}
+            {afilByMkt.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900 mb-1">Afiliação — Distribuição por mercado</h3>
+                <p className="text-xs text-slate-500 mb-4">% de cada mercado na faturação de afiliação</p>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <Donut data={afilByMkt} colors={COLORS_AFIL} label="Afiliação" />
+                  <Legend data={afilByMkt} colors={COLORS_AFIL} />
+                </div>
+              </div>
+            )}
+
+            {/* 4. Gráfico histórico mensal — Revenda 2025 vs 2026 */}
+            {(() => {
+              const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+              // Build historical data: for each month load from billing_months
+              const [histData, setHistData] = useState([]);
+              useEffect(() => {
+                (async () => {
+                  const rows = await Promise.all(
+                    MONTH_LABELS.map(async (_, mi) => {
+                      const key25 = `revenda-daily-${year-1}-${String(mi+1).padStart(2,"0")}`;
+                      const key26 = `revenda-daily-${year}-${String(mi+1).padStart(2,"0")}`;
+                      const getTotal = async (key) => {
+                        const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
+                        if (!row?.entries) return 0;
+                        const converted = dailyToCumulative(row.entries, TEAMS);
+                        const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+                        if (!days.length) return 0;
+                        const last = converted[String(days[days.length-1])];
+                        return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0);
+                      };
+                      const [v25, v26] = await Promise.all([getTotal(key25), getTotal(key26)]);
+                      return { month: MONTH_LABELS[mi], [year-1]: v25||null, [year]: v26||null };
+                    })
+                  );
+                  setHistData(rows);
+                })();
+              }, [year]);
+
+              if (!histData.length) return null;
+              const hasData = histData.some(r => r[year-1] || r[year]);
+              if (!hasData) return null;
+
+              const maxVal = Math.max(...histData.flatMap(r=>[r[year-1]||0,r[year]||0]));
+              const fmtK = v => v>=1000000 ? (v/1000000).toFixed(1)+"M" : v>=1000 ? Math.round(v/1000)+"k" : String(Math.round(v));
+
+              return (
+                <div className="bg-white rounded-xl border border-slate-200 p-5">
+                  <h3 className="font-semibold text-slate-900 mb-1">Revenda — Histórico {year-1} vs {year}</h3>
+                  <p className="text-xs text-slate-500 mb-4">Faturação mensal comparativa · actualiza automaticamente com os dados registados</p>
+                  <div className="overflow-x-auto">
+                    <div className="flex items-end gap-1.5 h-48 min-w-[600px] pt-6 relative">
+                      {/* Y axis labels */}
+                      {[0,0.25,0.5,0.75,1].map(pct=>(
+                        <div key={pct} className="absolute left-0 text-xs text-slate-400" style={{bottom:`${pct*100}%`,transform:"translateY(50%)"}}>
+                          {fmtK(maxVal*pct)}
+                        </div>
+                      ))}
+                      {/* Grid lines */}
+                      {[0.25,0.5,0.75,1].map(pct=>(
+                        <div key={pct} className="absolute left-8 right-0 border-t border-slate-100" style={{bottom:`${pct*100}%`}}/>
+                      ))}
+                      <div className="flex items-end gap-1.5 flex-1 ml-8 h-full">
+                        {histData.map((row, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                            <div className="w-full flex items-end gap-0.5 justify-center" style={{height:"100%"}}>
+                              {/* 2025 bar */}
+                              {row[year-1] > 0 ? (
+                                <div className="flex-1 rounded-t-sm relative group" title={`${row.month} ${year-1}: ${new Intl.NumberFormat("fr-FR").format(row[year-1])} €`}
+                                  style={{height:`${(row[year-1]/maxVal*100).toFixed(1)}%`,backgroundColor:"#F4A261",minHeight:"2px"}}>
+                                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-slate-500 hidden group-hover:block whitespace-nowrap">
+                                    {fmtK(row[year-1])}
+                                  </span>
+                                </div>
+                              ) : <div className="flex-1"/>}
+                              {/* 2026 bar */}
+                              {row[year] > 0 ? (
+                                <div className="flex-1 rounded-t-sm relative group" title={`${row.month} ${year}: ${new Intl.NumberFormat("fr-FR").format(row[year])} €`}
+                                  style={{height:`${(row[year]/maxVal*100).toFixed(1)}%`,backgroundColor:"#8B4513",minHeight:"2px"}}>
+                                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-slate-600 font-semibold hidden group-hover:block whitespace-nowrap">
+                                    {fmtK(row[year])}
+                                  </span>
+                                </div>
+                              ) : <div className="flex-1"/>}
+                            </div>
+                            <span className="text-[9px] text-slate-500 mt-1">{row.month}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Legend */}
+                    <div className="flex items-center gap-6 mt-3 justify-center text-xs text-slate-600">
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{backgroundColor:"#F4A261"}}/>{year-1}</div>
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{backgroundColor:"#8B4513"}}/>{year}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </>);
         })()}
 
         {/* Faturação por dia de semana — horizontal bars */}
