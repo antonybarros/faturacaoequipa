@@ -861,6 +861,8 @@ function DashboardWrapper({
     const v = closing.markets?.[marketCode]?.margin_curr;
     return v ? parseFloat(v) : null;
   };
+  // margin_prev is stored in closingCurr (the current month's closing record),
+  // not in closingPrev (which is the previous year's closing record).
   const getMarginPrev = (closing, marketCode) => {
     if (!closing) return null;
     if (marketCode === "total") {
@@ -872,7 +874,7 @@ function DashboardWrapper({
     return v ? parseFloat(v) : null;
   };
   const marginCurr = getMargin(closingCurr, scope);
-  const marginPrev = getMarginPrev(closingPrev, scope);
+  const marginPrev = getMarginPrev(closingCurr, scope); // reads margin_prev from current closing record
 
   // Encomendas — aggregate across all markets (total) or specific market
   const sumField = (closing, field) => {
@@ -4245,8 +4247,31 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
   const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
-    setSaved(false);
+    (async () => {
+      // Load current month closing
+      const curr = await loadClosing(year, monthNum);
+
+      // Auto-fill prev year values from prev year's closing (margin_curr of year-1)
+      // Only fill if not already manually set
+      const prevYearClosing = await loadClosing(year - 1, monthNum);
+      if (prevYearClosing) {
+        // Global margin
+        if (!curr.revenda_margin_prev && prevYearClosing.revenda_margin) {
+          curr.revenda_margin_prev = prevYearClosing.revenda_margin;
+        }
+        // Per market
+        MC_MARKETS.forEach(m => {
+          if (!curr.markets[m.code]) curr.markets[m.code] = {};
+          if (!curr.markets[m.code].margin_prev && prevYearClosing.markets?.[m.code]?.margin_curr) {
+            curr.markets[m.code].margin_prev = prevYearClosing.markets[m.code].margin_curr;
+          }
+        });
+      }
+
+      setData(curr);
+      dataRef.current = curr;
+      setSaved(false);
+    })();
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
