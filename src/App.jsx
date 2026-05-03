@@ -3016,8 +3016,22 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
   const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
-    setSaved(false);
+    (async () => {
+      const curr = await loadClosing(year, monthNum);
+      const prev = await loadClosing(year - 1, monthNum);
+      if (prev) {
+        // Global
+        if (!curr.afil_prev && prev.afil_result) curr.afil_prev = prev.afil_result;
+        if (!curr.afil_objective) curr.afil_objective = curr.afil_objective || "";
+        // Per market
+        MC_MARKETS.forEach(m => {
+          if (!curr.markets[m.code]) curr.markets[m.code] = {};
+          if (!curr.markets[m.code].afil_prev && prev.markets?.[m.code]?.afil_result)
+            curr.markets[m.code].afil_prev = prev.markets[m.code].afil_result;
+        });
+      }
+      setData(curr); dataRef.current = curr; setSaved(false);
+    })();
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
@@ -3089,8 +3103,22 @@ function Encomendas({ monthNum, year, isAdmin }) {
   const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
-    setSaved(false);
+    (async () => {
+      const curr = await loadClosing(year, monthNum);
+      const prev = await loadClosing(year - 1, monthNum);
+      if (prev) {
+        MC_MARKETS.forEach(m => {
+          if (!curr.markets[m.code]) curr.markets[m.code] = {};
+          const pm = prev.markets?.[m.code] || {};
+          const cm = curr.markets[m.code];
+          if (!cm.orders_prev && pm.orders_curr)             cm.orders_prev = pm.orders_curr;
+          if (!cm.first_orders_prev && pm.first_orders_curr) cm.first_orders_prev = pm.first_orders_curr;
+          if (!cm.first_orders_rev_prev && pm.first_orders_rev_curr)
+            cm.first_orders_rev_prev = pm.first_orders_rev_curr;
+        });
+      }
+      setData(curr); dataRef.current = curr; setSaved(false);
+    })();
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
@@ -3128,6 +3156,58 @@ function Encomendas({ monthNum, year, isAdmin }) {
         </div>
       </div>
 
+      {/* Card Total — soma de todos os mercados */}
+      {(() => {
+        const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
+        const totals = {
+          orders_prev: sumF("orders_prev"), orders_curr: sumF("orders_curr"),
+          first_orders_prev: sumF("first_orders_prev"), first_orders_curr: sumF("first_orders_curr"),
+          first_orders_rev_prev: sumF("first_orders_rev_prev"), first_orders_rev_curr: sumF("first_orders_rev_curr"),
+        };
+        const fmt = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) : "—";
+        const fmtE = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) + " €" : "—";
+        const evo = (prev, curr) => prev > 0 && curr > 0 ? ((curr-prev)/prev*100).toFixed(1)+"%" : "—";
+        return (
+          <MCCard title="Total" accent="text-blue-800">
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Encomendas {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.orders_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Encomendas {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.orders_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.orders_curr>=totals.orders_prev?"text-green-600":"text-red-600"}`}>{evo(totals.orders_prev,totals.orders_curr)}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">1ªs enc. {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.first_orders_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">1ªs enc. {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.first_orders_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.first_orders_curr>=totals.first_orders_prev?"text-green-600":"text-red-600"}`}>{evo(totals.first_orders_prev,totals.first_orders_curr)}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Fat. 1ªs enc. {year-1} (€)</p>
+                  <p className="font-semibold text-slate-700">{fmtE(totals.first_orders_rev_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Fat. 1ªs enc. {year} (€)</p>
+                  <p className="font-bold text-slate-900">{fmtE(totals.first_orders_rev_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.first_orders_rev_curr>=totals.first_orders_rev_prev?"text-green-600":"text-red-600"}`}>{evo(totals.first_orders_rev_prev,totals.first_orders_rev_curr)}</p>
+                </div>
+              </div>
+            </div>
+          </MCCard>
+        );
+      })()}
+
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
           <div className="grid grid-cols-3 gap-4">
@@ -3163,8 +3243,20 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
   const saveTimer = React.useRef(null);
 
   useEffect(() => {
-    loadClosing(year, monthNum).then(d => { setData(d); dataRef.current = d; });
-    setSaved(false);
+    (async () => {
+      const curr = await loadClosing(year, monthNum);
+      const prev = await loadClosing(year - 1, monthNum);
+      if (prev) {
+        MC_MARKETS.forEach(m => {
+          if (!curr.markets[m.code]) curr.markets[m.code] = {};
+          const pm = prev.markets?.[m.code] || {};
+          const cm = curr.markets[m.code];
+          if (!cm.leads_prev && pm.leads_curr)         cm.leads_prev = pm.leads_curr;
+          if (!cm.partners_prev && pm.partners_curr)   cm.partners_prev = pm.partners_curr;
+        });
+      }
+      setData(curr); dataRef.current = curr; setSaved(false);
+    })();
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [year, monthNum]);
 
@@ -3201,6 +3293,45 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
           {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
         </div>
       </div>
+
+      {/* Card Total — soma de todos os mercados */}
+      {(() => {
+        const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
+        const totals = {
+          leads_prev: sumF("leads_prev"), leads_curr: sumF("leads_curr"),
+          partners_prev: sumF("partners_prev"), partners_curr: sumF("partners_curr"),
+        };
+        const fmt = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) : "—";
+        const evo = (prev, curr) => prev > 0 && curr > 0 ? ((curr-prev)/prev*100).toFixed(1)+"%" : "—";
+        return (
+          <MCCard title="Total" accent="text-purple-800">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Leads {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.leads_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Leads {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.leads_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.leads_curr>=totals.leads_prev?"text-green-600":"text-red-600"}`}>{evo(totals.leads_prev,totals.leads_curr)}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.partners_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.partners_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.partners_curr>=totals.partners_prev?"text-green-600":"text-red-600"}`}>{evo(totals.partners_prev,totals.partners_curr)}</p>
+                </div>
+              </div>
+            </div>
+          </MCCard>
+        );
+      })()}
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
