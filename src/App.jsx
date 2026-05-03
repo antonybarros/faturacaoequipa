@@ -992,33 +992,37 @@ function DashboardWrapper({
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">CONCRETIZAÇÃO DO OBJETIVO</p>
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                   <span>0 €</span>
-                  <span>Objetivo: {fmtEur(obj)}{aboveObj > 0 ? ` + ${fmtEur(aboveObj)}` : ""}</span>
+                  <span>Objetivo: {fmtEur(obj)}{aboveObj > 0 ? ` +${fmtEur(aboveObj)}` : ""}</span>
                 </div>
-                <div className="relative h-7 bg-slate-200 rounded-full overflow-hidden">
-                  <div className="absolute left-0 top-0 h-full rounded-full bg-emerald-600 transition-all"
-                    style={{width:`${(clampPct*100).toFixed(1)}%`}}/>
+                {/* Bar — uses a flex row so widths are relative to each other */}
+                <div className="relative h-7 rounded-full overflow-hidden flex">
+                  {/* Main bar up to 100% of objective */}
+                  <div className="h-full bg-emerald-600" style={{width:`${(clampPct*100).toFixed(2)}%`, minWidth: clampPct>0?"4px":"0"}}/>
+                  {/* Excess bar beyond objective */}
                   {excessPct > 0 && (
-                    <div className="absolute top-0 h-full rounded-full bg-emerald-300 transition-all"
-                      style={{left:`${(clampPct*100).toFixed(1)}%`, width:`${(excessPct*100).toFixed(1)}%`}}/>
+                    <div className="h-full bg-emerald-300" style={{width:`${(excessPct*100).toFixed(2)}%`, minWidth:"4px"}}/>
                   )}
-                  <div className="absolute top-0 h-full w-0.5 bg-slate-800"
-                    style={{left:`${(clampPct*100).toFixed(1)}%`}}/>
+                  {/* Remaining unfilled */}
+                  <div className="h-full bg-slate-200 flex-1"/>
+                  {/* Objective line — positioned absolutely */}
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10"
+                    style={{left:`${(clampPct*100).toFixed(2)}%`}}/>
                 </div>
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between mt-3">
                   <div>
                     <p className="text-xs text-slate-500">% do objetivo</p>
                     <p className="text-2xl font-bold text-emerald-700">{pctObj.toFixed(2)}%</p>
                   </div>
                   {aboveObj > 0 && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 text-xs font-bold text-emerald-700">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5 text-xs font-bold text-emerald-700">
                       ✓ +{fmtEur(aboveObj)} acima do objetivo
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>{`Realizado até objetivo (${fmtEur(obj)})`}</span>
-                  {excessPct > 0 && <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-300"/>{`Excedente (+${fmtEur(aboveObj)})`}</span>}
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-0.5 h-3 bg-slate-800"/>Linha de objetivo</span>
+                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500 flex-wrap">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>Realizado até objetivo ({fmtEur(obj)})</span>
+                  {excessPct > 0 && <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-300"/>Excedente (+{fmtEur(aboveObj)})</span>}
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-0.5 h-3 bg-slate-900"/>Linha de objetivo</span>
                 </div>
               </div>
             )}
@@ -1489,6 +1493,30 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
   const noClosedDays = closedDay === 0;
   const scopeLabel = scope === "total" ? "Total" : scope;
   const [modal, setModal] = useState(null);
+  const [histData, setHistData] = useState([]);
+  useEffect(() => {
+    if (scope !== "total") return;
+    const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    (async () => {
+      const rows = await Promise.all(
+        MONTH_LABELS.map(async (_, mi) => {
+          const getTotal = async (y) => {
+            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
+            if (!row?.entries) return null;
+            const converted = dailyToCumulative(row.entries, TEAMS);
+            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            if (!days.length) return null;
+            const last = converted[String(days[days.length-1])];
+            return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0) || null;
+          };
+          const [v25, v26] = await Promise.all([getTotal(year-1), getTotal(year)]);
+          return { month: MONTH_LABELS[mi], [year-1]: v25, [year]: v26 };
+        })
+      );
+      setHistData(rows);
+    })();
+  }, [year, scope]);
 
   function YoYCard({ title, curr, prev, isEur = true, isPct = false }) {
     const fmt = v => v == null ? "—" : isPct ? `${v.toFixed(2)}%` : isEur ? fmtEur(v) : String(Math.round(v));
@@ -1846,66 +1874,27 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               </div>
             )}
 
-            {/* 4. Gráfico histórico mensal — Revenda 2025 vs 2026 */}
-            {(() => {
-              const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-              // Build historical data: for each month load from billing_months
-              const [histData, setHistData] = useState([]);
-              useEffect(() => {
-                (async () => {
-                  const rows = await Promise.all(
-                    MONTH_LABELS.map(async (_, mi) => {
-                      const key25 = `revenda-daily-${year-1}-${String(mi+1).padStart(2,"0")}`;
-                      const key26 = `revenda-daily-${year}-${String(mi+1).padStart(2,"0")}`;
-                      const getTotal = async (key) => {
-                        const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
-                        if (!row?.entries) return 0;
-                        const converted = dailyToCumulative(row.entries, TEAMS);
-                        const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
-                        if (!days.length) return 0;
-                        const last = converted[String(days[days.length-1])];
-                        return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0);
-                      };
-                      const [v25, v26] = await Promise.all([getTotal(key25), getTotal(key26)]);
-                      return { month: MONTH_LABELS[mi], [year-1]: v25||null, [year]: v26||null };
-                    })
-                  );
-                  setHistData(rows);
-                })();
-              }, [year]);
-
-              if (!histData.length) return null;
-              const hasData = histData.some(r => r[year-1] || r[year]);
-              if (!hasData) return null;
-
-              const maxVal = Math.max(...histData.flatMap(r=>[r[year-1]||0,r[year]||0]));
-              const fmtK = v => v>=1000000 ? (v/1000000).toFixed(1)+"M" : v>=1000 ? Math.round(v/1000)+"k" : String(Math.round(v));
-
-              return (
-                <div className="bg-white rounded-xl border border-slate-200 p-5">
-                  <h3 className="font-semibold text-slate-900 mb-1">Revenda — Histórico {year-1} vs {year}</h3>
-                  <p className="text-xs text-slate-500 mb-4">Faturação mensal comparativa · actualiza automaticamente com os dados registados</p>
-                  <div className="overflow-x-auto">
-                    <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={histData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                      <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-                      <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
-                        tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={40}/>
-                      <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €", name]}
-                        contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-                      <Legend iconType="square" iconSize={10}
-                        formatter={(v)=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-                      <Bar dataKey={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={28}
-                        label={{position:"top",fontSize:9,fill:"#94a3b8",formatter:v=>v>0?new Intl.NumberFormat("fr-FR").format(v):""}}/>
-                      <Bar dataKey={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={28}
-                        label={{position:"top",fontSize:9,fill:"#64748b",fontWeight:"bold",formatter:v=>v>0?new Intl.NumberFormat("fr-FR").format(v):""}}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  </div>
-                </div>
-              );
-            })()}
+            {/* 4. Gráfico histórico mensal */}
+            {histData.some(r => r[year-1] || r[year]) && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900 mb-1">Revenda — Histórico {year-1} vs {year}</h3>
+                <p className="text-xs text-slate-500 mb-4">Faturação mensal comparativa · actualiza automaticamente com os dados registados</p>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={histData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+                    <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+                    <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                      tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+                    <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €", name]}
+                      contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+                    <Legend iconType="square" iconSize={10}
+                      formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+                    <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+                    <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </>);
         })()}
 
