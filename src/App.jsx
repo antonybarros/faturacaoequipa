@@ -847,9 +847,32 @@ function DashboardWrapper({
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
 
-  // Margem — from closing data (global, same for all scopes for now)
-  const marginCurr = closingCurr?.revenda_margin ? parseFloat(closingCurr.revenda_margin) : null;
-  const marginPrev = closingPrev?.revenda_margin ? parseFloat(closingPrev.revenda_margin) : null;
+  // Margem — from MargemRegisto (closing.markets[code].margin_curr/prev)
+  // For "total" scope: use global revenda_margin field (set in Registo > Margem)
+  // For specific market scope: use that market's margin_curr/prev
+  const getMargin = (closing, marketCode) => {
+    if (!closing) return null;
+    if (marketCode === "total") {
+      // Try global field first, then fall back to average of markets
+      if (closing.revenda_margin) return parseFloat(closing.revenda_margin);
+      const vals = MC_MARKETS.map(m => parseFloat(closing.markets?.[m.code]?.margin_curr)).filter(v => !isNaN(v) && v > 0);
+      return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) / vals.length : null;
+    }
+    const v = closing.markets?.[marketCode]?.margin_curr;
+    return v ? parseFloat(v) : null;
+  };
+  const getMarginPrev = (closing, marketCode) => {
+    if (!closing) return null;
+    if (marketCode === "total") {
+      if (closing.revenda_margin_prev) return parseFloat(closing.revenda_margin_prev);
+      const vals = MC_MARKETS.map(m => parseFloat(closing.markets?.[m.code]?.margin_prev)).filter(v => !isNaN(v) && v > 0);
+      return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) / vals.length : null;
+    }
+    const v = closing.markets?.[marketCode]?.margin_prev;
+    return v ? parseFloat(v) : null;
+  };
+  const marginCurr = getMargin(closingCurr, scope);
+  const marginPrev = getMarginPrev(closingPrev, scope);
 
   // Encomendas — aggregate across all markets (total) or specific market
   const sumField = (closing, field) => {
