@@ -932,39 +932,99 @@ function DashboardWrapper({
         </div>
       )}
 
-      {/* Comparação vs ano anterior — faturação */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-orange-500" />
-          Faturação vs {year - 1}
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-50 rounded-xl p-4">
-            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year - 1}</p>
-            <p className="text-xl font-bold text-slate-700">
-              {prevYearActual != null ? fmtEur(prevYearActual) : <span className="text-slate-400 text-sm">Sem dados</span>}
-            </p>
+      {/* Faturação — Revenda (card completo tipo template) */}
+      {(() => {
+        const result  = stats.actual;
+        const prev    = prevYearActual;
+        const obj     = stats.goal;
+        const evoPct2 = prev > 0 ? ((result - prev) / prev * 100) : null;
+        const evoAbs2 = prev != null ? result - prev : null;
+        const aboveObj = obj > 0 ? result - obj : null;
+        const pctObj   = obj > 0 ? (result / obj * 100) : null;
+        const pos = evoPct2 != null && evoPct2 >= 0;
+        const clampPct = pctObj != null ? Math.min(pctObj / 100, 1) : 0;
+        const excessPct = pctObj != null ? Math.max(0, pctObj / 100 - 1) : 0;
+        const scopeLabel2 = scope === "total" ? "Total" : SCOPES.find(s=>s.id===scope)?.label || scope;
+        return (
+          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">FATURAÇÃO — REVENDA</h2>
+            <p className="text-sm font-semibold text-slate-500 -mt-3">{month} {year} – em comparação ao ano anterior · {scopeLabel2}</p>
+
+            {/* 3 KPI cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">RESULTADO {month.toUpperCase()} {year-1}</p>
+                <p className="text-2xl font-bold text-slate-700">{prev != null ? fmtEur(prev) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
+              </div>
+              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">OBJETIVO {month.toUpperCase()} {year}</p>
+                <p className="text-2xl font-bold text-emerald-600">{obj > 0 ? fmtEur(obj) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
+                {obj > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{((obj-prev)/prev*100).toFixed(2)}% vs resultado {month.toLowerCase()} {year-1}</p>}
+              </div>
+              <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 ring-2 ring-emerald-400">
+                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">RESULTADO {month.toUpperCase()} {year}</p>
+                <p className="text-3xl font-bold text-emerald-700">{result > 0 ? fmtEur(result) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
+                {evoPct2 != null && <p className="text-sm font-bold text-emerald-700 mt-1">{pos?"+":""}{evoPct2.toFixed(2)}% vs {year-1}</p>}
+              </div>
+            </div>
+
+            {/* Detalhe row */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">DETALHE DO RESULTADO</p>
+              <div className="grid grid-cols-4 gap-0 divide-x divide-slate-200">
+                {[
+                  {label:"Evolução vs "+(year-1), val: evoPct2!=null?`${pos?"+":""}${evoPct2.toFixed(2)}%`:"—", color: pos?"text-emerald-600":"text-red-600"},
+                  {label:"Ganho absoluto",         val: evoAbs2!=null?`${evoAbs2>=0?"+":""}${fmtEur(evoAbs2)}`:"—", color:"text-slate-900"},
+                  {label:"Acima do objetivo",      val: aboveObj!=null?fmtEur(aboveObj):"—", color:"text-emerald-600"},
+                  {label:"% do objetivo",          val: pctObj!=null?`${pctObj.toFixed(2)}%`:"—", color:"text-emerald-600"},
+                ].map((d,i) => (
+                  <div key={i} className="px-4 first:pl-0 last:pr-0">
+                    <p className="text-xs text-slate-500 mb-1">{d.label}</p>
+                    <p className={`text-xl font-bold ${d.color}`}>{d.val}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            {obj > 0 && result > 0 && (
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">CONCRETIZAÇÃO DO OBJETIVO</p>
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                  <span>0 €</span>
+                  <span>Objetivo: {fmtEur(obj)}{aboveObj > 0 ? ` + ${fmtEur(aboveObj)}` : ""}</span>
+                </div>
+                <div className="relative h-7 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="absolute left-0 top-0 h-full rounded-full bg-emerald-600 transition-all"
+                    style={{width:`${(clampPct*100).toFixed(1)}%`}}/>
+                  {excessPct > 0 && (
+                    <div className="absolute top-0 h-full rounded-full bg-emerald-300 transition-all"
+                      style={{left:`${(clampPct*100).toFixed(1)}%`, width:`${(excessPct*100).toFixed(1)}%`}}/>
+                  )}
+                  <div className="absolute top-0 h-full w-0.5 bg-slate-800"
+                    style={{left:`${(clampPct*100).toFixed(1)}%`}}/>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <div>
+                    <p className="text-xs text-slate-500">% do objetivo</p>
+                    <p className="text-2xl font-bold text-emerald-700">{pctObj.toFixed(2)}%</p>
+                  </div>
+                  {aboveObj > 0 && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 text-xs font-bold text-emerald-700">
+                      ✓ +{fmtEur(aboveObj)} acima do objetivo
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-600"/>{`Realizado até objetivo (${fmtEur(obj)})`}</span>
+                  {excessPct > 0 && <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-300"/>{`Excedente (+${fmtEur(aboveObj)})`}</span>}
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-0.5 h-3 bg-slate-800"/>Linha de objetivo</span>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="bg-blue-50 rounded-xl p-4">
-            <p className="text-xs text-slate-500 font-medium mb-1">{month} {year}</p>
-            <p className="text-xl font-bold text-blue-700">
-              {stats.actual > 0 ? fmtEur(stats.actual) : <span className="text-slate-400 text-sm">Sem dados</span>}
-            </p>
-          </div>
-          <div className={`rounded-xl p-4 ${evoPct == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
-            <p className="text-xs text-slate-500 font-medium mb-1">Evolução %</p>
-            <p className={`text-xl font-bold ${evoPct == null ? "text-slate-400" : isAheadYoY ? "text-green-700" : "text-red-700"}`}>
-              {evoPct == null ? "—" : `${isAheadYoY ? "+" : ""}${evoPct.toFixed(1)}%`}
-            </p>
-          </div>
-          <div className={`rounded-xl p-4 ${evoAbs == null ? "bg-slate-50" : isAheadYoY ? "bg-green-50" : "bg-red-50"}`}>
-            <p className="text-xs text-slate-500 font-medium mb-1">Ganho absoluto</p>
-            <p className={`text-xl font-bold ${evoAbs == null ? "text-slate-400" : isAheadYoY ? "text-green-700" : "text-red-700"}`}>
-              {evoAbs == null ? "—" : `${evoAbs >= 0 ? "+" : ""}${fmtEur(evoAbs)}`}
-            </p>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       <RevDashboard
         stats={stats}
@@ -1826,50 +1886,22 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                   <h3 className="font-semibold text-slate-900 mb-1">Revenda — Histórico {year-1} vs {year}</h3>
                   <p className="text-xs text-slate-500 mb-4">Faturação mensal comparativa · actualiza automaticamente com os dados registados</p>
                   <div className="overflow-x-auto">
-                    <div className="flex items-end gap-1.5 h-48 min-w-[600px] pt-6 relative">
-                      {/* Y axis labels */}
-                      {[0,0.25,0.5,0.75,1].map(pct=>(
-                        <div key={pct} className="absolute left-0 text-xs text-slate-400" style={{bottom:`${pct*100}%`,transform:"translateY(50%)"}}>
-                          {fmtK(maxVal*pct)}
-                        </div>
-                      ))}
-                      {/* Grid lines */}
-                      {[0.25,0.5,0.75,1].map(pct=>(
-                        <div key={pct} className="absolute left-8 right-0 border-t border-slate-100" style={{bottom:`${pct*100}%`}}/>
-                      ))}
-                      <div className="flex items-end gap-1.5 flex-1 ml-8 h-full">
-                        {histData.map((row, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                            <div className="w-full flex items-end gap-0.5 justify-center" style={{height:"100%"}}>
-                              {/* 2025 bar */}
-                              {row[year-1] > 0 ? (
-                                <div className="flex-1 rounded-t-sm relative group" title={`${row.month} ${year-1}: ${new Intl.NumberFormat("fr-FR").format(row[year-1])} €`}
-                                  style={{height:`${(row[year-1]/maxVal*100).toFixed(1)}%`,backgroundColor:"#F4A261",minHeight:"2px"}}>
-                                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-slate-500 hidden group-hover:block whitespace-nowrap">
-                                    {fmtK(row[year-1])}
-                                  </span>
-                                </div>
-                              ) : <div className="flex-1"/>}
-                              {/* 2026 bar */}
-                              {row[year] > 0 ? (
-                                <div className="flex-1 rounded-t-sm relative group" title={`${row.month} ${year}: ${new Intl.NumberFormat("fr-FR").format(row[year])} €`}
-                                  style={{height:`${(row[year]/maxVal*100).toFixed(1)}%`,backgroundColor:"#8B4513",minHeight:"2px"}}>
-                                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-slate-600 font-semibold hidden group-hover:block whitespace-nowrap">
-                                    {fmtK(row[year])}
-                                  </span>
-                                </div>
-                              ) : <div className="flex-1"/>}
-                            </div>
-                            <span className="text-[9px] text-slate-500 mt-1">{row.month}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Legend */}
-                    <div className="flex items-center gap-6 mt-3 justify-center text-xs text-slate-600">
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{backgroundColor:"#F4A261"}}/>{year-1}</div>
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{backgroundColor:"#8B4513"}}/>{year}</div>
-                    </div>
+                    <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={histData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+                      <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+                      <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                        tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={40}/>
+                      <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €", name]}
+                        contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+                      <Legend iconType="square" iconSize={10}
+                        formatter={(v)=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+                      <Bar dataKey={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={28}
+                        label={{position:"top",fontSize:9,fill:"#94a3b8",formatter:v=>v>0?new Intl.NumberFormat("fr-FR").format(v):""}}/>
+                      <Bar dataKey={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={28}
+                        label={{position:"top",fontSize:9,fill:"#64748b",fontWeight:"bold",formatter:v=>v>0?new Intl.NumberFormat("fr-FR").format(v):""}}/>
+                    </BarChart>
+                  </ResponsiveContainer>
                   </div>
                 </div>
               );
