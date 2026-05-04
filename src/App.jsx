@@ -1451,7 +1451,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     val: "text-xl font-bold",
   };
 
-  function BigCard({ name, result, prev, objective, children }) {
+  function BigCard({ name, result, prev, objective, showObjective = true, children }) {
     const evoPct = prev > 0 ? ((result - prev) / prev * 100) : null;
     const evoAbs = prev != null ? result - prev : null;
     const aboveObj = objective > 0 ? result - objective : null;
@@ -1468,16 +1468,18 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           <p className={DS.subtitle}>{month} {year} – em comparação ao ano anterior · {scopeLabel}</p>
         </div>
         {/* 3 KPI cards */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className={showObjective ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
           <div className={DS.kpiBox}>
             <p className={DS.kpiLabel}>RESULTADO {month.toUpperCase()} {year-1}</p>
             <p className={DS.kpiVal}>{prev > 0 ? fmtE(prev) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
           </div>
+          {showObjective && (
           <div className={DS.kpiBox}>
             <p className={DS.kpiLabel}>OBJETIVO {month.toUpperCase()} {year}</p>
             <p className="text-2xl font-bold text-emerald-600">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
             {objective > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{fmtP((objective-prev)/prev*100,true)} vs {month.toLowerCase()} {year-1}</p>}
           </div>
+          )}
           <div className={DS.kpiBoxHL}>
             <p className={DS.kpiLabel}>RESULTADO {month.toUpperCase()} {year}</p>
             <p className={DS.kpiValBig}>{result > 0 ? fmtE(result) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
@@ -1491,8 +1493,10 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             {[
               {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
               {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
-              {label:"Acima do objetivo",      val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
-              {label:"% do objetivo",          val: pctObj!=null?fmtP(pctObj):"—", color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
+              ...(showObjective ? [
+                {label:"Acima do objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
+                {label:"% do objetivo",     val: pctObj!=null?fmtP(pctObj):"—",    color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
+              ] : []),
             ].map((d,i) => (
               <div key={i} className={DS.col}>
                 <p className="text-xs text-slate-500 mb-1">{d.label}</p>
@@ -1607,7 +1611,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </div>
 
       {/* ── CARD: REVENDA ── */}
-      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal}>
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"}>
         {/* Distribuição por mercado — dentro do card Revenda */}
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
@@ -1710,7 +1714,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       {/* ── CARD: AFILIAÇÃO ── */}
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
-          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}>
+          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
+          showObjective={scope === "total"}>
           {afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
           )}
