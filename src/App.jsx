@@ -1509,11 +1509,16 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               <span>0 €</span>
               <span>Objetivo: {fmtE(objective)}{aboveObj > 0 ? ` +${fmtE(aboveObj)}` : ""}</span>
             </div>
-            <div className="relative h-7 rounded-full overflow-hidden flex">
-              <div className="h-full bg-emerald-600" style={{width:`${(clampPct*100).toFixed(2)}%`,minWidth:clampPct>0?"4px":"0"}}/>
-              {excessPct > 0 && <div className="h-full bg-emerald-300" style={{width:`${(excessPct*100).toFixed(2)}%`,minWidth:"4px"}}/>}
-              <div className="h-full bg-slate-200 flex-1"/>
-              <div className="absolute top-0 bottom-0 w-0.5 bg-slate-900 z-10" style={{left:`${(clampPct*100).toFixed(2)}%`}}/>
+            <div className="relative h-7">
+              {/* Coloured fill bars */}
+              <div className="absolute inset-0 rounded-full overflow-hidden flex">
+                <div className="h-full bg-emerald-600" style={{width:`${(clampPct*100).toFixed(2)}%`,minWidth:clampPct>0?"4px":"0"}}/>
+                {excessPct > 0 && <div className="h-full bg-emerald-300" style={{width:`${(excessPct*100).toFixed(2)}%`,minWidth:"4px"}}/>}
+                <div className="h-full bg-slate-200 flex-1"/>
+              </div>
+              {/* Objective line — outside overflow:hidden so it's always visible */}
+              <div className="absolute top-0 bottom-0 w-1 bg-slate-900 rounded-full z-10"
+                style={{left:`calc(${(clampPct*100).toFixed(2)}% - 2px)`}}/>
             </div>
             <div className="flex items-center justify-between mt-3">
               <div>
@@ -1705,7 +1710,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       {/* ── CARD: AFILIAÇÃO ── */}
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
-          objective={parseFloat(closingCurr?.afil_objective)||0}>
+          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}>
           {afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
           )}
@@ -1794,7 +1799,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                     <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
                     <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500"
-                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#3A9E8F",minWidth:barPct>0?"8px":"0"}}/>
+                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#6ee7b7",minWidth:barPct>0?"8px":"0"}}/>
                     </div>
                     <div className="w-36 flex items-center gap-2 shrink-0">
                       <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
