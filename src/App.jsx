@@ -254,7 +254,7 @@ function MainApp() {
         { id: "dashboard", label: "Resumo" },
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
-        { id: "entry", label: "Registro" },
+        { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
@@ -769,39 +769,10 @@ function AnaliseDashboardWrapper({
 function DashboardWrapper({
   data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
 }) {
-  // From January 2025 onwards, use Registo Revenda (daily values) as data source
-  const useRevendaReg = year >= 2025;
-  const revendaKey = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
-
-  const [revendaEntries, setRevendaEntries] = useState(null);
-  useEffect(() => {
-    if (!useRevendaReg) { setRevendaEntries(null); return; }
-    supabase.from("billing_months").select("entries").eq("month_key", revendaKey).maybeSingle()
-      .then(({ data: row }) => {
-        setRevendaEntries(row?.entries || {});
-      });
-  }, [revendaKey, useRevendaReg]);
-
-  // Build effective data: if using Registo Revenda, convert daily→cumulative
-  const effectiveData = useMemo(() => {
-    if (!useRevendaReg || revendaEntries === null) return data;
-    return {
-      ...data,
-      entries: dailyToCumulative(revendaEntries, TEAMS),
-    };
-  }, [data, useRevendaReg, revendaEntries]);
-
-  // When using Registo Revenda, closedDay = last day that has any entry filled
-  const revendaClosedDay = useMemo(() => {
-    if (!useRevendaReg || revendaEntries === null) return closedDay;
-    if (revendaEntries["_total"]) return totalDays; // 2025: monthly total
-    const days = Object.keys(revendaEntries).map(Number).filter(n => !isNaN(n) && n > 0);
-    return days.length > 0 ? Math.max(...days) : closedDay;
-  }, [useRevendaReg, revendaEntries, closedDay, totalDays]);
-
+  // Resumo uses same data as Análise comercial (billing_months/YYYY-MM)
   const stats = useMemo(
-    () => computeScopeStats(effectiveData, scope, totalDays, revendaClosedDay, year, monthNum),
-    [effectiveData, scope, totalDays, revendaClosedDay, year, monthNum]
+    () => computeScopeStats(data, scope, totalDays, closedDay, year, monthNum),
+    [data, scope, totalDays, closedDay, year, monthNum]
   );
 
   // Load prev year data + closing data (margem, encomendas)
@@ -811,20 +782,11 @@ function DashboardWrapper({
 
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
-    // Prev year billing — also try revenda-daily for prev year if applicable
-    const prevUseReg = (year - 1) >= 2025;
-    const prevDataKey = prevUseReg
-      ? `revenda-daily-${year - 1}-${String(monthNum + 1).padStart(2, "0")}`
-      : prevKey;
-
-    supabase.from("billing_months").select("entries").eq("month_key", prevDataKey).maybeSingle()
+    // Prev year billing — same source as current year (billing_months)
+    supabase.from("billing_months").select("entries").eq("month_key", prevKey).maybeSingle()
       .then(({ data: row }) => {
         if (!row?.entries) { setPrevYearActual(null); return; }
-        let entries = row.entries;
-        if (prevUseReg) {
-          // Convert daily to cumulative to extract final value
-          entries = dailyToCumulative(entries, TEAMS);
-        }
+        const entries = row.entries;
         const days = Object.keys(entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
         if (!days.length) { setPrevYearActual(null); return; }
         const lastEntry = entries[String(days[days.length - 1])] || {};
@@ -936,22 +898,14 @@ function DashboardWrapper({
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
 
-      {useRevendaReg && (
-        <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-          <span className="font-semibold">📋 Fonte:</span> Registo Revenda (valores diários)
-          {revendaEntries && Object.keys(revendaEntries).filter(k => !isNaN(Number(k))).length === 0 && (
-            <span className="ml-1 text-orange-600 font-medium">— ainda sem dados registados</span>
-          )}
-        </div>
-      )}
-
-      <RevDashboard
+<RevDashboard
         stats={stats}
         scope={scope}
         month={month}
         year={year}
         totalDays={totalDays}
-        closedDay={revendaClosedDay}
+        closedDay={closedDay}
+        data={data}
         isCurrentMonth={isCurrentMonth}
         prevYearActual={prevYearActual}
         marginCurr={marginCurr}
@@ -966,7 +920,6 @@ function DashboardWrapper({
         leadsPrev={leadsPrev}
         afilCurr={afilCurr}
         afilPrev={afilPrev}
-        effectiveData={effectiveData}
         closingCurr={closingCurr}
       />
     </div>
@@ -1396,7 +1349,7 @@ function Dashboard({
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  effectiveData, closingCurr }) {
+  closingCurr, data }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1417,13 +1370,12 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getTotal = async (y) => {
-            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const converted = dailyToCumulative(row.entries, TEAMS);
-            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = converted[String(days[days.length-1])];
+            const last = row.entries[String(days[days.length-1])];
             return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0) || null;
           };
           const [v25, v26] = await Promise.all([getTotal(year-1), getTotal(year)]);
@@ -1442,13 +1394,12 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getVal = async (y) => {
-            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const converted = dailyToCumulative(row.entries, TEAMS);
-            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = converted[String(days[days.length-1])];
+            const last = row.entries[String(days[days.length-1])];
             return Number(last?.[scope]) || null;
           };
           const [v25, v26] = await Promise.all([getVal(year-1), getVal(year)]);
@@ -1616,10 +1567,13 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
   // ── Data for charts ─────────────────────────────────────────────────────────
   const getLastMktVal = (code) => {
-    if (!effectiveData?.entries) return 0;
-    const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    if (!stats?.daily) return 0;
+    // Use the last cumulative value from stats.daily for this scope
+    // For per-market, read directly from data.entries last day
+    const entries = data?.entries || {};
+    const days = Object.keys(entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
     if (!days.length) return 0;
-    return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
+    return Number(entries[String(days[days.length-1])][code]) || 0;
   };
   const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
   const COLORS_AFIL = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
@@ -4744,13 +4698,13 @@ function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAd
 
 // ── EntryHub — Registo Diário com sub-tabs ──────────────────────────────────
 function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
-  const [subTab, setSubTab] = useState("revenda");
+  const [subTab, setSubTab] = useState("registo");
   const subTabs = [
-    { id: "revenda",    label: "Revenda",      color: "bg-blue-600" },
-    { id: "afiliacao",  label: "Afiliação",    color: "bg-orange-500" },
-    { id: "encomendas", label: "Encomendas",   color: "bg-blue-700" },
-    { id: "parceiros",  label: "Parceiros",    color: "bg-purple-500" },
-    { id: "margem",     label: "Margem",       color: "bg-green-600" },
+    { id: "registo",    label: "Registo Diário", color: "bg-blue-600" },
+    { id: "afiliacao",  label: "Afiliação",      color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",     color: "bg-blue-700" },
+    { id: "parceiros",  label: "Parceiros",      color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",         color: "bg-green-600" },
   ];
   return (
     <div className="space-y-4">
@@ -4763,7 +4717,7 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
           </button>
         ))}
       </div>
-      {subTab === "revenda" && (
+      {subTab === "registo" && (
         <Entry data={data} setEntry={setEntry} totalDays={totalDays}
           closedDay={closedDay} isCurrentMonth={isCurrentMonth} />
       )}
