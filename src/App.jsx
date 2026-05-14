@@ -1866,30 +1866,27 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       )}
 
       {/* ── 7. Per-market historical chart (non-total scopes) ── */}
-      {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (() => {
-        if (true) {
-        return (
-          <div className={DS.card}>
-            <div>
-              <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
-              <p className={DS.subtitle}>{SCOPES.find(s=>s.id===scope)?.label} · faturação mensal comparativa</p>
-            </div>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={mktHistData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-                <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
-                  tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-                <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
-                  contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-                <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-                <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
-                <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
-              </BarChart>
-            </ResponsiveContainer>
+      {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
+            <p className={DS.subtitle}>{SCOPES.find(s=>s.id===scope)?.label} · faturação mensal comparativa</p>
           </div>
-        );
-      })()}
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={mktHistData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
+                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* ── 8. Daily revenue chart for each market ── */}
       {scope !== "total" && closedDay > 0 && (() => {
@@ -1919,11 +1916,11 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                   formatter={(v)=>[new Intl.NumberFormat("fr-FR").format(v)+" €","Faturação"]}
                   labelFormatter={l=>`Dia ${l}`}
                   contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-                <Bar dataKey="valor" radius={[3,3,0,0]} maxBarSize={24}
-                  fill="#3A9E8F"
-                  cell={chartData.map((d,i)=>(
+                <Bar dataKey="valor" radius={[3,3,0,0]} maxBarSize={24}>
+                  {chartData.map((d,i)=>(
                     <Cell key={i} fill={d.supersales?"#F59E0B":"#3A9E8F"}/>
-                  ))}/>
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
             {chartData.some(d=>d.supersales) && (
