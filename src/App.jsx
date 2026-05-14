@@ -805,7 +805,7 @@ function DashboardWrapper({
     loadClosing(year - 1, monthNum).then(setClosingPrev);
   }, [year, monthNum, scope]);
 
-  // YoY faturação — use displayActual (may differ from stats.actual when using Registo Revenda)
+  // YoY faturação
   const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
@@ -881,18 +881,7 @@ function DashboardWrapper({
     return global > 0 ? global : null;
   })();
 
-  // Fallback: if billing data is empty, try to read total from Registo Revenda closing
-  // This covers months where data was entered via the simple 2025 form
-  const revendaActual = stats.actual > 0 ? stats.actual : (() => {
-    if (!closingCurr) return 0;
-    // Try _total from revenda closing (2025 format stored in closing)
-    const rev = closingCurr?.revenda_total;
-    if (rev) return Number(rev);
-    return 0;
-  })();
 
-  // Use revendaActual instead of stats.actual for YoY comparison display
-  const displayActual = revendaActual || stats.actual;
 
   return (
     <div className="space-y-5">
@@ -1595,7 +1584,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </div>
 
       {/* ── CARD: REVENDA ── */}
-      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!effectiveData?.entries) return 0; const days=Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=effectiveData.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!data?.entries) return 0; const days=Object.keys(data.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=data.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
         {/* Distribuição por mercado — dentro do card Revenda */}
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
