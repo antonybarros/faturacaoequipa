@@ -791,9 +791,17 @@ function DashboardWrapper({
     };
   }, [data, useRevendaReg, revendaEntries]);
 
+  // When using Registo Revenda, closedDay = last day that has any entry filled
+  const revendaClosedDay = useMemo(() => {
+    if (!useRevendaReg || revendaEntries === null) return closedDay;
+    if (revendaEntries["_total"]) return totalDays; // 2025: monthly total
+    const days = Object.keys(revendaEntries).map(Number).filter(n => !isNaN(n) && n > 0);
+    return days.length > 0 ? Math.max(...days) : closedDay;
+  }, [useRevendaReg, revendaEntries, closedDay, totalDays]);
+
   const stats = useMemo(
-    () => computeScopeStats(effectiveData, scope, totalDays, closedDay, year, monthNum),
-    [effectiveData, scope, totalDays, closedDay, year, monthNum]
+    () => computeScopeStats(effectiveData, scope, totalDays, revendaClosedDay, year, monthNum),
+    [effectiveData, scope, totalDays, revendaClosedDay, year, monthNum]
   );
 
   // Load prev year data + closing data (margem, encomendas)
@@ -943,7 +951,7 @@ function DashboardWrapper({
         month={month}
         year={year}
         totalDays={totalDays}
-        closedDay={closedDay}
+        closedDay={revendaClosedDay}
         isCurrentMonth={isCurrentMonth}
         prevYearActual={prevYearActual}
         marginCurr={marginCurr}
