@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["PT", "IT", "ES", "FR", "CH-BNL-DEAT", "CZ", "USA", "OT"];
+const TEAMS = ["PT", "IT", "ES", "FR", "CH-BNL-DEAT", "CZ-SK-GR-CY-PL", "USA", "OT"];
 const SCOPES = [
   { id: "total", label: "Total" },
   { id: "PT", label: "Portugal" },
@@ -17,18 +17,18 @@ const SCOPES = [
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
   { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
-  { id: "CZ", label: "Chéquia" },
+  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
   { id: "USA", label: "USA" },
   { id: "OT", label: "Outros" },
 ];
 // Equipas para "Análise comercial" — cada equipa agrega vários mercados
 const ANALISE_TEAMS = [
-  { id: "total",      label: "Total",      markets: ["PT","IT","ES","FR","CH-BNL-DEAT","CZ","USA","OT"] },
+  { id: "total",      label: "Total",      markets: ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"] },
   { id: "equipa_pt",  label: "Equipa PT",  markets: ["PT","OT"] },
   { id: "equipa_it",  label: "Equipa IT",  markets: ["IT"] },
   { id: "equipa_es",  label: "Equipa ES",  markets: ["ES"] },
   { id: "equipa_fr",  label: "Equipa FR",  markets: ["FR","CH-BNL-DEAT"] },
-  { id: "equipa_na",  label: "Equipa NA",  markets: ["CZ","USA"] },
+  { id: "equipa_na",  label: "Equipa NA",  markets: ["CZ-SK-GR-CY-PL","USA"] },
 ];
 const ANALISE_COLORS = {
   total: "#0f172a", equipa_pt: "#16a34a", equipa_it: "#2563eb",
@@ -38,7 +38,7 @@ const ANALISE_COLORS = {
 const TEAM_COLORS = {
   PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
   FR: "#9333ea", "CH-BNL-DEAT": "#d97706",
-  CZ: "#0891b2", USA: "#7c3aed", OT: "#64748b", total: "#0f172a",
+  "CZ-SK-GR-CY-PL": "#0891b2", USA: "#7c3aed", OT: "#64748b", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -57,7 +57,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
+  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
   entries: {},
 });
 
@@ -255,7 +255,6 @@ function MainApp() {
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo Diário" },
-        { id: "revenda_reg", label: "Registo" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
@@ -376,24 +375,18 @@ function MainApp() {
               <Relatorio monthNum={month} year={year} />
             )}
             {tab === "entry" && isAdmin && (
-              <Entry
+              <EntryHub
                 data={data}
                 setEntry={setEntry}
                 totalDays={totalDays}
                 closedDay={closedDay}
                 isCurrentMonth={isCurrentMonth}
-              />
-            )}
-            {tab === "revenda_reg" && isAdmin && (
-              <RegistoHub
                 monthNum={month}
                 year={year}
-                totalDays={totalDays}
-                closedDay={closedDay}
-                isCurrentMonth={isCurrentMonth}
                 isAdmin={isAdmin}
               />
             )}
+
             {tab === "setup" && isAdmin && (
               <Setup
                 data={data}
@@ -1408,6 +1401,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
   const scopeLabel = scope === "total" ? "Total" : scope;
   const [modal, setModal] = useState(null);
   const [histData, setHistData] = useState([]);
+  const [mktHistData, setMktHistData] = useState([]);
   useEffect(() => {
     if (scope !== "total") return;
     const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -1432,6 +1426,31 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     })();
   }, [year, scope]);
 
+  // Per-market historical data
+  useEffect(() => {
+    if (scope === "total") return;
+    const MONTH_LABELS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    (async () => {
+      const rows = await Promise.all(
+        MONTH_LABELS.map(async (_, mi) => {
+          const getVal = async (y) => {
+            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
+            if (!row?.entries) return null;
+            const converted = dailyToCumulative(row.entries, TEAMS);
+            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            if (!days.length) return null;
+            const last = converted[String(days[days.length-1])];
+            return Number(last?.[scope]) || null;
+          };
+          const [v25, v26] = await Promise.all([getVal(year-1), getVal(year)]);
+          return { month: MONTH_LABELS[mi], [year-1]: v25, [year]: v26 };
+        })
+      );
+      setMktHistData(rows);
+    })();
+  }, [year, scope]);
+
   // ── Design helpers ──────────────────────────────────────────────────────────
   const DS = {
     card: "bg-white rounded-2xl border border-slate-200 p-5 space-y-4",
@@ -1451,7 +1470,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     val: "text-xl font-bold",
   };
 
-  function BigCard({ name, result, prev, objective, showObjective = true, children }) {
+  function BigCard({ name, result, prev, objective, showObjective = true, totalResult = 0, children }) {
     const evoPct = prev > 0 ? ((result - prev) / prev * 100) : null;
     const evoAbs = prev != null ? result - prev : null;
     const aboveObj = objective > 0 ? result - objective : null;
@@ -1493,6 +1512,9 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             {[
               {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
               {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
+              ...(!showObjective && totalResult > 0 && result > 0 ? [
+                {label:"% do total",  val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
+              ] : []),
               ...(showObjective ? [
                 {label:"Acima do objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
                 {label:"% do objetivo",     val: pctObj!=null?fmtP(pctObj):"—",    color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
@@ -1611,7 +1633,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </div>
 
       {/* ── CARD: REVENDA ── */}
-      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"}>
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!effectiveData?.entries) return 0; const days=Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=effectiveData.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
         {/* Distribuição por mercado — dentro do card Revenda */}
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
@@ -1842,6 +1864,77 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* ── 7. Per-market historical chart (non-total scopes) ── */}
+      {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (() => {
+        if (true) {
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
+              <p className={DS.subtitle}>{SCOPES.find(s=>s.id===scope)?.label} · faturação mensal comparativa</p>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={mktHistData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+                <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+                <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                  tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+                <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
+                  contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+                <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+                <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+                <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
+
+      {/* ── 8. Daily revenue chart for each market ── */}
+      {scope !== "total" && closedDay > 0 && (() => {
+        const scopeLabel2 = SCOPES.find(s=>s.id===scope)?.label || scope;
+        const chartData = daily
+          .filter(d => d.day <= closedDay)
+          .map(d => ({
+            dia: d.day,
+            valor: d.value > 0 ? d.value : null,
+            supersales: d.supersales,
+          }));
+        if (!chartData.some(d=>d.valor)) return null;
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>FATURAÇÃO DIÁRIA</h2>
+              <p className={DS.subtitle}>{scopeLabel2} · {month} {year} · valor faturado por dia</p>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData} margin={{top:10,right:8,left:8,bottom:0}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+                <XAxis dataKey="dia" tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false}
+                  label={{value:"Dia",position:"insideBottomRight",offset:-5,fontSize:10,fill:"#94a3b8"}}/>
+                <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":String(v)}
+                  tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={40}/>
+                <Tooltip
+                  formatter={(v)=>[new Intl.NumberFormat("fr-FR").format(v)+" €","Faturação"]}
+                  labelFormatter={l=>`Dia ${l}`}
+                  contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+                <Bar dataKey="valor" radius={[3,3,0,0]} maxBarSize={24}
+                  fill="#3A9E8F"
+                  cell={chartData.map((d,i)=>(
+                    <Cell key={i} fill={d.supersales?"#F59E0B":"#3A9E8F"}/>
+                  ))}/>
+              </BarChart>
+            </ResponsiveContainer>
+            {chartData.some(d=>d.supersales) && (
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-500"/>Dia normal</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-400"/>Supersales</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {modal && (
         <DailyModal mode={modal} daily={daily} closedDay={closedDay} goal={goal}
@@ -2667,7 +2760,7 @@ function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal,
           <div>
             <h3 className="font-semibold text-slate-900">Objetivos por equipa</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Equipa PT = Portugal + Outros · Equipa FR = França + CH-BNL-DEAT · Equipa NA = Chéquia + USA
+              Equipa PT = Portugal + Outros · Equipa FR = França + CH-BNL-DEAT · Equipa NA = CZ-SK-GR-CY-PL + USA
             </p>
           </div>
           <button
@@ -3028,7 +3121,7 @@ const MC_MARKETS = [
   { code: "ES",          name: "Espanha" },
   { code: "FR",          name: "França" },
   { code: "CH-BNL-DEAT", name: "CH-BNL-DEAT" },
-  { code: "CZ",          name: "Chéquia" },
+  { code: "CZ-SK-GR-CY-PL", name: "CZ-SK-GR-CY-PL" },
   { code: "USA",         name: "USA" },
   { code: "OT",          name: "Outros" },
 ];
@@ -4364,7 +4457,7 @@ const AFILIACAO_SCOPES = [
   { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
   { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
-  { id: "CZ", label: "Chéquia" },
+  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
   { id: "USA", label: "USA" },
   { id: "OT", label: "Outros" },
 ];
@@ -4373,7 +4466,7 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
   const [afilScope, setAfilScope] = useState("total");
   const [afilData, setAfilData] = useState({
     totalGoal: 0,
-    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
+    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
     entries: {},
   });
   const [loading, setLoading] = useState(true);
@@ -4394,11 +4487,11 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
       if (row) {
         setAfilData({
           totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 },
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
           entries: row.entries || {},
         });
       } else {
-        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, CZ: 0, USA: 0, OT: 0 }, entries: {} });
+        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 }, entries: {} });
       }
       setLoading(false);
     })();
@@ -4410,7 +4503,7 @@ function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCur
     [afilData, afilScope, totalDays, closedDay, year, monthNum]
   );
   const teamStats = useMemo(
-    () => ["PT","IT","ES","FR","CH-BNL-DEAT","CZ","USA","OT"].map((t) => ({
+    () => ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"].map((t) => ({
       team: t,
       ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
     })),
@@ -4635,6 +4728,40 @@ function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAd
       {subTab === "margem" && (
         <MargemRegisto monthNum={monthNum} year={year} isAdmin={isAdmin} />
       )}
+    </div>
+  );
+}
+
+
+// ── EntryHub — Registo Diário com sub-tabs ──────────────────────────────────
+function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
+  const [subTab, setSubTab] = useState("revenda");
+  const subTabs = [
+    { id: "revenda",    label: "Revenda",      color: "bg-blue-600" },
+    { id: "afiliacao",  label: "Afiliação",    color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",   color: "bg-blue-700" },
+    { id: "parceiros",  label: "Parceiros",    color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",       color: "bg-green-600" },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {subTabs.map(t => (
+          <button key={t.id} onClick={() => setSubTab(t.id)}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+              subTab === t.id ? `${t.color} text-white` : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {subTab === "revenda" && (
+        <Entry data={data} setEntry={setEntry} totalDays={totalDays}
+          closedDay={closedDay} isCurrentMonth={isCurrentMonth} />
+      )}
+      {subTab === "afiliacao" && <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />}
+      {subTab === "encomendas" && <Encomendas monthNum={monthNum} year={year} isAdmin={isAdmin} />}
+      {subTab === "parceiros" && <LeadsParcerias monthNum={monthNum} year={year} isAdmin={isAdmin} />}
+      {subTab === "margem" && <MargemRegisto monthNum={monthNum} year={year} isAdmin={isAdmin} />}
     </div>
   );
 }
