@@ -254,7 +254,7 @@ function MainApp() {
         { id: "dashboard", label: "Resumo" },
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
-        { id: "entry", label: "Registo Diário" },
+        { id: "entry", label: "Registro" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
@@ -1638,6 +1638,29 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
+        {/* Margem */}
+        {(marginCurr || marginPrev) && (
+          <div className={DS.detailBox}>
+            <p className={DS.detailLabel}>MARGEM</p>
+            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">{year-1}</p>
+                <p className="text-xl font-semibold text-slate-600">{marginPrev!=null?`${marginPrev.toFixed(2)}%`:"—"}</p>
+              </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">{year}</p>
+                <p className="text-xl font-bold text-slate-900">{marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—"}</p>
+              </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">Evolução</p>
+                {marginCurr!=null&&marginPrev!=null?(()=>{const d=marginCurr-marginPrev;return(
+                  <p className={`text-xl font-bold ${d>=0?"text-emerald-600":"text-red-600"}`}>{d>=0?"+":""}{d.toFixed(2)}pp</p>
+                );})():<p className="text-xl font-bold text-slate-400">—</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Médias diárias */}
         {closedDay > 0 && (
           <div className={DS.detailBox}>
@@ -3293,9 +3316,8 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-orange-600">
-          <div className="grid grid-cols-2 gap-3">
-            <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
-            <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
+          <div className="grid grid-cols-1 gap-3">
+            <MCField label="Afiliação (€)" value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
           </div>
         </MCCard>
       ))}
@@ -3420,22 +3442,10 @@ function Encomendas({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
-          <div className="grid grid-cols-3 gap-4">
-            {/* Col 1: Encomendas */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`Encomendas ${year-1}`} value={data.markets[m.code]?.orders_prev||""} onChange={v => upMkt(m.code,"orders_prev",v)} />
-              <MCField label={`Encomendas ${year}`} value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
-            </div>
-            {/* Col 2: 1ªs enc. */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`1ªs enc. ${year-1}`} value={data.markets[m.code]?.first_orders_prev||""} onChange={v => upMkt(m.code,"first_orders_prev",v)} />
-              <MCField label={`1ªs enc. ${year}`} value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
-            </div>
-            {/* Col 3: Fat. 1ªs enc. */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={data.markets[m.code]?.first_orders_rev_prev||""} onChange={v => upMkt(m.code,"first_orders_rev_prev",v)} />
-              <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
-            </div>
+          <div className="grid grid-cols-3 gap-3">
+            <MCField label="Encomendas" value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
+            <MCField label="1ªs enc." value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
+            <MCField label="Fat. 1ªs enc. (€)" value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
           </div>
         </MCCard>
       ))}
@@ -3545,15 +3555,9 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-3">
-              <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
-              <MCField label={`Novos parceiros ${year-1}`} value={data.markets[m.code]?.partners_prev||""} onChange={v => upMkt(m.code,"partners_prev",v)} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
-              <MCField label={`Novos parceiros ${year}`} value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <MCField label="Leads" value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
+            <MCField label="Novos parceiros" value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
           </div>
         </MCCard>
       ))}
