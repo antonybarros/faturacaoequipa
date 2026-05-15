@@ -1743,6 +1743,36 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
+
+        {/* Histórico dentro do card Revenda */}
+        {scope === "total" && histData.some(r=>r[year-1]||r[year]) && (<>
+          <p className={DS.detailLabel} style={{marginTop:"0.5rem"}}>HISTÓRICO {year-1} VS {year}</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={histData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </>)}
+        {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (<>
+          <p className={DS.detailLabel} style={{marginTop:"0.5rem"}}>HISTÓRICO {year-1} VS {year}</p>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={mktHistData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </>)}
         {/* Médias diárias */}
         {closedDay > 0 && (
           <div className={DS.detailBox}>
@@ -1869,101 +1899,78 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: LEADS ── */}
-      {(leadsCurr || leadsPrev) && (
+      {/* ── CARD: LEADS + ORIGEM + NOVOS PARCEIROS ── */}
+      {(leadsCurr || leadsPrev || (originCurr && originCurr.some(v=>v!=null)) || (progCurr && progCurr.some(v=>v!=null))) && (
         <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>LEADS</h2>
-            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-          </div>
-          <div className={DS.detailBox}>
-            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{leadsPrev!=null?Math.round(leadsPrev):"—"}</p></div>
-              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{leadsCurr!=null?Math.round(leadsCurr):"—"}</p></div>
-              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
-                {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
+          <div><h2 className={DS.title}>LEADS</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
+
+          {/* Leads totais */}
+          {(leadsCurr || leadsPrev) && (
+            <div className={DS.detailBox}>
+              <p className={DS.detailLabel}>TOTAL DE LEADS</p>
+              <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{leadsPrev!=null?Math.round(leadsPrev):"—"}</p></div>
+                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{leadsCurr!=null?Math.round(leadsCurr):"—"}</p></div>
+                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                  {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ── CARD: ORIGEM DAS LEADS — Chart.js grouped bar ── */}
-      {originCurr && originCurr.some(v => v != null) && (() => {
-        const labels = ["Be A Partner","Vindas de angariadores","Outras fontes"];
-        const d25 = originPrev.map(v => v || 0);
-        const d26 = originCurr.map(v => v || 0);
-        const chartId = `origin-${scope}`;
-        return (
-          <div className={DS.card}>
-            <div>
-              <h2 className={DS.title}>ORIGEM DAS LEADS</h2>
-              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-            </div>
-            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
-              </span>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
-              </span>
-            </div>
-            <div style={{position:"relative",width:"100%",height:"220px"}}>
-              <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
-            </div>
-            <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
-          </div>
-        );
-      })()}
+          {/* Origem das leads */}
+          {originCurr && originCurr.some(v=>v!=null) && (() => {
+            const labels = ["Be A Partner","Vindas de angariadores","Outras fontes"];
+            const d25 = originPrev.map(v=>v||0);
+            const d26 = originCurr.map(v=>v||0);
+            const chartId = `origin-${scope}`;
+            return (<>
+              <p className={DS.detailLabel} style={{marginTop:"1rem"}}>ORIGEM DAS LEADS</p>
+              <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
+                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
+              </div>
+              <div style={{position:"relative",width:"100%",height:"200px"}}>
+                <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
+              </div>
+              <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
+            </>);
+          })()}
 
-      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — chart + table ── */}
-      {progCurr && progCurr.some(v => v != null) && (() => {
-        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        const combined = progLabels.map((l,i) => ({l, c:progCurr[i]||0, p:progPrev[i]||0})).sort((a,b)=>b.c-a.c);
-        const chartId = `prog-${scope}`;
-        const h = Math.max(300, combined.length * 48 + 60);
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
-              </span>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
-              </span>
-            </div>
-            <div style={{position:"relative",width:"100%",height:`${h}px`}}>
-              <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
-            </div>
-            <ChartProg id={chartId} labels={combined.map(x=>x.l)} d25={combined.map(x=>x.p)} d26={combined.map(x=>x.c)} />
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-              <thead><tr>
-                {["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(
-                  <th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {combined.map((row,i)=>{
+          {/* Novos parceiros por programa */}
+          {progCurr && progCurr.some(v=>v!=null) && (() => {
+            const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+            const combined = progLabels.map((l,i)=>({l,c:progCurr[i]||0,p:progPrev[i]||0})).sort((a,b)=>b.c-a.c);
+            const chartId = `prog-${scope}`;
+            const h = Math.max(280, combined.length*44+60);
+            return (<>
+              <p className={DS.detailLabel} style={{marginTop:"1.5rem"}}>NOVOS PARCEIROS POR PROGRAMA</p>
+              <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
+                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
+              </div>
+              <div style={{position:"relative",width:"100%",height:`${h}px`}}>
+                <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
+              </div>
+              <ChartProg id={chartId} labels={combined.map(x=>x.l)} d25={combined.map(x=>x.p)} d26={combined.map(x=>x.c)} />
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+                <thead><tr>{["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
+                <tbody>{combined.map((row,i)=>{
                   const evo=row.p>0&&row.c>0?((row.c-row.p)/row.p*100):null;
                   const pos=evo!=null&&evo>=0;
                   const border=i<combined.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                  return (
-                    <tr key={i}>
-                      <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.l}</td>
-                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{row.p>0?new Intl.NumberFormat("fr-FR").format(row.p):"—"}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{row.c>0?new Intl.NumberFormat("fr-FR").format(row.c):"—"}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>
-                        {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
+                  return (<tr key={i}>
+                    <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.l}</td>
+                    <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{row.p>0?new Intl.NumberFormat("fr-FR").format(row.p):"—"}</td>
+                    <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{row.c>0?new Intl.NumberFormat("fr-FR").format(row.c):"—"}</td>
+                    <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </>);
+          })()}
+        </div>
+      )}
 
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
       {afilCurr != null && scope === "total" && (() => {
@@ -1997,98 +2004,9 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: FATURAÇÃO POR DIA DE SEMANA ── */}
-      {closedDay > 0 && (() => {
-        const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-        const byWeekday = Array.from({length:7},(_,i)=>({label:DAYS_PT[i],total:0,count:0,ssTotal:0,ssCount:0}));
-        daily.forEach(d=>{
-          if(d.day>closedDay) return;
-          const val=d.value;
-          if(val==null||val===0) return;
-          const wd=d.weekday!==undefined?d.weekday:new Date(year,monthNum,d.day).getDay();
-          if(d.supersales){byWeekday[wd].ssTotal+=val;byWeekday[wd].ssCount++;}
-          else{byWeekday[wd].total+=val;byWeekday[wd].count++;}
-        });
-        const ordered=[1,2,3,4,5,6,0].map(i=>({...byWeekday[i],avg:byWeekday[i].count>0?Math.round(byWeekday[i].total/byWeekday[i].count):null}));
-        const maxAvg=Math.max(...ordered.map(d=>d.avg||0));
-        if(!maxAvg) return null;
-        const barColor=TEAM_COLORS[scope]||"#2563eb";
-        return (
-          <div className={DS.card}>
-            <div>
-              <h2 className={DS.title}>MÉDIA POR DIA DA SEMANA</h2>
-              <p className={DS.subtitle}>Excluindo dias de Supersales · (Nx) = nº de dias</p>
-            </div>
-            <div className="space-y-3">
-              {ordered.map((d,i)=>{
-                const barPct=maxAvg>0&&d.avg?(d.avg/maxAvg*100):0;
-                const isWeekend=i>=5;
-                return (
-                  <div key={d.label} className="flex items-center gap-3">
-                    <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
-                    <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#6ee7b7",minWidth:barPct>0?"8px":"0"}}/>
-                    </div>
-                    <div className="w-36 flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
-                      {d.count>0&&<span className="text-xs text-slate-400">({d.count}x)</span>}
-                      {d.ssCount>0&&<span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-xs text-slate-400">Média = valor diário médio excluindo dias de Supersales</p>
-          </div>
-        );
-      })()}
 
-      {/* ── CARD: HISTÓRICO 2025 vs 2026 (só Total) ── */}
-      {scope === "total" && histData.some(r=>r[year-1]||r[year]) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
-            <p className={DS.subtitle}>Faturação mensal comparativa · actualiza automaticamente</p>
-          </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={histData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
-                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
-                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
-              <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
-      {/* ── 7. Per-market historical chart (non-total scopes) ── */}
-      {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
-            <p className={DS.subtitle}>{SCOPES.find(s=>s.id===scope)?.label} · faturação mensal comparativa</p>
-          </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={mktHistData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
-                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
-                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
-              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+
 
       {/* ── 8. Daily revenue chart for each market ── */}
       {closedDay > 0 && (() => {
@@ -2131,6 +2049,46 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-400"/>Supersales</span>
               </div>
             )}
+
+            {/* Média por dia da semana — dentro do mesmo card */}
+            {(() => {
+              const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+              const byWeekday = Array.from({length:7},(_,i)=>({label:DAYS_PT[i],total:0,count:0,ssTotal:0,ssCount:0}));
+              daily.forEach(d=>{
+                if(d.day>closedDay) return;
+                const val=d.value; if(val==null||val===0) return;
+                const wd=d.weekday!==undefined?d.weekday:new Date(year,monthNum,d.day).getDay();
+                if(d.supersales){byWeekday[wd].ssTotal+=val;byWeekday[wd].ssCount++;}
+                else{byWeekday[wd].total+=val;byWeekday[wd].count++;}
+              });
+              const ordered=[1,2,3,4,5,6,0].map(i=>({...byWeekday[i],avg:byWeekday[i].count>0?Math.round(byWeekday[i].total/byWeekday[i].count):null}));
+              const maxAvg=Math.max(...ordered.map(d=>d.avg||0));
+              if(!maxAvg) return null;
+              return (<>
+                <p className={DS.detailLabel} style={{marginTop:"1.5rem"}}>MÉDIA POR DIA DA SEMANA</p>
+                <p className="text-xs text-slate-400 mb-3">Excluindo dias de Supersales · (Nx) = nº de dias</p>
+                <div className="space-y-3">
+                  {ordered.map((d,i)=>{
+                    const barPct=maxAvg>0&&d.avg?(d.avg/maxAvg*100):0;
+                    const isWeekend=i>=5;
+                    return (
+                      <div key={d.label} className="flex items-center gap-3">
+                        <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
+                        <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500"
+                            style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#6ee7b7",minWidth:barPct>0?"8px":"0"}}/>
+                        </div>
+                        <div className="w-36 flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
+                          {d.count>0&&<span className="text-xs text-slate-400">({d.count}x)</span>}
+                          {d.ssCount>0&&<span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>);
+            })()}
           </div>
         );
       })()}
