@@ -1361,6 +1361,70 @@ function Dashboard({
 
 
 
+
+// ── LeadsMonthlyTable — tabela mensal de leads até ao mês actual ─────────────
+function LeadsMonthlyTable({ scope, year, monthNum }) {
+  const [rows, setRows] = useState(null);
+  const MONTH_LABELS = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+
+  useEffect(() => {
+    (async () => {
+      const months = Array.from({length: monthNum + 1}, (_, i) => i);
+      const data = await Promise.all(months.map(async mi => {
+        const key25 = `closing-${year-1}-${String(mi+1).padStart(2,"0")}`;
+        const key26 = `closing-${year}-${String(mi+1).padStart(2,"0")}`;
+        const get = async (key) => {
+          const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
+          if (!row?.entries) return null;
+          const mkts = scope === "total" ? MC_MARKETS.map(m=>m.code) : [scope];
+          return mkts.reduce((s,m) => s+(Number(row.entries?.markets?.[m]?.leads_curr)||0), 0) || null;
+        };
+        const [v25, v26] = await Promise.all([get(key25), get(key26)]);
+        return {month: MONTH_LABELS[mi], v25, v26};
+      }));
+      setRows(data);
+    })();
+  }, [scope, year, monthNum]);
+
+  if (!rows || !rows.some(r=>r.v25||r.v26)) return null;
+
+  return (
+    <div className="overflow-x-auto mt-2">
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+        <thead>
+          <tr>
+            <th style={{textAlign:"left",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",minWidth:"80px"}}></th>
+            {rows.map((r,i)=>(
+              <th key={i} style={{textAlign:"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",minWidth:"60px"}}>{r.month}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            {label:String(year-1), vals:rows.map(r=>r.v25), bold:false},
+            {label:String(year),   vals:rows.map(r=>r.v26), bold:true},
+            {label:"EVOLUÇÃO",     vals:rows.map(r=>r.v25>0&&r.v26>0?((r.v26-r.v25)/r.v25*100):null), isEvo:true},
+          ].map((row,ri)=>(
+            <tr key={ri}>
+              <td style={{padding:"8px",color:"var(--color-text-secondary)",fontWeight:row.bold?"500":"normal",borderBottom:ri<2?"0.5px solid var(--color-border-tertiary)":"none",fontSize:"12px"}}>{row.label}</td>
+              {row.vals.map((v,i)=>{
+                const pos = v!=null&&v>=0;
+                return (
+                  <td key={i} style={{padding:"8px",textAlign:"right",fontWeight:row.bold?"600":"normal",
+                    color:row.isEvo?(v==null?"var(--color-text-secondary)":v>=0?"#0F6E56":"#A32D2D"):(row.bold?"var(--color-text-primary)":"var(--color-text-secondary)"),
+                    borderBottom:ri<2?"0.5px solid var(--color-border-tertiary)":"none"}}>
+                    {v==null?"—":row.isEvo?`${v>=0?"+":""}${v.toFixed(2)}%`:new Intl.NumberFormat("fr-FR").format(Math.round(v))}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Chart.js helper components for RevDashboard ──────────────────────────────
 // Loaded once from CDN; subsequent renders reuse the global Chart object
 function useChartJs(cb, deps) {
@@ -1500,7 +1564,7 @@ function ChartProg({ id, labels, d25, d26 }) {
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  closingCurr, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt }) {
+  closingCurr, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1625,6 +1689,11 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               ...(!showObjective && totalResult > 0 && result > 0 ? [
                 {label:"% do total",  val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
               ] : []),
+              ...(!showObjective && marginCurr != null ? [
+                {label:"Margem",
+                 val: `${marginCurr.toFixed(2)}%${marginPrev!=null?" ("+(marginCurr-marginPrev>=0?"+":"")+(marginCurr-marginPrev).toFixed(2)+"pp)":""}`,
+                 color: marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
+              ] : []),
               ...(showObjective ? [
                 {label:"Acima do objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
                 {label:"% do objetivo",     val: pctObj!=null?fmtP(pctObj):"—",    color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
@@ -1747,8 +1816,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
       {/* ── CARD: REVENDA ── */}
       <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!data?.entries) return 0; const days=Object.keys(data.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=data.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
-        {/* Distribuição por mercado — dentro do card Revenda */}
-        {revendaByMkt.length > 0 && (
+        {/* Distribuição por mercado — só no Total */}
+        {scope === "total" && revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
 
@@ -1849,7 +1918,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
           objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
           showObjective={scope === "total"}>
-          {afilByMkt.length > 0 && (
+          {/* Distribuição por mercado afiliação — só no Total */}
+          {scope === "total" && afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
           )}
         </BigCard>
@@ -1907,81 +1977,119 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: LEADS + ORIGEM + NOVOS PARCEIROS ── */}
-      {(leadsCurr || leadsPrev || (originCurr && originCurr.some(v=>v!=null)) || (progCurr && progCurr.some(v=>v!=null))) && (
-        <div className={DS.card}>
-          <div><h2 className={DS.title}>LEADS</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-
-          {/* Leads totais */}
-          {(leadsCurr || leadsPrev) && (
-            <div className={DS.detailBox}>
-              <p className={DS.detailLabel}>TOTAL DE LEADS</p>
-              <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{leadsPrev!=null?Math.round(leadsPrev):"—"}</p></div>
-                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{leadsCurr!=null?Math.round(leadsCurr):"—"}</p></div>
-                <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
-                  {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Origem das leads */}
-          {originCurr && originCurr.some(v=>v!=null) && (() => {
-            const labels = ["Be A Partner","Vindas de angariadores","Outras fontes"];
-            const d25 = originPrev.map(v=>v||0);
-            const d26 = originCurr.map(v=>v||0);
-            const chartId = `origin-${scope}`;
-            return (<>
-              <p className={DS.detailLabel} style={{marginTop:"1rem"}}>ORIGEM DAS LEADS</p>
-              <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
-                <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
-              </div>
-              <div style={{position:"relative",width:"100%",height:"200px"}}>
-                <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
-              </div>
-              <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
-            </>);
-          })()}
-
-        </div>
-      )}
-
-      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA ── */}
-      {progCurr && progCurr.some(v=>v!=null) && (() => {
-        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        const combined = progLabels.map((l,i)=>({l,c:progCurr[i]||0,p:progPrev[i]||0})).sort((a,b)=>b.c-a.c);
-        const chartId = `prog-${scope}`;
-        const h = Math.max(280, combined.length*44+60);
+      {/* ── CARD: LEADS ── */}
+      {(leadsCurr || leadsPrev || (originCurr && originCurr.some(v=>v!=null))) && (() => {
+        const ORIGIN_LABELS_SHORT = ["Be A Partner","Vindas de angariadores","Outras fontes"];
+        const leadsEvo = leadsCurr&&leadsPrev>0?((leadsCurr-leadsPrev)/leadsPrev*100):null;
         return (
           <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
+            <div><h2 className={DS.title}>LEADS</h2><p className={DS.subtitle}>{month} {year}</p></div>
+
+            {/* 3 KPI cards — Total, Be A Partner, Outras fontes */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className={`${DS.kpiBoxHL}`}>
+                <p className={DS.kpiLabel}>TOTAL DE LEADS</p>
+                <p className={DS.kpiValBig}>{leadsCurr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(leadsCurr)):"—"}</p>
+                {leadsEvo!=null&&<p className={`text-sm font-bold mt-1 ${leadsEvo>=0?"text-emerald-700":"text-red-600"}`}>{leadsEvo>=0?"+":""}{leadsEvo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
+              </div>
+              {originCurr && originCurr[0]!=null && (() => {
+                const evo = originPrev[0]>0&&originCurr[0]>0?((originCurr[0]-originPrev[0])/originPrev[0]*100):null;
+                return (
+                  <div className={DS.kpiBox}>
+                    <p className={DS.kpiLabel}>BE A PARTNER</p>
+                    <p className={DS.kpiVal}>{new Intl.NumberFormat("fr-FR").format(Math.round(originCurr[0]))}</p>
+                    {evo!=null&&<p className={`text-sm font-bold mt-1 ${evo>=0?"text-emerald-700":"text-red-600"}`}>{evo>=0?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
+                  </div>
+                );
+              })()}
+              {originCurr && (originCurr[1]!=null||originCurr[2]!=null) && (() => {
+                const outrasTotal = (originCurr[1]||0)+(originCurr[2]||0);
+                const outrasPrev  = (originPrev[1]||0)+(originPrev[2]||0);
+                const evo = outrasPrev>0&&outrasTotal>0?((outrasTotal-outrasPrev)/outrasPrev*100):null;
+                return (
+                  <div className={DS.kpiBox}>
+                    <p className={DS.kpiLabel}>OUTRAS FONTES</p>
+                    <p className={DS.kpiVal}>{new Intl.NumberFormat("fr-FR").format(Math.round(outrasTotal))}</p>
+                    {evo!=null&&<p className={`text-sm font-bold mt-1 ${evo>=0?"text-emerald-700":"text-red-600"}`}>{evo>=0?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
+                  </div>
+                );
+              })()}
             </div>
-            <div style={{position:"relative",width:"100%",height:`${h}px`}}>
-              <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
-            </div>
-            <ChartProg id={chartId} labels={combined.map(x=>x.l)} d25={combined.map(x=>x.p)} d26={combined.map(x=>x.c)} />
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-              <thead><tr>{["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
-              <tbody>{combined.map((row,i)=>{
-                const evo=row.p>0&&row.c>0?((row.c-row.p)/row.p*100):null;
-                const pos=evo!=null&&evo>=0;
-                const border=i<combined.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                return (<tr key={i}>
-                  <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.l}</td>
-                  <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{row.p>0?new Intl.NumberFormat("fr-FR").format(row.p):"—"}</td>
-                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{row.c>0?new Intl.NumberFormat("fr-FR").format(row.c):"—"}</td>
-                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
-                </tr>);
-              })}</tbody>
-            </table>
+
+            {/* Tabela mensal — meses até ao mês actual */}
+            <LeadsMonthlyTable scope={scope} year={year} monthNum={monthNum} />
+
+            {/* Origem das leads */}
+            {originCurr && originCurr.some(v=>v!=null) && (() => {
+              const labels = ORIGIN_LABELS_SHORT;
+              const d25 = originPrev.map(v=>v||0);
+              const d26 = originCurr.map(v=>v||0);
+              const chartId = `origin-${scope}`;
+              return (<>
+                <p className={DS.detailLabel} style={{marginTop:"1rem"}}>ORIGEM DAS LEADS</p>
+                <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+                  <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
+                  <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
+                </div>
+                <div style={{position:"relative",width:"100%",height:"200px"}}>
+                  <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
+                </div>
+                <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
+              </>);
+            })()}
           </div>
         );
       })()}
+
+      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — donut + table ── */}
+      {progCurr && progCurr.some(v=>v!=null) && (() => {
+        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+        const combined = progLabels.map((l,i)=>({l,c:progCurr[i]||0,p:progPrev[i]||0}))
+          .filter(x=>x.c>0||x.p>0).sort((a,b)=>b.c-a.c);
+        const PROG_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+        const totalC = combined.reduce((s,x)=>s+x.c,0);
+        const size=180,cx=90,cy=90,r=68,ri=38;
+        let a=-Math.PI/2;
+        const slices = combined.filter(x=>x.c>0).map((x,i)=>{
+          const angle=(x.c/totalC)*2*Math.PI,ea=a+angle;
+          const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
+          a=ea; return {...x,path,pct:(x.c/totalC*100).toFixed(1),color:PROG_COLORS[i%PROG_COLORS.length]};
+        });
+        return (
+          <div className={DS.card}>
+            <div><h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <svg width={size} height={size} className="shrink-0">
+                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
+                <text x={cx} y={cy-6} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
+                <text x={cx} y={cy+9} textAnchor="middle" fontSize={12} fontWeight="bold" fill="#1e293b">{new Intl.NumberFormat("fr-FR").format(totalC)}</text>
+              </svg>
+              <div className="flex-1 w-full">
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px"}}>
+                  <thead><tr>{["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
+                  <tbody>{slices.map((x,i)=>{
+                    const evo=x.p>0&&x.c>0?((x.c-x.p)/x.p*100):null;
+                    const pos=evo!=null&&evo>=0;
+                    const border=i<slices.length-1?"0.5px solid var(--color-border-tertiary)":"none";
+                    return (<tr key={i}>
+                      <td style={{padding:"8px",borderBottom:border}}>
+                        <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
+                          <span style={{width:"8px",height:"8px",borderRadius:"2px",background:x.color,display:"inline-block",flexShrink:0}}></span>
+                          <span style={{color:"var(--color-text-primary)"}}>{x.l}</span>
+                        </span>
+                      </td>
+                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{x.p>0?new Intl.NumberFormat("fr-FR").format(x.p):"—"}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{new Intl.NumberFormat("fr-FR").format(x.c)} <span style={{fontSize:"11px",color:"#64748b"}}>({x.pct}%)</span></td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
+                    </tr>);
+                  })}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
 
       {/* ── CARD: NOVOS PARCEIROS POR MERCADO (só Total) ── */}
       {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
@@ -2025,6 +2133,74 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                 </table>
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ── CARD: MAPA DE NOVAS PARCERIAS (só Total) ── */}
+      {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
+        const totalCurr = partnersByMkt.reduce((s,m)=>s+m.curr,0);
+        const totalPrev = partnersByMkt.reduce((s,m)=>s+m.prev,0);
+        const evo = totalPrev>0&&totalCurr>0?((totalCurr-totalPrev)/totalPrev*100):null;
+        const pos = evo!=null&&evo>=0;
+        // Map positions for each market (% of SVG 800x450)
+        const MKT_POS = {
+          "PT": {x:12,y:62,label:"PORTUGAL"},
+          "ES": {x:18,y:55,label:"ESPANHA"},
+          "FR": {x:28,y:45,label:"FRANÇA"},
+          "IT": {x:42,y:52,label:"ITALIA"},
+          "CH-BNL-DEAT": {x:38,y:36,label:"CH-BNL-DE-AT"},
+          "CZ-SK-GR-CY-PL": {x:52,y:38,label:"CHÉQUIA"},
+          "USA": {x:6,y:30,label:"USA"},
+          "OT": {x:68,y:28,label:"OUTROS"},
+        };
+        const ranked = [...partnersByMkt].sort((a,b)=>b.curr-a.curr);
+        return (
+          <div className={DS.card}>
+            <div><h2 className={DS.title}>MAPA DE NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – total de novos parceiros por mercado</p></div>
+            {/* Map */}
+            <div className="relative w-full bg-slate-50 rounded-xl overflow-hidden" style={{paddingBottom:"56%"}}>
+              <div className="absolute inset-0">
+                {/* Europe SVG background */}
+                <svg viewBox="0 0 800 450" className="w-full h-full opacity-10">
+                  <path d="M150,80 L200,60 L280,50 L350,55 L420,45 L500,50 L580,45 L650,55 L700,70 L720,90 L700,120 L680,150 L650,180 L600,200 L580,230 L550,260 L520,280 L480,290 L450,310 L420,330 L380,340 L340,350 L300,360 L260,350 L220,340 L180,320 L150,300 L120,270 L100,240 L90,200 L95,160 L110,120 Z" fill="#3A9E8F"/>
+                </svg>
+                {/* Market pins */}
+                {ranked.map((m,i) => {
+                  const pos2 = MKT_POS[m.code];
+                  if (!pos2) return null;
+                  return (
+                    <div key={m.code} className="absolute flex items-center gap-1.5"
+                      style={{left:`${pos2.x}%`,top:`${pos2.y}%`,transform:"translate(-50%,-50%)"}}>
+                      <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
+                        {i+1}
+                      </div>
+                      <div className="bg-white border border-emerald-200 rounded-lg px-2 py-1 shadow-sm whitespace-nowrap">
+                        <p className="text-sm font-bold text-emerald-700">{new Intl.NumberFormat("fr-FR").format(m.curr)}</p>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">{pos2.label}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Total box */}
+                <div className="absolute bottom-4 right-4 bg-white border-2 border-emerald-400 rounded-xl px-4 py-2 shadow">
+                  <p className="text-2xl font-bold text-slate-900">{new Intl.NumberFormat("fr-FR").format(totalCurr)}</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total</p>
+                </div>
+              </div>
+            </div>
+            {/* Table */}
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+              <thead><tr>{["",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
+              <tbody>
+                <tr>
+                  <td style={{padding:"8px",color:"var(--color-text-primary)",fontWeight:"500"}}>Total de parcerias</td>
+                  <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?new Intl.NumberFormat("fr-FR").format(totalPrev):"—"}</td>
+                  <td style={{padding:"8px",textAlign:"right",fontWeight:"bold",color:"var(--color-text-primary)"}}>{new Intl.NumberFormat("fr-FR").format(totalCurr)}</td>
+                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D"}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         );
       })()}
