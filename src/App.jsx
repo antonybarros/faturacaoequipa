@@ -854,7 +854,23 @@ function DashboardWrapper({
   const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
   const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
   const leadsCurr     = sumField(closingCurr, "leads_curr");
-  const leadsPrev     = sumField(closingPrev, "leads_curr");
+  const leadsPrev     = sumField(closingCurr, "leads_prev"); // prev stored in curr closing
+
+  // Origem das leads
+  const getOrigin = (closing, field) => {
+    if (!closing?.markets) return null;
+    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+    const t = markets.reduce((s,m) => s + (Number(closing.markets[m]?.[field])||0), 0);
+    return t > 0 ? t : null;
+  };
+  const originFields = ["leads_bap","leads_ang","leads_outras"];
+  const originCurr = originFields.map(f => getOrigin(closingCurr, f+"_curr"));
+  const originPrev = originFields.map(f => getOrigin(closingCurr, f+"_prev"));
+
+  // Novos parceiros por programa
+  const progFields = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
+  const progCurr = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_curr"));
+  const progPrev = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_prev"));
   // Afiliação
   const afilCurr = (() => {
     if (!closingCurr) return null;
@@ -910,6 +926,22 @@ function DashboardWrapper({
         afilCurr={afilCurr}
         afilPrev={afilPrev}
         closingCurr={closingCurr}
+        originCurr={originCurr}
+        originPrev={originPrev}
+        progCurr={progCurr}
+        progPrev={progPrev}
+        ordersCurrMkt={(() => {
+          if (!closingCurr?.markets) return {};
+          const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+          return {
+            orders: markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.orders_curr)||0), 0),
+            first:  markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.first_orders_curr)||0), 0),
+            firstRev: markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.first_orders_rev_curr)||0), 0),
+            ordersPrev: (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.orders_prev)||0),0); })(),
+            firstPrev:  (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.first_orders_prev)||0),0); })(),
+            firstRevPrev: (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.first_orders_rev_prev)||0),0); })(),
+          };
+        })()}
       />
     </div>
   );
@@ -1338,7 +1370,7 @@ function Dashboard({
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  closingCurr, data }) {
+  closingCurr, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1718,6 +1750,39 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </BigCard>
       )}
 
+      {/* ── CARD: ENCOMENDAS (from Registo closing) ── */}
+      {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>ENCOMENDAS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          {[
+            {label:"Total encomendas",   curr:ordersCurrMkt.orders,    prev:ordersCurrMkt.ordersPrev,    isEur:false},
+            {label:"1ªs encomendas",     curr:ordersCurrMkt.first,     prev:ordersCurrMkt.firstPrev,     isEur:false},
+            {label:"Fat. 1ªs enc. (€)",  curr:ordersCurrMkt.firstRev,  prev:ordersCurrMkt.firstRevPrev,  isEur:true},
+          ].map((row,i) => {
+            const evo = row.prev>0&&row.curr>0?((row.curr-row.prev)/row.prev*100):null;
+            const pos = evo!=null&&evo>=0;
+            const fmt = v => v>0?(row.isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
+            return (
+              <div key={i} className={DS.detailBox}>
+                <p className={DS.detailLabel}>{row.label}</p>
+                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{fmt(row.prev)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{fmt(row.curr)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
+                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── CARD: LEADS ── */}
       {(leadsCurr || leadsPrev) && (
         <div className={DS.card}>
@@ -1732,6 +1797,62 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
                 {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CARD: ORIGEM DAS LEADS ── */}
+      {originCurr && originCurr.some(v => v != null) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>ORIGEM DAS LEADS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          {[["Be A Partner",0],["Vindas de angariadores",1],["Outras fontes",2]].map(([label,i]) => {
+            const curr = originCurr[i], prev = originPrev[i];
+            const evo = prev>0&&curr>0?((curr-prev)/prev*100):null;
+            const pos = evo!=null&&evo>=0;
+            return (
+              <div key={i} className={DS.detailBox}>
+                <p className={DS.detailLabel}>{label}</p>
+                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{prev!=null?new Intl.NumberFormat("fr-FR").format(Math.round(prev)):"—"}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{curr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(curr)):"—"}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
+                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA ── */}
+      {progCurr && progCurr.some(v => v != null) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          <div className={DS.detailBox}>
+            <div className="grid grid-cols-4 gap-4">
+              {["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"].map((label,i) => {
+                const curr = progCurr[i], prev = progPrev[i];
+                const evo = prev>0&&curr>0?((curr-prev)/prev*100):null;
+                const pos = evo!=null&&evo>=0;
+                return (
+                  <div key={i} className="text-center">
+                    <p className="text-xs text-slate-500 mb-1">{label}</p>
+                    <p className="text-lg font-bold text-slate-900">{curr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(curr)):"—"}</p>
+                    {prev!=null&&<p className="text-xs text-slate-400">{year-1}: {new Intl.NumberFormat("fr-FR").format(Math.round(prev))}</p>}
+                    {evo!=null&&<p className={`text-xs font-semibold ${pos?"text-emerald-600":"text-red-600"}`}>{pos?"+":""}{evo.toFixed(1)}%</p>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -3406,6 +3527,11 @@ function Encomendas({ monthNum, year, isAdmin }) {
 
 // ─── LEADS / PARCERIAS ────────────────────────────────────────────────────────
 
+const PROG_FIELDS = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
+const PROG_LABELS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+const ORIGIN_FIELDS = ["leads_bap","leads_ang","leads_outras"];
+const ORIGIN_LABELS = ["Be A Partner","Vindas de angariadores","Outras fontes"];
+
 function LeadsParcerias({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -3422,8 +3548,15 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
           if (!curr.markets[m.code]) curr.markets[m.code] = {};
           const pm = prev.markets?.[m.code] || {};
           const cm = curr.markets[m.code];
-          if (!cm.leads_prev && pm.leads_curr)         cm.leads_prev = pm.leads_curr;
-          if (!cm.partners_prev && pm.partners_curr)   cm.partners_prev = pm.partners_curr;
+          if (!cm.leads_prev && pm.leads_curr)       cm.leads_prev = pm.leads_curr;
+          if (!cm.partners_prev && pm.partners_curr) cm.partners_prev = pm.partners_curr;
+          // Auto-fill origin and programme fields from prev year
+          ORIGIN_FIELDS.forEach(f => {
+            if (!cm[f+"_prev"] && pm[f+"_curr"]) cm[f+"_prev"] = pm[f+"_curr"];
+          });
+          PROG_FIELDS.forEach(f => {
+            if (!cm["prog_"+f+"_prev"] && pm["prog_"+f+"_curr"]) cm["prog_"+f+"_prev"] = pm["prog_"+f+"_curr"];
+          });
         });
       }
       setData(curr); dataRef.current = curr; setSaved(false);
@@ -3452,12 +3585,14 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
+  const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-purple-500"/>
-          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+          <p className="text-sm text-slate-500">Parceiros · {MC_MONTHS_PT[monthNum+1]} {year}</p>
         </div>
         <div className="text-xs">
           {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
@@ -3465,50 +3600,55 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
         </div>
       </div>
 
-      {/* Card Total — soma de todos os mercados */}
-      {(() => {
-        const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
-        const totals = {
-          leads_prev: sumF("leads_prev"), leads_curr: sumF("leads_curr"),
-          partners_prev: sumF("partners_prev"), partners_curr: sumF("partners_curr"),
-        };
-        const fmt = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) : "—";
-        const evo = (prev, curr) => prev > 0 && curr > 0 ? ((curr-prev)/prev*100).toFixed(1)+"%" : "—";
-        return (
-          <MCCard title="Total" accent="text-purple-800">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Leads {year-1}</p>
-                  <p className="font-semibold text-slate-700">{fmt(totals.leads_prev)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Leads {year}</p>
-                  <p className="font-bold text-slate-900">{fmt(totals.leads_curr)}</p>
-                  <p className={`text-xs font-semibold mt-0.5 ${totals.leads_curr>=totals.leads_prev?"text-green-600":"text-red-600"}`}>{evo(totals.leads_prev,totals.leads_curr)}</p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year-1}</p>
-                  <p className="font-semibold text-slate-700">{fmt(totals.partners_prev)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year}</p>
-                  <p className="font-bold text-slate-900">{fmt(totals.partners_curr)}</p>
-                  <p className={`text-xs font-semibold mt-0.5 ${totals.partners_curr>=totals.partners_prev?"text-green-600":"text-red-600"}`}>{evo(totals.partners_prev,totals.partners_curr)}</p>
-                </div>
-              </div>
+      {/* ── Card Total ── */}
+      <MCCard title="Total" accent="text-purple-800">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Origem das leads</p>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {ORIGIN_FIELDS.map((f,i) => (
+            <div key={f}>
+              <p className="text-xs text-slate-500 mb-1">{ORIGIN_LABELS[i]}</p>
+              <p className="text-sm font-bold text-slate-800">{sumF(f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF(f+"_curr")) : "—"}</p>
             </div>
-          </MCCard>
-        );
-      })()}
+          ))}
+        </div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Novos parceiros por programa</p>
+        <div className="grid grid-cols-4 gap-3">
+          {PROG_FIELDS.map((f,i) => (
+            <div key={f}>
+              <p className="text-xs text-slate-500 mb-1">{PROG_LABELS[i]}</p>
+              <p className="text-sm font-bold text-slate-800">{sumF("prog_"+f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF("prog_"+f+"_curr")) : "—"}</p>
+            </div>
+          ))}
+        </div>
+      </MCCard>
 
+      {/* ── Cards por mercado ── */}
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
-          <div className="grid grid-cols-2 gap-3">
+          {/* Leads + Parceiros */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
             <MCField label="Leads" value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
             <MCField label="Novos parceiros" value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
+          </div>
+
+          {/* Origem das leads */}
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Origem das leads</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {ORIGIN_FIELDS.map((f,i) => (
+              <MCField key={f} label={ORIGIN_LABELS[i]}
+                value={data.markets[m.code]?.[f+"_curr"]||""}
+                onChange={v => upMkt(m.code, f+"_curr", v)} />
+            ))}
+          </div>
+
+          {/* Novos parceiros por programa */}
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Novos parceiros por programa</p>
+          <div className="grid grid-cols-4 gap-3">
+            {PROG_FIELDS.map((f,i) => (
+              <MCField key={f} label={PROG_LABELS[i]}
+                value={data.markets[m.code]?.["prog_"+f+"_curr"]||""}
+                onChange={v => upMkt(m.code, "prog_"+f+"_curr", v)} />
+            ))}
           </div>
         </MCCard>
       ))}
