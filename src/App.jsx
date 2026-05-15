@@ -252,7 +252,6 @@ function MainApp() {
     ? [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
-        { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
@@ -371,9 +370,7 @@ function MainApp() {
             )}
             {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
 
-            {tab === "relatorio" && isAdmin && (
-              <Relatorio monthNum={month} year={year} />
-            )}
+
             {tab === "entry" && isAdmin && (
               <EntryHub
                 data={data}
@@ -1355,6 +1352,106 @@ function Dashboard({
 }
 
 
+
+// ── Chart.js helper components for RevDashboard ──────────────────────────────
+// Loaded once from CDN; subsequent renders reuse the global Chart object
+function useChartJs(cb, deps) {
+  useEffect(() => {
+    const el = document.createElement("script");
+    el.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+    el.async = true;
+    el.onload = cb;
+    if (window.Chart) { cb(); return; }
+    document.head.appendChild(el);
+    return () => {};
+  }, deps);
+}
+
+function ChartOrigin({ id, labels, d25, d26 }) {
+  useEffect(() => {
+    const init = () => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
+      const textColor = isDark ? "#e5e5e3" : "#444441";
+      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      canvas._chartInstance = new window.Chart(canvas, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
+            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")}` } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 }, autoSkip: false }, border: { display: false } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
+          }
+        }
+      });
+    };
+    if (window.Chart) init();
+    else {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = init; document.head.appendChild(s);
+    }
+    return () => {
+      const canvas = document.getElementById(id);
+      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+    };
+  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
+  return null;
+}
+
+function ChartProg({ id, labels, d25, d26 }) {
+  useEffect(() => {
+    const init = () => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
+      const textColor = isDark ? "#e5e5e3" : "#444441";
+      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      canvas._chartInstance = new window.Chart(canvas, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
+            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
+          ]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString("fr-FR")}` } } },
+          scales: {
+            y: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 } }, border: { display: false } },
+            x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
+          }
+        }
+      });
+    };
+    if (window.Chart) init();
+    else {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = init; document.head.appendChild(s);
+    }
+    return () => {
+      const canvas = document.getElementById(id);
+      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+    };
+  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
+  return null;
+}
+
 // ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
@@ -1696,38 +1793,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       )}
 
-      {/* ── CARD: ENCOMENDAS ── */}
-      {(ordersCurr || ordersPrev) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>ENCOMENDAS</h2>
-            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-          </div>
-          {[
-            {label:"Total encomendas", prev:ordersPrev, curr:ordersCurr, fmt:v=>v!=null?Math.round(v).toString():"—"},
-            {label:"1ªs encomendas",   prev:firstPrev,  curr:firstCurr,  fmt:v=>v!=null?Math.round(v).toString():"—"},
-            {label:"Fat. 1ªs enc. (€)",prev:firstRevPrev, curr:firstRevCurr, fmt:v=>v!=null?fmtEur(v):"—"},
-          ].map((row,i)=>{
-            const evo=row.prev>0&&row.curr!=null?((row.curr-row.prev)/row.prev*100):null;
-            const pos=evo!=null&&evo>=0;
-            return (
-              <div key={i} className={DS.detailBox}>
-                <p className={DS.detailLabel}>{row.label}</p>
-                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{row.fmt(row.prev)}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{row.fmt(row.curr)}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
-                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
-                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* ── CARD: AFILIAÇÃO ── */}
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
@@ -1791,61 +1856,66 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       )}
 
-      {/* ── CARD: ORIGEM DAS LEADS ── */}
-      {originCurr && originCurr.some(v => v != null) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>ORIGEM DAS LEADS</h2>
-            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-          </div>
-          {[["Be A Partner",0],["Vindas de angariadores",1],["Outras fontes",2]].map(([label,i]) => {
-            const curr = originCurr[i], prev = originPrev[i];
-            const evo = prev>0&&curr>0?((curr-prev)/prev*100):null;
-            const pos = evo!=null&&evo>=0;
-            return (
-              <div key={i} className={DS.detailBox}>
-                <p className={DS.detailLabel}>{label}</p>
-                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{prev!=null?new Intl.NumberFormat("fr-FR").format(Math.round(prev)):"—"}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{curr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(curr)):"—"}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
-                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
-                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA ── */}
-      {progCurr && progCurr.some(v => v != null) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2>
-            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-          </div>
-          <div className={DS.detailBox}>
-            <div className="grid grid-cols-4 gap-4">
-              {["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"].map((label,i) => {
-                const curr = progCurr[i], prev = progPrev[i];
-                const evo = prev>0&&curr>0?((curr-prev)/prev*100):null;
-                const pos = evo!=null&&evo>=0;
-                return (
-                  <div key={i} className="text-center">
-                    <p className="text-xs text-slate-500 mb-1">{label}</p>
-                    <p className="text-lg font-bold text-slate-900">{curr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(curr)):"—"}</p>
-                    {prev!=null&&<p className="text-xs text-slate-400">{year-1}: {new Intl.NumberFormat("fr-FR").format(Math.round(prev))}</p>}
-                    {evo!=null&&<p className={`text-xs font-semibold ${pos?"text-emerald-600":"text-red-600"}`}>{pos?"+":""}{evo.toFixed(1)}%</p>}
-                  </div>
-                );
-              })}
+      {/* ── CARD: ORIGEM DAS LEADS — Chart.js grouped bar ── */}
+      {originCurr && originCurr.some(v => v != null) && (() => {
+        const labels = ["Be A Partner","Vindas de angariadores","Outras fontes"];
+        const d25 = originPrev.map(v => v || 0);
+        const d26 = originCurr.map(v => v || 0);
+        const chartId = `origin-${scope}`;
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>ORIGEM DAS LEADS</h2>
+              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
             </div>
+            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
+              </span>
+            </div>
+            <div style={{position:"relative",width:"100%",height:"220px"}}>
+              <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
+            </div>
+            <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — Chart.js horizontal bar ── */}
+      {progCurr && progCurr.some(v => v != null) && (() => {
+        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+        // Sort by 2026 value descending
+        const combined = progLabels.map((l,i) => ({l, c: progCurr[i]||0, p: progPrev[i]||0}))
+          .sort((a,b) => b.c - a.c);
+        const sortedLabels = combined.map(x => x.l);
+        const d26 = combined.map(x => x.c);
+        const d25 = combined.map(x => x.p);
+        const chartId = `prog-${scope}`;
+        const h = Math.max(300, combined.length * 48 + 60);
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2>
+              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+            </div>
+            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
+              </span>
+            </div>
+            <div style={{position:"relative",width:"100%",height:`${h}px`}}>
+              <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
+            </div>
+            <ChartProg id={chartId} labels={sortedLabels} d25={d25} d26={d26} />
+          </div>
+        );
+      })()}
 
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
       {afilCurr != null && scope === "total" && (() => {
@@ -3646,901 +3716,6 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
 
 // ─── RELATÓRIO (auto-fill version) ───────────────────────────────────────────
-
-function Relatorio({ monthNum, year }) {
-  const [step, setStep] = useState(0);
-  const [generating, setGenerating] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [closingCurr, setClosingCurr] = useState(null);
-  const [closingPrev, setClosingPrev] = useState(null);
-
-  // All form state
-  const [rev, setRev] = useState({
-    result: 0, objective: 0, margin_pct: "",
-    margin_pct_prev: "",
-    q_result_prev_year: "", q_objective: "", q_result: "",
-    q_month1_revenue: "", q_month1_evolution: "", q_month1_margin: "",
-    q_month2_revenue: "", q_month2_evolution: "", q_month2_margin: "",
-    q_month3_revenue: "", q_month3_evolution: "", q_month3_margin: "",
-    prev_year: "",
-    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: 0, prev: "" }])),
-  });
-  const [afil, setAfil] = useState({
-    objective: "", result: "", prev_year: "",
-    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: "", prev: "" }])),
-  });
-  const [orders, setOrders] = useState({
-    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
-      orders_curr:"", orders_prev:"",
-      first_curr:"", first_prev:"",
-      first_rev_curr:"", first_rev_prev:"",
-    }])),
-  });
-  const [leads, setLeads] = useState({
-    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr:"", prev:"" }])),
-  });
-  const [programs, setPrograms] = useState(
-    Object.fromEntries(MC_PROGRAMS.map(p => [p, { curr:"", prev:"" }]))
-  );
-
-  // Auto-fill from Supabase
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const monthKey = `${year}-${String(monthNum+1).padStart(2,"0")}`;
-
-      // 1. Revenda from billing_months
-      const { data: bm } = await supabase
-        .from("billing_months")
-        .select("*")
-        .eq("month_key", monthKey)
-        .maybeSingle();
-
-      // 2. Closing data (afil, encomendas, leads, programs, margins)
-      const closing = await loadClosing(year, monthNum);
-
-      // Build revenda by market from last entry
-      const byMarket = Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: 0, prev: "" }]));
-      if (bm?.entries) {
-        const days = Object.keys(bm.entries).map(Number).sort((a,b)=>a-b);
-        const lastDay = days[days.length - 1];
-        if (lastDay) {
-          const lastEntry = bm.entries[String(lastDay)];
-          MC_MARKETS.forEach(m => {
-            if (lastEntry?.[m.code]) byMarket[m.code].curr = lastEntry[m.code];
-          });
-        }
-      }
-
-      // Fill closing market data into byMarket prev
-      if (closing?.markets) {
-        MC_MARKETS.forEach(m => {
-          const d = closing.markets[m.code] || {};
-          byMarket[m.code].prev = d.afil_prev || "";
-        });
-      }
-
-      // Restore manual fields from closing
-      const savedByMkt = closing?.revenda_by_market || {};
-      MC_MARKETS.forEach(m => {
-        if (savedByMkt[m.code]?.prev) byMarket[m.code].prev = savedByMkt[m.code].prev;
-      });
-
-      setRev(p => ({
-        ...p,
-        result: bm?.entries ? (() => {
-          const days = Object.keys(bm.entries).map(Number).sort((a,b)=>a-b);
-          const lastEntry = bm.entries[String(days[days.length-1])] || {};
-          return lastEntry.total || Object.values(lastEntry).reduce((s,v) => typeof v==="number"?s+v:s, 0);
-        })() : 0,
-        objective: bm?.total_goal || 0,
-        margin_pct:          closing?.revenda_margin || "",
-        margin_pct_prev:     closing?.revenda_margin_prev || "",
-        prev_year:           closing?.revenda_prev || "",
-        q_result_prev_year:  closing?.q_result_prev_year || "",
-        q_objective:         closing?.q_objective || "",
-        q_result:            closing?.q_result || "",
-        q_month1_revenue:    closing?.q_month1_revenue || "",
-        q_month1_evolution:  closing?.q_month1_evolution || "",
-        q_month1_margin:     closing?.q_month1_margin || "",
-        q_month2_revenue:    closing?.q_month2_revenue || "",
-        q_month2_evolution:  closing?.q_month2_evolution || "",
-        q_month2_margin:     closing?.q_month2_margin || "",
-        q_month3_revenue:    closing?.q_month3_revenue || "",
-        q_month3_evolution:  closing?.q_month3_evolution || "",
-        q_month3_margin:     closing?.q_month3_margin || "",
-        byMarket,
-      }));
-
-      setAfil({
-        objective: closing?.afil_objective || "",
-        result: closing?.afil_result || "",
-        prev_year: closing?.afil_prev || "",
-        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
-          curr: closing?.markets?.[m.code]?.afil_result || "",
-          prev: closing?.markets?.[m.code]?.afil_prev || "",
-        }])),
-      });
-
-      setOrders({
-        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
-          orders_curr: closing?.markets?.[m.code]?.orders_curr || "",
-          orders_prev: closing?.markets?.[m.code]?.orders_prev || "",
-          first_curr:  closing?.markets?.[m.code]?.first_orders_curr || "",
-          first_prev:  closing?.markets?.[m.code]?.first_orders_prev || "",
-          first_rev_curr: closing?.markets?.[m.code]?.first_orders_rev_curr || "",
-          first_rev_prev: closing?.markets?.[m.code]?.first_orders_rev_prev || "",
-        }])),
-      });
-
-      setLeads({
-        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
-          curr: closing?.markets?.[m.code]?.leads_curr || "",
-          prev: closing?.markets?.[m.code]?.leads_prev || "",
-        }])),
-      });
-
-      if (closing?.programs) {
-        setPrograms(Object.fromEntries(MC_PROGRAMS.map(p => [p, {
-          curr: closing.programs[p]?.curr || "",
-          prev: closing.programs[p]?.prev || "",
-        }])));
-      }
-
-      // Load closing data for margin/orders in PPTX
-      loadClosing(year, monthNum).then(setClosingCurr);
-      loadClosing(year - 1, monthNum).then(setClosingPrev);
-
-      setLoading(false);
-    })();
-  }, [monthNum, year]);
-
-  const N = s => parseFloat(s) || 0;
-  const fmtE = n => n == null ? "–" : new Intl.NumberFormat("fr-FR").format(n) + " €";
-  const fmtP = (n, sign=false) => {
-    if (n == null || isNaN(n)) return "–";
-    const s = Math.abs(n).toFixed(2) + "%";
-    if (sign) return (n>=0?"+":"-")+s;
-    return s;
-  };
-  const evo = (prev, curr) => {
-    if (!prev) return "–";
-    const e = ((curr-prev)/prev)*100;
-    return fmtP(e, true);
-  };
-
-  const MONTHS_UPPER = MC_MONTHS_PT.map(m => m.toUpperCase());
-  const [savingDraft, setSavingDraft] = useState(false);
-  const [savedDraft, setSavedDraft] = useState(false);
-
-  async function saveDraft() {
-    setSavingDraft(true);
-    const existing = await loadClosing(year, monthNum);
-    const merged = {
-      ...existing,
-      revenda_margin:      rev.margin_pct,
-      revenda_margin_prev: rev.margin_pct_prev,
-      revenda_prev:        rev.prev_year,
-      revenda_by_market:   Object.fromEntries(MC_MARKETS.map(m => [m.code, { prev: rev.byMarket[m.code]?.prev || "" }])),
-      afil_objective:      afil.objective,
-      afil_result:         afil.result,
-      afil_prev:           afil.prev_year,
-      q_result_prev_year:  rev.q_result_prev_year,
-      q_objective:         rev.q_objective,
-      q_result:            rev.q_result,
-      q_month1_revenue:    rev.q_month1_revenue,
-      q_month1_evolution:  rev.q_month1_evolution,
-      q_month1_margin:     rev.q_month1_margin,
-      q_month2_revenue:    rev.q_month2_revenue,
-      q_month2_evolution:  rev.q_month2_evolution,
-      q_month2_margin:     rev.q_month2_margin,
-      q_month3_revenue:    rev.q_month3_revenue,
-      q_month3_evolution:  rev.q_month3_evolution,
-      q_month3_margin:     rev.q_month3_margin,
-      programs:            Object.fromEntries(MC_PROGRAMS.map(p => [p, { curr: programs[p]?.curr || "", prev: programs[p]?.prev || "" }])),
-      markets: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
-        ...(existing?.markets?.[m.code] || {}),
-        afil_result:             afil.byMarket[m.code]?.curr || "",
-        afil_prev:               afil.byMarket[m.code]?.prev || "",
-        orders_curr:             orders.byMarket[m.code]?.orders_curr || "",
-        orders_prev:             orders.byMarket[m.code]?.orders_prev || "",
-        first_orders_curr:       orders.byMarket[m.code]?.first_curr || "",
-        first_orders_prev:       orders.byMarket[m.code]?.first_prev || "",
-        first_orders_rev_curr:   orders.byMarket[m.code]?.first_rev_curr || "",
-        first_orders_rev_prev:   orders.byMarket[m.code]?.first_rev_prev || "",
-        leads_curr:              leads.byMarket[m.code]?.curr || "",
-        leads_prev:              leads.byMarket[m.code]?.prev || "",
-      }])),
-    };
-    await saveClosing(year, monthNum, merged);
-    setSavingDraft(false);
-    setSavedDraft(true);
-    setTimeout(() => setSavedDraft(false), 3000);
-  }
-
-  async function generatePptx() {
-    setGenerating(true);
-    await saveDraft();
-    try {
-      const pptxgenjs = await import("pptxgenjs");
-      const PptxGenJS = pptxgenjs.default || pptxgenjs;
-      const prs = new PptxGenJS();
-      prs.layout = "LAYOUT_WIDE";
-      prs.title = `Apresentação de Resultados – ${MC_MONTHS_PT[monthNum+1]} ${year}`;
-
-      // ── Design system (Prozis Partners template) ──
-      const C = {
-        cream:   "F2F0EB",  // background
-        white:   "FFFFFF",
-        black:   "1A1A1A",
-        teal:    "3A9E8F",  // primary accent
-        tealDk:  "2E7D71",  // dark teal
-        tealLt:  "D6EDE9",  // light teal card bg
-        gray:    "E8E6E1",  // divider
-        grayDk:  "888888",  // muted text
-        grayLt:  "F7F5F1",  // subtle card bg
-        green:   "2E7D71",
-        red:     "C0392B",
-      };
-      const W = 13.33, H = 7.5;
-      const FF = "Calibri";
-      const mLabel = MONTHS_UPPER[monthNum+1];
-
-      // Format helpers
-      const fmtN = n => n == null ? "—" : new Intl.NumberFormat("fr-FR").format(Math.round(n));
-      const fmtE2 = n => n == null ? "—" : fmtN(n) + " €";
-      const fmtP2 = (n, sign=false) => {
-        if (n == null || isNaN(n)) return "—";
-        const s = Math.abs(n).toFixed(2) + "%";
-        return sign ? (n>=0?"+":"-")+s : s;
-      };
-      const evo2 = (prev, curr) => {
-        if (!prev || !curr) return "—";
-        const e = ((curr-prev)/prev*100);
-        return fmtP2(e, true);
-      };
-      const N2 = s => parseFloat(s)||0;
-
-      // ── Slide helpers ──
-
-      // Cream background on every slide
-      function bgCream(s) { s.background = {color: C.cream}; }
-
-      // Section separator slide (design: teal circle badge + bordered box label)
-      function addSep(num, title) {
-        const s = prs.addSlide(); bgCream(s);
-        // Diagonal stripe watermark
-        s.addShape(prs.ShapeType.rect, {x:4.5,y:-1,w:12,h:10, rotate:15,
-          fill:{color:"E8E6E1",transparency:70}, line:{color:"E8E6E1",transparency:70}});
-        s.addShape(prs.ShapeType.rect, {x:5.5,y:-1,w:12,h:10, rotate:15,
-          fill:{color:"E8E6E1",transparency:80}, line:{color:"E8E6E1",transparency:80}});
-        // Teal circle with number
-        s.addShape(prs.ShapeType.ellipse, {x:3.9, y:3.1, w:0.9, h:0.9,
-          fill:{color:C.teal}, line:{color:C.teal}});
-        s.addText(String(num), {x:3.9,y:3.05,w:0.9,h:0.9,
-          fontSize:28, bold:true, color:C.white, align:"center", fontFace:FF});
-        // Bordered label box
-        s.addShape(prs.ShapeType.rect, {x:4.95,y:2.85,w:7.2,h:0.85,
-          fill:{color:C.white,transparency:100}, line:{color:C.teal,pt:1.5}});
-        s.addText("DEPARTAMENTO", {x:5.1,y:2.88,w:7,h:0.25,
-          fontSize:10, bold:true, color:C.teal, fontFace:FF, charSpacing:3});
-        s.addText(title, {x:5.1,y:3.18,w:7,h:0.45,
-          fontSize:26, bold:false, color:C.black, fontFace:FF});
-      }
-
-      // Result slide (3 cards + detail row + progress bar)
-      function addResult(dept, subtitle, prevYear, objective, result) {
-        const s = prs.addSlide(); bgCream(s);
-        // Title
-        s.addText(dept, {x:0.5,y:0.25,w:12,h:0.5, fontSize:32,bold:true,color:C.black,fontFace:FF});
-        s.addText(subtitle, {x:0.5,y:0.75,w:12,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
-
-        // 3 KPI cards
-        const cards = [
-          {label:`RESULTADO ${mLabel} ${year-1}`, val: fmtE2(prevYear), big:false, bordered:false},
-          {label:`OBJETIVO ${mLabel} ${year}`,   val: fmtE2(objective),
-           sub: objective&&prevYear ? fmtP2((objective-prevYear)/prevYear*100,true)+" vs resultado "+mLabel.toLowerCase()+" "+(year-1) : "",
-           big:false, bordered:false, teal:true},
-          {label:`RESULTADO ${mLabel} ${year}`,  val: fmtE2(result),
-           sub: result&&prevYear ? fmtP2((result-prevYear)/prevYear*100,true)+" vs "+(year-1) : "",
-           big:true, bordered:true, teal:true},
-        ];
-        cards.forEach((c,i) => {
-          const x = 0.5 + i*4.15;
-          s.addShape(prs.ShapeType.roundRect, {x, y:1.15, w:3.95, h:1.55,
-            fill:{color:C.tealLt}, line:{color: c.bordered ? C.teal : C.tealLt, pt: c.bordered?2:1},
-            rectRadius:0.12});
-          s.addText(c.label, {x:x+0.18,y:1.22,w:3.6,h:0.28, fontSize:9,color:C.grayDk,fontFace:FF,bold:false});
-          s.addText(c.val, {x:x+0.18,y:1.52,w:3.6,h:0.55,
-            fontSize: c.big?28:22, bold:c.big, color: c.teal?C.teal:C.black, fontFace:FF});
-          if (c.sub) s.addText(c.sub, {x:x+0.18,y:2.12,w:3.6,h:0.22,
-            fontSize:10, bold:c.big, color:C.teal, fontFace:FF});
-        });
-
-        // Detail row
-        const evoPct = prevYear ? ((result-prevYear)/prevYear*100) : 0;
-        const evoAbs = result - (prevYear||0);
-        const aboveObj = result - (objective||0);
-        const pctObj = objective ? (result/objective*100) : 0;
-        const details = [
-          {label:"Evolução vs "+(year-1), val: fmtP2(evoPct,true)},
-          {label:"Ganho absoluto",          val: (evoAbs>=0?"+":"")+fmtE2(evoAbs)},
-          {label:"Acima do objetivo",       val: fmtE2(aboveObj)},
-          {label:"% do objetivo",           val: fmtP2(pctObj)},
-        ];
-        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:2.88,w:12.33,h:1.0,
-          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
-        s.addText("DETALHE DO RESULTADO", {x:0.72,y:2.93,w:4,h:0.22,
-          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
-        details.forEach((d,i) => {
-          const x = 0.72 + i*3.08;
-          if (i>0) s.addShape(prs.ShapeType.line, {x:x-0.05,y:3.05,w:0,h:0.65,
-            line:{color:C.gray,pt:1}});
-          s.addText(d.label, {x:x+0.05,y:3.06,w:2.9,h:0.22, fontSize:11,color:C.black,fontFace:FF});
-          const pos = !d.val.startsWith("-");
-          s.addText(d.val, {x:x+0.05,y:3.32,w:2.9,h:0.42,
-            fontSize:22, bold:true, color: i===0||i===3 ? C.teal : C.black, fontFace:FF});
-        });
-
-        // Progress bar
-        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:4.08,w:12.33,h:1.75,
-          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
-        s.addText("CONCRETIZAÇÃO DO OBJETIVO", {x:0.72,y:4.13,w:6,h:0.24,
-          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
-        const barW = 11.5;
-        const barX = 0.72;
-        const barY = 4.52;
-        const barH = 0.28;
-        const clampPct = Math.min(pctObj/100, 1);
-        const excessPct = Math.max(0, pctObj/100 - 1);
-        // Bar track
-        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW,h:barH,
-          fill:{color:C.gray}, line:{color:C.gray,pt:0.5}, rectRadius:0.05});
-        // Main bar (up to objective)
-        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW*clampPct,h:barH,
-          fill:{color:C.teal}, line:{color:C.teal}, rectRadius:0.05});
-        // Excess bar
-        if (excessPct>0) {
-          s.addShape(prs.ShapeType.roundRect, {x:barX+barW*clampPct,y:barY,w:barW*excessPct,h:barH,
-            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.05});
-        }
-        // Objective line
-        s.addShape(prs.ShapeType.line, {x:barX+barW*clampPct,y:barY-0.05,w:0,h:barH+0.1,
-          line:{color:C.black,pt:2}});
-        // Labels
-        s.addText("% do objetivo", {x:barX,y:barY+0.35,w:2,h:0.24, fontSize:9,color:C.grayDk,fontFace:FF});
-        s.addText(fmtP2(pctObj), {x:barX,y:barY+0.57,w:2,h:0.38, fontSize:22,bold:true,color:C.teal,fontFace:FF});
-        if (aboveObj>0) {
-          s.addShape(prs.ShapeType.roundRect, {x:barX+7.5,y:barY+0.42,w:4,h:0.32,
-            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.08});
-          s.addText(`✓  +${fmtE2(aboveObj)} acima do objetivo`, {x:barX+7.6,y:barY+0.46,w:3.8,h:0.24,
-            fontSize:9, color:C.teal, bold:true, fontFace:FF});
-        }
-        // Legend
-        const legends = [
-          {color:C.teal, label:`Realizado até objetivo (${fmtE2(objective)})`},
-          {color:C.tealLt, label:`Excedente (+${fmtE2(aboveObj)})`},
-        ];
-        legends.forEach((l,i) => {
-          const lx = barX + i*4.5;
-          s.addShape(prs.ShapeType.rect, {x:lx,y:6.08,w:0.18,h:0.12,fill:{color:l.color},line:{color:l.color}});
-          s.addText(l.label, {x:lx+0.25,y:6.05,w:4,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
-        });
-        s.addShape(prs.ShapeType.line, {x:barX+9,y:6.08,w:0,h:0.12,line:{color:C.black,pt:1.5}});
-        s.addText("Linha de objetivo", {x:barX+9.1,y:6.05,w:3,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
-      }
-
-      // Market distribution table slide
-      function addMktTable(dept, subtitle, rows) {
-        const s = prs.addSlide(); bgCream(s);
-        s.addText(dept, {x:0.5,y:0.25,w:8,h:0.45, fontSize:28,bold:true,color:C.black,fontFace:FF});
-        s.addText(subtitle, {x:0.5,y:0.72,w:9,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
-        // Table
-        const tRows = [
-          [{text:"MERCADO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10}},
-           {text:"FATURAÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10,align:"right"}}],
-          ...rows.map((r,i)=>[
-            {text:r[0],options:{fontSize:10,fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
-            {text:r[1],options:{fontSize:10,bold:true,align:"right",fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
-          ])
-        ];
-        s.addTable(tRows, {x:0.5,y:1.15,w:5.5,colW:[4,1.5],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
-      }
-
-      // ─────────────────────────────────────────────
-      // SLIDE 1: CAPA
-      // ─────────────────────────────────────────────
-      const s1 = prs.addSlide(); bgCream(s1);
-      // Diagonal stripe left
-      s1.addShape(prs.ShapeType.rect, {x:-1,y:-0.5,w:4,h:9,rotate:5,
-        fill:{color:"ECEAE4",transparency:30},line:{color:"ECEAE4",transparency:30}});
-      // Teal bar left edge
-      s1.addShape(prs.ShapeType.rect, {x:0,y:0,w:0.35,h:H,fill:{color:C.teal},line:{color:C.teal}});
-      // Logo area
-      s1.addText("PROZIS PARTNERS", {x:0.6,y:0.4,w:6,h:0.5,
-        fontSize:16,bold:true,color:C.teal,fontFace:FF,charSpacing:2});
-      // Title
-      s1.addText("Apresentação\nde resultados", {x:0.6,y:2.5,w:7,h:2.2,
-        fontSize:52,bold:true,color:C.black,fontFace:FF,breakLine:true});
-      s1.addText(`${mLabel} ${year}`, {x:0.6,y:4.7,w:7,h:0.8,
-        fontSize:36,bold:true,color:C.teal,fontFace:FF});
-
-      // ─────────────────────────────────────────────
-      // REVENDA
-      // ─────────────────────────────────────────────
-      addSep(1, "REVENDA");
-      addResult("REVENDA", `${mLabel} ${year} – em comparação ao ano anterior`,
-        N2(rev.prev_year), N2(rev.objective), N2(rev.result));
-
-      // Trimestre (only if quarter month)
-      if (isQuarterMonth) {
-        const qPrev=N2(rev.q_result_prev_year), qObj=N2(rev.q_objective), qRes=N2(rev.q_result);
-        const qEvo = qPrev?((qRes-qPrev)/qPrev*100):0;
-        const sq = prs.addSlide(); bgCream(sq);
-        sq.addText("REVENDA", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
-        sq.addText("Mensal", {x:0.5,y:0.72,w:9,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
-        const qCards = [
-          {label:`1º TRIMESTRE ${year-1}`, val:fmtE2(qPrev)},
-          {label:`OBJETIVO TRIMESTRE ${year}`, val:fmtE2(qObj),
-           sub:qPrev?fmtP2((qObj-qPrev)/qPrev*100,true)+" vs resultado 1º trimestre "+(year-1):""},
-          {label:`RESULTADO TRIMESTRE ${year}`, val:fmtE2(qRes),
-           sub:qPrev?fmtP2(qEvo,true)+" vs "+(year-1):"", big:true},
-        ];
-        qCards.forEach((c,i)=>{
-          const x=0.5+i*4.15;
-          sq.addShape(prs.ShapeType.roundRect,{x,y:1.15,w:3.95,h:c.big?1.8:1.55,
-            fill:{color:C.tealLt},line:{color:c.big?C.teal:C.tealLt,pt:c.big?2:1},rectRadius:0.12});
-          sq.addText(c.label,{x:x+0.18,y:1.22,w:3.6,h:0.28,fontSize:9,color:C.grayDk,fontFace:FF});
-          sq.addText(c.val,{x:x+0.18,y:1.52,w:3.6,h:0.55,
-            fontSize:c.big?26:20,bold:c.big,color:C.teal,fontFace:FF});
-          if(c.sub) sq.addText(c.sub,{x:x+0.18,y:2.1,w:3.6,h:0.22,fontSize:10,bold:c.big,color:C.teal,fontFace:FF});
-        });
-        const qMonthNums = monthNum<3?[1,2,3]:monthNum<6?[4,5,6]:monthNum<9?[7,8,9]:[10,11,12];
-        const qTblRows = [
-          [{text:"MÉTRICA",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9}},
-           ...qMonthNums.map(mn=>({text:MONTHS_UPPER[mn],options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9,align:"right"}}))],
-          [{text:"FATURAÇÃO",options:{fontSize:9}},
-           {text:fmtN(N2(rev.q_month1_revenue)),options:{fontSize:9,bold:true,align:"right"}},
-           {text:fmtN(N2(rev.q_month2_revenue)),options:{fontSize:9,bold:true,align:"right"}},
-           {text:fmtN(N2(rev.q_month3_revenue)),options:{fontSize:9,bold:true,align:"right"}}],
-          [{text:"EVOLUÇÃO FACE AO ANO ANTERIOR",options:{fontSize:9}},
-           {text:fmtP2(N2(rev.q_month1_evolution),true),options:{fontSize:9,color:N2(rev.q_month1_evolution)>=0?C.teal:C.red,align:"right"}},
-           {text:fmtP2(N2(rev.q_month2_evolution),true),options:{fontSize:9,color:N2(rev.q_month2_evolution)>=0?C.teal:C.red,align:"right"}},
-           {text:fmtP2(N2(rev.q_month3_evolution),true),options:{fontSize:9,color:N2(rev.q_month3_evolution)>=0?C.teal:C.red,align:"right"}}],
-          [{text:"MARGEM",options:{fontSize:9}},
-           {text:fmtP2(N2(rev.q_month1_margin)),options:{fontSize:9,align:"right"}},
-           {text:fmtP2(N2(rev.q_month2_margin)),options:{fontSize:9,align:"right"}},
-           {text:fmtP2(N2(rev.q_month3_margin)),options:{fontSize:9,align:"right"}}],
-        ];
-        sq.addTable(qTblRows,{x:0.5,y:3.2,w:12.3,colW:[5,2.1,2.1,2.1],
-          border:{type:"solid",color:C.gray,pt:0.5},rowH:0.48});
-      }
-
-      // Market distribution — revenda
-      const revMktRows = MC_MARKETS
-        .filter(m=>N2(rev.byMarket[m.code]?.curr)>0)
-        .sort((a,b)=>N2(rev.byMarket[b.code]?.curr)-N2(rev.byMarket[a.code]?.curr))
-        .map(m=>[m.name, fmtE2(N2(rev.byMarket[m.code]?.curr))]);
-      if (revMktRows.length) addMktTable("REVENDA","Distribuição da faturação por mercado", revMktRows);
-
-      // Programs
-      const progRows = MC_PROGRAMS.filter(p=>N2(programs[p]?.curr)>0)
-        .sort((a,b)=>N2(programs[b]?.curr)-N2(programs[a]?.curr))
-        .map(p=>[p, fmtE2(N2(programs[p]?.curr))]);
-      if (progRows.length) addMktTable("REVENDA","Distribuição da faturação por programa", progRows);
-
-      // ─────────────────────────────────────────────
-      // AFILIAÇÃO
-      // ─────────────────────────────────────────────
-      addSep(2, "AFILIAÇÃO");
-      addResult("AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
-        N2(afil.prev_year), N2(afil.objective), N2(afil.result));
-
-      const afilMktRows = MC_MARKETS
-        .filter(m=>N2(afil.byMarket[m.code]?.curr)>0)
-        .sort((a,b)=>N2(afil.byMarket[b.code]?.curr)-N2(afil.byMarket[a.code]?.curr))
-        .map(m=>[m.name, fmtE2(N2(afil.byMarket[m.code]?.curr))]);
-      if (afilMktRows.length) addMktTable("AFILIAÇÃO","Distribuição da afiliação por mercado", afilMktRows);
-
-      // ─────────────────────────────────────────────
-      // TOTAL
-      // ─────────────────────────────────────────────
-      addSep(3, "TOTAL");
-      const totResult = N2(rev.result)+N2(afil.result);
-      const totPrev   = N2(rev.prev_year)+N2(afil.prev_year);
-      const totObj    = N2(rev.objective)+N2(afil.objective);
-      addResult("REVENDA + AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
-        totPrev, totObj, totResult);
-
-      // Total breakdown slide
-      const st = prs.addSlide(); bgCream(st);
-      st.addText("REVENDA + AFILIAÇÃO", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
-      st.addText(`${mLabel} ${year} – Histórico em gráficos`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
-      const revPct = totResult>0?Math.round(N2(rev.result)/totResult*100):0;
-      const afPct  = totResult>0?Math.round(N2(afil.result)/totResult*100):0;
-      st.addShape(prs.ShapeType.roundRect,{x:0.5,y:1.2,w:3.5,h:2.5,
-        fill:{color:C.tealLt},line:{color:C.teal,pt:1},rectRadius:0.12});
-      st.addText("TOTAL", {x:0.6,y:1.28,w:3.3,h:0.28,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
-      st.addText(fmtE2(totResult), {x:0.6,y:1.6,w:3.3,h:0.65,fontSize:24,bold:true,color:C.black,fontFace:FF});
-      // Revenda / Afil boxes
-      [{label:"REVENDA",val:N2(rev.result),pct:revPct,y:3.95},{label:"AFILIAÇÃO",val:N2(afil.result),pct:afPct,y:5.1}]
-      .forEach((item)=>{
-        st.addShape(prs.ShapeType.roundRect,{x:0.5,y:item.y,w:3.5,h:0.95,
-          fill:{color:C.tealLt},line:{color:C.teal,pt:0.5},rectRadius:0.1});
-        st.addText(item.label,{x:0.65,y:item.y+0.08,w:2,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
-        st.addText(fmtE2(item.val),{x:0.65,y:item.y+0.35,w:2.8,h:0.42,fontSize:18,bold:true,color:C.teal,fontFace:FF});
-        st.addText(`${item.pct}%`,{x:3.1,y:item.y+0.25,w:0.9,h:0.45,fontSize:22,bold:true,color:C.teal,fontFace:FF,align:"right"});
-      });
-
-      // ─────────────────────────────────────────────
-      // ENCOMENDAS
-      // ─────────────────────────────────────────────
-      addSep(4, "ENCOMENDAS");
-      const encTotCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_curr)),0);
-      const encTotPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_prev)),0);
-      const enc1stCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_curr)),0);
-      const enc1stPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_prev)),0);
-      const encRev1Curr = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_curr)),0);
-      const encRev1Prev = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_prev)),0);
-
-      const se = prs.addSlide(); bgCream(se);
-      se.addText("ENCOMENDAS", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
-      se.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
-      se.addText("DETALHE POR MÉTRICA", {x:0.5,y:1.12,w:12,h:0.25,fontSize:8,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
-      const encMetrics = [
-        [`ENCOMENDAS TOTAIS`, fmtN(encTotPrev), fmtN(encTotCurr), evo2(encTotPrev,encTotCurr)],
-        [`PRIMEIRAS ENCOMENDAS`, fmtN(enc1stPrev), fmtN(enc1stCurr), evo2(enc1stPrev,enc1stCurr)],
-        [`FATURAÇÃO 1ªs ENC.`, fmtE2(encRev1Prev), fmtE2(encRev1Curr), evo2(encRev1Prev,encRev1Curr)],
-      ];
-      const encHdr = [
-        [{text:"",options:{fill:{color:C.teal}}},{text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
-         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
-         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}}],
-        ...encMetrics.map((r,i)=>{
-          const bg=i%2===0?C.white:C.grayLt;
-          const pos=r[3].startsWith("+");
-          return [{text:r[0],options:{fontSize:10,fill:{color:bg},bold:true}},
-            {text:r[1],options:{fontSize:10,align:"right",fill:{color:bg}}},
-            {text:r[2],options:{fontSize:10,bold:true,align:"right",fill:{color:bg}}},
-            {text:r[3],options:{fontSize:10,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}}];
-        })
-      ];
-      se.addTable(encHdr,{x:0.5,y:1.4,w:12.3,colW:[4.5,2.5,2.5,2.8],
-        border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
-
-      // ─────────────────────────────────────────────
-      // LEADS
-      // ─────────────────────────────────────────────
-      addSep(5, "LEADS E NOVAS PARCERIAS");
-      const leadsTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.curr),0);
-      const leadsPrevTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.prev),0);
-      const partnersTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_curr),0);
-      const partnersPrevT = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_prev),0);
-
-      // Leads by market table
-      const leadsRows = MC_MARKETS
-        .filter(m=>N2(leads.byMarket[m.code]?.curr)>0)
-        .sort((a,b)=>N2(leads.byMarket[b.code]?.curr)-N2(leads.byMarket[a.code]?.curr))
-        .map(m=>[m.name, String(Math.round(N2(leads.byMarket[m.code]?.curr)))]);
-      if (leadsRows.length) addMktTable("LEADS","BE A PARTNER – por mercado", leadsRows);
-
-      // Leads summary slide
-      const sl = prs.addSlide(); bgCream(sl);
-      sl.addText("LEADS", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
-      sl.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:8,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
-      const lSummary = [
-        ["TOTAL DE LEADS", leadsPrevTotal, leadsTotal],
-        ["NOVAS PARCERIAS", partnersPrevT, partnersTotal],
-      ];
-      lSummary.forEach((row,i)=>{
-        const y = 1.2+i*1.4;
-        sl.addShape(prs.ShapeType.roundRect,{x:0.5,y,w:12.3,h:1.2,
-          fill:{color:i===0?C.tealLt:C.white},line:{color:C.teal,pt:0.5},rectRadius:0.1});
-        sl.addText(row[0],{x:0.7,y:y+0.08,w:4,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF,charSpacing:1});
-        sl.addText(fmtN(row[2]),{x:0.7,y:y+0.42,w:3,h:0.55,fontSize:30,bold:true,color:C.teal,fontFace:FF});
-        if (row[1]>0) {
-          const e=(row[2]-row[1])/row[1]*100;
-          sl.addText(`${e>=0?"+":""}${e.toFixed(2)}% vs ${mLabel.toLowerCase()} ${year-1}`,
-            {x:4,y:y+0.52,w:4,h:0.3,fontSize:12,bold:true,color:e>=0?C.teal:C.red,fontFace:FF});
-        }
-      });
-
-      // ─────────────────────────────────────────────
-      // RESULTADOS POR MERCADO
-      // ─────────────────────────────────────────────
-      addSep(6, "RESULTADOS POR MERCADO");
-
-      MC_MARKETS.forEach(m=>{
-        const rd=rev.byMarket[m.code]||{}, ad=afil.byMarket[m.code]||{};
-        const od=orders.byMarket[m.code]||{};
-        const rCurr=N2(rd.curr),rPrev=N2(rd.prev),aCurr=N2(ad.curr),aPrev=N2(ad.prev);
-        if(!rCurr&&!aCurr) return;
-        const tCurr=rCurr+aCurr, tPrev=rPrev+aPrev;
-        const mDiff=N2(closingCurr?.markets?.[m.code]?.margin_curr)-N2(closingCurr?.markets?.[m.code]?.margin_prev||closingPrev?.markets?.[m.code]?.margin_curr);
-
-        const sm = prs.addSlide(); bgCream(sm);
-        sm.addText(m.name.toUpperCase(),{x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
-        sm.addText("DETALHE POR MÉTRICA",{x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
-
-        // KPI indicators (4 cards)
-        const rEvo=rPrev?((rCurr-rPrev)/rPrev*100):0;
-        const oEvo=N2(od.orders_prev)?((N2(od.orders_curr)-N2(od.orders_prev))/N2(od.orders_prev)*100):0;
-        const kpis=[
-          {label:"Revenda",val:fmtE2(rCurr),sub:fmtP2(rEvo,true),pos:rEvo>=0},
-          {label:"Margem",val:fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)),sub:fmtP2(mDiff,true)+"pp",pos:mDiff>=0},
-          {label:"Encomendas",val:fmtN(N2(od.orders_curr)),sub:fmtP2(oEvo,true),pos:oEvo>=0},
-          {label:`Total ${year}`,val:fmtE2(tCurr),sub:evo2(tPrev,tCurr),pos:tCurr>=tPrev},
-        ];
-        kpis.forEach((k,i)=>{
-          const x=0.5+i*3.2;
-          sm.addShape(prs.ShapeType.roundRect,{x,y:1.18,w:3.0,h:1.1,
-            fill:{color:C.white},line:{color:C.gray,pt:0.8},rectRadius:0.1});
-          sm.addText("INDICADORES PRINCIPAIS",{x:0.5,y:1.1,w:12,h:0.2,fontSize:7,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
-          sm.addText(k.label,{x:x+0.12,y:1.22,w:2.8,h:0.22,fontSize:9,color:C.grayDk,fontFace:FF});
-          sm.addText(k.val,{x:x+0.12,y:1.46,w:2.8,h:0.45,fontSize:18,bold:true,color:C.black,fontFace:FF});
-          sm.addText(k.sub,{x:x+0.12,y:1.92,w:2.8,h:0.22,fontSize:9,bold:true,color:k.pos?C.teal:C.red,fontFace:FF});
-        });
-
-        // Detail table
-        const dtRows=[
-          [{text:"",options:{fill:{color:C.teal}}},
-           {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
-           {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
-           {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}}],
-          ...([
-            ["Revenda", fmtE2(rPrev), fmtE2(rCurr), evo2(rPrev,rCurr)],
-            ["Afiliação", fmtE2(aPrev), fmtE2(aCurr), evo2(aPrev,aCurr)],
-            ["Total (rev + afil)", fmtE2(tPrev), fmtE2(tCurr), evo2(tPrev,tCurr)],
-            ["Margem", fmtP2(N2(closingPrev?.markets?.[m.code]?.margin_curr)), fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)), fmtP2(mDiff,true)+"pp"],
-            ["Encomendas", fmtN(N2(od.orders_prev)), fmtN(N2(od.orders_curr)), evo2(N2(od.orders_prev),N2(od.orders_curr))],
-            ["1ªs enc.", fmtN(N2(od.first_prev)), fmtN(N2(od.first_curr)), evo2(N2(od.first_prev),N2(od.first_curr))],
-            ["Faturação 1ªs enc.", fmtE2(N2(od.first_rev_prev)), fmtE2(N2(od.first_rev_curr)), evo2(N2(od.first_rev_prev),N2(od.first_rev_curr))],
-          ].map((r,i)=>{
-            const bg=i%2===0?C.white:C.grayLt;
-            const pos=r[3].startsWith("+");
-            return [
-              {text:r[0],options:{fontSize:9,fill:{color:bg},bold:i===2}},
-              {text:r[1],options:{fontSize:9,align:"right",fill:{color:bg}}},
-              {text:r[2],options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
-              {text:r[3],options:{fontSize:9,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}},
-            ];
-          }))
-        ];
-        sm.addTable(dtRows,{x:0.5,y:2.45,w:12.3,colW:[4.2,2.5,2.5,2.6],
-          border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
-      });
-
-      await prs.writeFile({fileName:`Relatorio-${MC_MONTHS_PT[monthNum+1]}-${year}.pptx`});
-    } catch(e) {
-      console.error(e);
-      alert("Erro ao gerar PowerPoint: "+e.message);
-    }
-    setGenerating(false);
-  }
-
-  const isQuarterMonth = [2,5,8,11].includes(monthNum); // Mar, Jun, Set, Dez
-  const steps = isQuarterMonth
-    ? ["Revenda","Afiliação","Total","Mercados","Programas","Trimestre"]
-    : ["Revenda","Afiliação","Total","Mercados","Programas"];
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-20 text-slate-400">
-      <div className="text-center">
-        <div className="text-3xl mb-3">⏳</div>
-        <p className="text-sm">A carregar dados de {MC_MONTHS_PT[monthNum+1]} {year}…</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="max-w-3xl mx-auto pb-10">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Relatório — {MC_MONTHS_PT[monthNum+1]} {year}</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Dados carregados automaticamente · edita antes de gerar</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {savedDraft && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
-          <button onClick={saveDraft} disabled={savingDraft}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60">
-            {savingDraft ? "A guardar…" : "💾 Guardar"}
-          </button>
-          <button onClick={generatePptx} disabled={generating}
-            className="px-5 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center gap-2">
-            {generating ? "⏳ A gerar…" : "⬇️ Gerar PowerPoint"}
-          </button>
-        </div>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex gap-1 mb-5 overflow-x-auto pb-1">
-        {steps.map((s,i) => (
-          <button key={i} onClick={() => setStep(i)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-              step===i?"bg-orange-500 text-white":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-            {i+1}. {s}
-          </button>
-        ))}
-      </div>
-
-      {/* Step 0 – Revenda */}
-      {step===0 && (
-        <>
-          <MCCard title="Revenda — Resultados mensais">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <MCField label={`Resultado ${year-1} (€)`} value={rev.prev_year} onChange={v=>setRev(p=>({...p,prev_year:v}))} />
-              <MCField label={`Objetivo ${year} (€)`} value={String(rev.objective)} onChange={v=>setRev(p=>({...p,objective:v}))} />
-              <MCField label={`Resultado ${year} (€) ✦`} value={String(rev.result)} onChange={v=>setRev(p=>({...p,result:v}))} />
-              <MCField label={`Margem ${year} %`} value={rev.margin_pct} onChange={v=>setRev(p=>({...p,margin_pct:v}))} />
-              <MCField label={`Margem ${year-1} %`} value={rev.margin_pct_prev} onChange={v=>setRev(p=>({...p,margin_pct_prev:v}))} />
-            </div>
-          </MCCard>
-          <MCCard title="Revenda — Por mercado">
-            {MC_MARKETS.map(m => (
-              <div key={m.code} className="mb-3">
-                <p className="text-xs font-semibold text-slate-600 mb-2">{m.name}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <MCField label={`${year} (€) ✦`} value={String(rev.byMarket[m.code]?.curr||"")} onChange={v=>setRev(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
-                  <MCField label={`${year-1} (€)`} value={String(rev.byMarket[m.code]?.prev||"")} onChange={v=>setRev(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
-                </div>
-              </div>
-            ))}
-          </MCCard>
-          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir do Registo Diário</p>
-        </>
-      )}
-
-      {/* Step 1 – Afiliação */}
-      {step===1 && (
-        <>
-          <MCCard title="Afiliação — Resultados mensais">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <MCField label={`Resultado ${year-1} (€)`} value={afil.prev_year} onChange={v=>setAfil(p=>({...p,prev_year:v}))} />
-              <MCField label={`Objetivo ${year} (€) ✦`} value={String(afil.objective)} onChange={v=>setAfil(p=>({...p,objective:v}))} />
-              <MCField label={`Resultado ${year} (€) ✦`} value={String(afil.result)} onChange={v=>setAfil(p=>({...p,result:v}))} />
-            </div>
-          </MCCard>
-          <MCCard title="Afiliação — Por mercado">
-            {MC_MARKETS.map(m => (
-              <div key={m.code} className="mb-3">
-                <p className="text-xs font-semibold text-slate-600 mb-2">{m.name}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <MCField label={`${year-1} (€)`} value={String(afil.byMarket[m.code]?.prev||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
-                  <MCField label={`${year} (€) ✦`} value={String(afil.byMarket[m.code]?.curr||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
-                </div>
-              </div>
-            ))}
-          </MCCard>
-          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir de Afiliação</p>
-        </>
-      )}
-
-      {/* Step 2 – Total */}
-      {step===2 && (
-        <MCCard title="Total (Revenda + Afiliação)">
-          <div className="grid grid-cols-2 gap-4">
-            {[["Resultado "+year+" (€)","auto",N(rev.result)+N(afil.result)],
-              ["Resultado "+(year-1)+" (€)","auto",N(rev.prev_year)+N(afil.prev_year)],
-              ["Objetivo "+year+" (€)","auto",N(rev.objective)+N(afil.objective)]]
-            .map(([label,,val],i) => (
-              <div key={i} className="bg-slate-50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">{label}</p>
-                <p className="text-xl font-bold text-slate-800">{new Intl.NumberFormat("fr-FR").format(val)} €</p>
-                <p className="text-xs text-slate-400 mt-1">calculado automaticamente</p>
-              </div>
-            ))}
-          </div>
-        </MCCard>
-      )}
-
-      {/* Step 3 – Mercados (encomendas + leads) */}
-      {step===3 && (
-        <>
-          {MC_MARKETS.map(m => (
-            <MCCard key={m.code} title={m.name}>
-              <div className="grid grid-cols-2 gap-6">
-                {/* Coluna 2025 */}
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{year-1}</p>
-                  <MCField label={`Enc. ${year-1}`} value={orders.byMarket[m.code]?.orders_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_prev:v}}}))} />
-                  <MCField label={`1ªs enc. ${year-1}`} value={orders.byMarket[m.code]?.first_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_prev:v}}}))} />
-                  <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={orders.byMarket[m.code]?.first_rev_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_prev:v}}}))} />
-                  <MCField label={`Leads ${year-1}`} value={leads.byMarket[m.code]?.prev||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
-                </div>
-                {/* Coluna 2026 */}
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs font-bold text-orange-400 uppercase tracking-wide">{year} ✦</p>
-                  <MCField label={`Enc. ${year}`} value={orders.byMarket[m.code]?.orders_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_curr:v}}}))} />
-                  <MCField label={`1ªs enc. ${year}`} value={orders.byMarket[m.code]?.first_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_curr:v}}}))} />
-                  <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={orders.byMarket[m.code]?.first_rev_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_curr:v}}}))} />
-                  <MCField label={`Leads ${year}`} value={leads.byMarket[m.code]?.curr||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
-                </div>
-              </div>
-            </MCCard>
-          ))}
-          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir de Encomendas / Leads</p>
-        </>
-      )}
-
-      {/* Step 4 – Programas */}
-      {step===4 && (
-        <MCCard title="Revenda — Programas">
-          {MC_PROGRAMS.map(p => (
-            <div key={p} className="mb-3">
-              <p className="text-xs font-semibold text-slate-600 mb-2">{p}</p>
-              <div className="grid grid-cols-2 gap-3">
-                <MCField label={`${year-1} (€)`} value={programs[p]?.prev||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],prev:v}}))} />
-                <MCField label={`${year} (€)`} value={programs[p]?.curr||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],curr:v}}))} />
-              </div>
-            </div>
-          ))}
-        </MCCard>
-      )}
-
-      {/* Step 5 – Trimestre (só Mar/Jun/Set/Dez) */}
-      {step===5 && isQuarterMonth && (
-        <>
-          <MCCard title="Revenda — Trimestre">
-            <div className="grid grid-cols-3 gap-3">
-              <MCField label={`Trim. ${year-1} (€)`} value={rev.q_result_prev_year} onChange={v=>setRev(p=>({...p,q_result_prev_year:v}))} />
-              <MCField label={`Obj. trim. ${year} (€)`} value={rev.q_objective} onChange={v=>setRev(p=>({...p,q_objective:v}))} />
-              <MCField label={`Res. trim. ${year} (€)`} value={rev.q_result} onChange={v=>setRev(p=>({...p,q_result:v}))} />
-            </div>
-          </MCCard>
-          <MCCard title="Detalhe dos 3 meses">
-            {[{key:"q_month1",label:MC_MONTHS_PT[monthNum<3?1:monthNum<6?4:monthNum<9?7:10]},
-              {key:"q_month2",label:MC_MONTHS_PT[monthNum<3?2:monthNum<6?5:monthNum<9?8:11]},
-              {key:"q_month3",label:MC_MONTHS_PT[monthNum<3?3:monthNum<6?6:monthNum<9?9:12]}]
-            .map(({key,label}) => (
-              <div key={key} className="mb-4">
-                <p className="text-sm font-semibold text-slate-700 mb-2">{label}</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <MCField label="Faturação (€)" value={rev[`${key}_revenue`]} onChange={v=>setRev(p=>({...p,[`${key}_revenue`]:v}))} />
-                  <MCField label="Evolução % (ex: 74.9)" value={rev[`${key}_evolution`]} onChange={v=>setRev(p=>({...p,[`${key}_evolution`]:v}))} />
-                  <MCField label="Margem % (ex: 49.6)" value={rev[`${key}_margin`]} onChange={v=>setRev(p=>({...p,[`${key}_margin`]:v}))} />
-                </div>
-              </div>
-            ))}
-          </MCCard>
-        </>
-      )}
-
-      {/* Navegação */}
-      <div className="flex justify-between mt-4">
-        <button onClick={() => setStep(s => Math.max(0,s-1))} disabled={step===0}
-          className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-30">
-          ← Anterior
-        </button>
-        {step < steps.length-1 ? (
-          <button onClick={() => setStep(s => s+1)}
-            className="px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700">
-            Seguinte →
-          </button>
-        ) : (
-          <button onClick={generatePptx} disabled={generating}
-            className="px-5 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 disabled:opacity-60">
-            {generating?"⏳ A gerar…":"⬇️ Gerar PowerPoint"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-// ---- Afiliação ----
-const AFILIACAO_SCOPES = [
-  { id: "total", label: "Total" },
-  { id: "PT", label: "Portugal" },
-  { id: "IT", label: "Itália" },
-  { id: "ES", label: "Espanha" },
-  { id: "FR", label: "França" },
-  { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
-  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
-  { id: "USA", label: "USA" },
-  { id: "OT", label: "Outros" },
-];
 
 function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth, isAdmin }) {
   const [afilScope, setAfilScope] = useState("total");
