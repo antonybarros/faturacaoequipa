@@ -2139,64 +2139,61 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
       {/* ── CARD: MAPA DE NOVAS PARCERIAS (só Total) ── */}
       {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
-        const totalCurr = partnersByMkt.reduce((s,m)=>s+m.curr,0);
-        const totalPrev = partnersByMkt.reduce((s,m)=>s+m.prev,0);
+        const CARD_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
+        const CARD_TEXT   = ["#fff","#fff","#fff","#fff","#1A5C52","#1A5C52","#fff","#fff"];
+        const CARD_SUB    = ["#9FE1CB","#5BB8AC","#2E7D71","#2E7D71","#2E7D71","#2E7D71","#5BB8AC","#5BB8AC"];
+        const ranked = [...partnersByMkt].sort((a,b)=>b.curr-a.curr);
+        const totalCurr = ranked.reduce((s,m)=>s+m.curr,0);
+        const totalPrev = ranked.reduce((s,m)=>s+m.prev,0);
         const evo = totalPrev>0&&totalCurr>0?((totalCurr-totalPrev)/totalPrev*100):null;
         const pos = evo!=null&&evo>=0;
-        // Map positions for each market (% of SVG 800x450)
-        const MKT_POS = {
-          "PT": {x:12,y:62,label:"PORTUGAL"},
-          "ES": {x:18,y:55,label:"ESPANHA"},
-          "FR": {x:28,y:45,label:"FRANÇA"},
-          "IT": {x:42,y:52,label:"ITALIA"},
-          "CH-BNL-DEAT": {x:38,y:36,label:"CH-BNL-DE-AT"},
-          "CZ-SK-GR-CY-PL": {x:52,y:38,label:"CHÉQUIA"},
-          "USA": {x:6,y:30,label:"USA"},
-          "OT": {x:68,y:28,label:"OUTROS"},
-        };
-        const ranked = [...partnersByMkt].sort((a,b)=>b.curr-a.curr);
+        const fmt = n => new Intl.NumberFormat("fr-FR").format(n);
         return (
           <div className={DS.card}>
-            <div><h2 className={DS.title}>MAPA DE NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – total de novos parceiros por mercado</p></div>
-            {/* Map */}
-            <div className="relative w-full bg-slate-50 rounded-xl overflow-hidden" style={{paddingBottom:"56%"}}>
-              <div className="absolute inset-0">
-                {/* Europe SVG background */}
-                <svg viewBox="0 0 800 450" className="w-full h-full opacity-10">
-                  <path d="M150,80 L200,60 L280,50 L350,55 L420,45 L500,50 L580,45 L650,55 L700,70 L720,90 L700,120 L680,150 L650,180 L600,200 L580,230 L550,260 L520,280 L480,290 L450,310 L420,330 L380,340 L340,350 L300,360 L260,350 L220,340 L180,320 L150,300 L120,270 L100,240 L90,200 L95,160 L110,120 Z" fill="#3A9E8F"/>
-                </svg>
-                {/* Market pins */}
-                {ranked.map((m,i) => {
-                  const pos2 = MKT_POS[m.code];
-                  if (!pos2) return null;
-                  return (
-                    <div key={m.code} className="absolute flex items-center gap-1.5"
-                      style={{left:`${pos2.x}%`,top:`${pos2.y}%`,transform:"translate(-50%,-50%)"}}>
-                      <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
-                        {i+1}
-                      </div>
-                      <div className="bg-white border border-emerald-200 rounded-lg px-2 py-1 shadow-sm whitespace-nowrap">
-                        <p className="text-sm font-bold text-emerald-700">{new Intl.NumberFormat("fr-FR").format(m.curr)}</p>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">{pos2.label}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {/* Total box */}
-                <div className="absolute bottom-4 right-4 bg-white border-2 border-emerald-400 rounded-xl px-4 py-2 shadow">
-                  <p className="text-2xl font-bold text-slate-900">{new Intl.NumberFormat("fr-FR").format(totalCurr)}</p>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total</p>
+            <div><h2 className={DS.title}>NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – por mercado</p></div>
+            {/* Grid of market cards */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:"10px",marginBottom:"1rem"}}>
+              {ranked.map((m,i) => (
+                <div key={m.code} style={{
+                  background:"var(--color-background-secondary)",
+                  border:"0.5px solid var(--color-border-tertiary)",
+                  borderRadius:"var(--border-radius-md)",
+                  padding:"12px 14px",
+                  position:"relative",
+                }}>
+                  <span style={{
+                    position:"absolute",top:"10px",right:"10px",
+                    background:CARD_COLORS[i%CARD_COLORS.length],
+                    color:CARD_TEXT[i%CARD_TEXT.length],
+                    borderRadius:"50%",width:"20px",height:"20px",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:"11px",fontWeight:"500",
+                  }}>{i+1}</span>
+                  <p style={{fontSize:"11px",color:"var(--color-text-secondary)",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em",paddingRight:"24px"}}>{m.name}</p>
+                  <p style={{fontSize:"22px",fontWeight:"500",margin:"0",color:"var(--color-text-primary)"}}>{fmt(m.curr)}</p>
+                  {m.prev > 0 && (() => {
+                    const e=(m.curr-m.prev)/m.prev*100;
+                    return <p style={{fontSize:"11px",fontWeight:"500",margin:"4px 0 0",color:e>=0?"#0F6E56":"#A32D2D"}}>{e>=0?"+":""}{e.toFixed(1)}%</p>;
+                  })()}
                 </div>
+              ))}
+              {/* Total card */}
+              <div style={{
+                background:"#1D9E75",border:"2px solid #0F6E56",
+                borderRadius:"var(--border-radius-md)",padding:"12px 14px",
+              }}>
+                <p style={{fontSize:"11px",color:"#9FE1CB",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em"}}>Total</p>
+                <p style={{fontSize:"26px",fontWeight:"500",margin:"0",color:"#fff"}}>{fmt(totalCurr)}</p>
               </div>
             </div>
             {/* Table */}
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
               <thead><tr>{["",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
               <tbody>
                 <tr>
                   <td style={{padding:"8px",color:"var(--color-text-primary)",fontWeight:"500"}}>Total de parcerias</td>
-                  <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?new Intl.NumberFormat("fr-FR").format(totalPrev):"—"}</td>
-                  <td style={{padding:"8px",textAlign:"right",fontWeight:"bold",color:"var(--color-text-primary)"}}>{new Intl.NumberFormat("fr-FR").format(totalCurr)}</td>
+                  <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?fmt(totalPrev):"—"}</td>
+                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)"}}>{fmt(totalCurr)}</td>
                   <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D"}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
                 </tr>
               </tbody>
