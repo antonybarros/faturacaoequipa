@@ -1367,6 +1367,42 @@ function useChartJs(cb, deps) {
   }, deps);
 }
 
+
+function ChartGrouped({ id, labels, d25, d26 }) {
+  useEffect(() => {
+    const init = () => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
+      const textColor = isDark ? "#e5e5e3" : "#444441";
+      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      canvas._chartInstance = new window.Chart(canvas, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor:"#B4B2A9", borderRadius:4, borderWidth:0 },
+            { label: String(new Date().getFullYear()),   data: d26, backgroundColor:"#1D9E75", borderRadius:4, borderWidth:0 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")}` } } },
+          scales: {
+            x: { grid:{ display:false }, ticks:{ color:textColor, font:{size:12}, autoSkip:false }, border:{ display:false } },
+            y: { grid:{ color:gridColor }, ticks:{ color:textColor, font:{size:11} }, border:{ display:false } }
+          }
+        }
+      });
+    };
+    if (window.Chart) init();
+    else { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"; s.onload=init; document.head.appendChild(s); }
+    return () => { const c=document.getElementById(id); if(c?._chartInstance){c._chartInstance.destroy();c._chartInstance=null;} };
+  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
+  return null;
+}
+
 function ChartOrigin({ id, labels, d25, d26 }) {
   useEffect(() => {
     const init = () => {
@@ -1707,29 +1743,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
-        {/* Margem */}
-        {(marginCurr || marginPrev) && (
-          <div className={DS.detailBox}>
-            <p className={DS.detailLabel}>MARGEM</p>
-            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-              <div className={DS.col}>
-                <p className="text-xs text-slate-400 mb-1">{year-1}</p>
-                <p className="text-xl font-semibold text-slate-600">{marginPrev!=null?`${marginPrev.toFixed(2)}%`:"—"}</p>
-              </div>
-              <div className={DS.col}>
-                <p className="text-xs text-slate-400 mb-1">{year}</p>
-                <p className="text-xl font-bold text-slate-900">{marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—"}</p>
-              </div>
-              <div className={DS.col}>
-                <p className="text-xs text-slate-400 mb-1">Evolução</p>
-                {marginCurr!=null&&marginPrev!=null?(()=>{const d=marginCurr-marginPrev;return(
-                  <p className={`text-xl font-bold ${d>=0?"text-emerald-600":"text-red-600"}`}>{d>=0?"+":""}{d.toFixed(2)}pp</p>
-                );})():<p className="text-xl font-bold text-slate-400">—</p>}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Médias diárias */}
         {closedDay > 0 && (
           <div className={DS.detailBox}>
@@ -1804,38 +1817,57 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </BigCard>
       )}
 
-      {/* ── CARD: ENCOMENDAS (from Registo closing) ── */}
-      {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (
-        <div className={DS.card}>
-          <div>
-            <h2 className={DS.title}>ENCOMENDAS</h2>
-            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+      {/* ── CARD: ENCOMENDAS — chart + table ── */}
+      {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (() => {
+        const encRows = [
+          {label:"Total encomendas",  curr:ordersCurrMkt.orders,   prev:ordersCurrMkt.ordersPrev,   isEur:false},
+          {label:"1ªs encomendas",    curr:ordersCurrMkt.first,    prev:ordersCurrMkt.firstPrev,    isEur:false},
+          {label:"Fat. 1ªs enc. (€)", curr:ordersCurrMkt.firstRev, prev:ordersCurrMkt.firstRevPrev, isEur:true},
+        ];
+        const encId = `enc-${scope}`;
+        const fmt = (v,isEur) => v>0?(isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
+        return (
+          <div className={DS.card}>
+            <div><h2 className={DS.title}>ENCOMENDAS</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
+            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
+              </span>
+            </div>
+            <div style={{position:"relative",width:"100%",height:"200px"}}>
+              <canvas id={encId} role="img" aria-label={`Encomendas ${year-1} vs ${year}`}></canvas>
+            </div>
+            <ChartGrouped id={encId} labels={encRows.map(r=>r.label)} d25={encRows.map(r=>r.prev||0)} d26={encRows.map(r=>r.curr||0)} />
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:"0.5rem"}}>
+              <thead><tr>
+                {["Métrica",""+year-1,""+year,"Evolução"].map((h,i)=>(
+                  <th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {encRows.map((row,i)=>{
+                  const evo=row.prev>0&&row.curr>0?((row.curr-row.prev)/row.prev*100):null;
+                  const pos=evo!=null&&evo>=0;
+                  const border=i<encRows.length-1?"0.5px solid var(--color-border-tertiary)":"none";
+                  return (
+                    <tr key={i}>
+                      <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.label}</td>
+                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{fmt(row.prev,row.isEur)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{fmt(row.curr,row.isEur)}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>
+                        {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          {[
-            {label:"Total encomendas",   curr:ordersCurrMkt.orders,    prev:ordersCurrMkt.ordersPrev,    isEur:false},
-            {label:"1ªs encomendas",     curr:ordersCurrMkt.first,     prev:ordersCurrMkt.firstPrev,     isEur:false},
-            {label:"Fat. 1ªs enc. (€)",  curr:ordersCurrMkt.firstRev,  prev:ordersCurrMkt.firstRevPrev,  isEur:true},
-          ].map((row,i) => {
-            const evo = row.prev>0&&row.curr>0?((row.curr-row.prev)/row.prev*100):null;
-            const pos = evo!=null&&evo>=0;
-            const fmt = v => v>0?(row.isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
-            return (
-              <div key={i} className={DS.detailBox}>
-                <p className={DS.detailLabel}>{row.label}</p>
-                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{fmt(row.prev)}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{fmt(row.curr)}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
-                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
-                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── CARD: LEADS ── */}
       {(leadsCurr || leadsPrev) && (
@@ -1884,23 +1916,15 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — Chart.js horizontal bar ── */}
+      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — chart + table ── */}
       {progCurr && progCurr.some(v => v != null) && (() => {
         const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        // Sort by 2026 value descending
-        const combined = progLabels.map((l,i) => ({l, c: progCurr[i]||0, p: progPrev[i]||0}))
-          .sort((a,b) => b.c - a.c);
-        const sortedLabels = combined.map(x => x.l);
-        const d26 = combined.map(x => x.c);
-        const d25 = combined.map(x => x.p);
+        const combined = progLabels.map((l,i) => ({l, c:progCurr[i]||0, p:progPrev[i]||0})).sort((a,b)=>b.c-a.c);
         const chartId = `prog-${scope}`;
         const h = Math.max(300, combined.length * 48 + 60);
         return (
           <div className={DS.card}>
-            <div>
-              <h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2>
-              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
-            </div>
+            <div><h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
             <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
               <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
                 <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
@@ -1912,7 +1936,31 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             <div style={{position:"relative",width:"100%",height:`${h}px`}}>
               <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
             </div>
-            <ChartProg id={chartId} labels={sortedLabels} d25={d25} d26={d26} />
+            <ChartProg id={chartId} labels={combined.map(x=>x.l)} d25={combined.map(x=>x.p)} d26={combined.map(x=>x.c)} />
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+              <thead><tr>
+                {["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(
+                  <th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {combined.map((row,i)=>{
+                  const evo=row.p>0&&row.c>0?((row.c-row.p)/row.p*100):null;
+                  const pos=evo!=null&&evo>=0;
+                  const border=i<combined.length-1?"0.5px solid var(--color-border-tertiary)":"none";
+                  return (
+                    <tr key={i}>
+                      <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.l}</td>
+                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{row.p>0?new Intl.NumberFormat("fr-FR").format(row.p):"—"}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{row.c>0?new Intl.NumberFormat("fr-FR").format(row.c):"—"}</td>
+                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>
+                        {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         );
       })()}
@@ -2043,8 +2091,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       )}
 
       {/* ── 8. Daily revenue chart for each market ── */}
-      {scope !== "total" && closedDay > 0 && (() => {
-        const scopeLabel2 = SCOPES.find(s=>s.id===scope)?.label || scope;
+      {closedDay > 0 && (() => {
+        const scopeLabel2 = scope === "total" ? "Total" : (SCOPES.find(s=>s.id===scope)?.label || scope);
         const chartData = daily
           .filter(d => d.day <= closedDay)
           .map(d => ({
