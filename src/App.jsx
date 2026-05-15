@@ -824,20 +824,9 @@ function DashboardWrapper({
     const v = closing.markets?.[marketCode]?.margin_curr;
     return v ? parseFloat(v) : null;
   };
-  // margin_prev is stored in closingCurr (the current month's closing record),
-  // not in closingPrev (which is the previous year's closing record).
-  const getMarginPrev = (closing, marketCode) => {
-    if (!closing) return null;
-    if (marketCode === "total") {
-      if (closing.revenda_margin_prev) return parseFloat(closing.revenda_margin_prev);
-      const vals = MC_MARKETS.map(m => parseFloat(closing.markets?.[m.code]?.margin_prev)).filter(v => !isNaN(v) && v > 0);
-      return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) / vals.length : null;
-    }
-    const v = closing.markets?.[marketCode]?.margin_prev;
-    return v ? parseFloat(v) : null;
-  };
+  // marginPrev comes from closingPrev (prev year's closing) using margin_curr field
   const marginCurr = getMargin(closingCurr, scope);
-  const marginPrev = getMarginPrev(closingCurr, scope); // reads margin_prev from current closing record
+  const marginPrev = getMargin(closingPrev, scope); // reads margin_curr from prev year closing
 
   // Encomendas — aggregate across all markets (total) or specific market
   const sumField = (closing, field) => {
@@ -854,7 +843,7 @@ function DashboardWrapper({
   const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
   const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
   const leadsCurr     = sumField(closingCurr, "leads_curr");
-  const leadsPrev     = sumField(closingCurr, "leads_prev"); // prev stored in curr closing
+  const leadsPrev     = sumField(closingPrev, "leads_curr"); // read from prev year closing
 
   // Origem das leads
   const getOrigin = (closing, field) => {
@@ -865,12 +854,12 @@ function DashboardWrapper({
   };
   const originFields = ["leads_bap","leads_ang","leads_outras"];
   const originCurr = originFields.map(f => getOrigin(closingCurr, f+"_curr"));
-  const originPrev = originFields.map(f => getOrigin(closingCurr, f+"_prev"));
+  const originPrev = originFields.map(f => getOrigin(closingPrev, f+"_curr"));
 
   // Novos parceiros por programa
   const progFields = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
   const progCurr = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_curr"));
-  const progPrev = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_prev"));
+  const progPrev = progFields.map(f => getOrigin(closingPrev, "prog_"+f+"_curr"));
   // Afiliação
   const afilCurr = (() => {
     if (!closingCurr) return null;
@@ -885,15 +874,14 @@ function DashboardWrapper({
     return global > 0 ? global : null;
   })();
   const afilPrev = (() => {
-    if (!closingCurr) return null; // prev year stored in current closing as afil_prev
-    // Try per-market afil_prev
-    if (closingCurr.markets) {
+    if (!closingPrev) return null;
+    // Read afil_result from prev year closing
+    if (closingPrev.markets) {
       const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-      const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_prev)||0), 0);
+      const t = markets.reduce((s,m) => s + (parseFloat(closingPrev.markets[m]?.afil_result)||0), 0);
       if (t > 0) return t;
     }
-    // Fallback: global afil_prev field
-    const global = parseFloat(closingCurr.afil_prev);
+    const global = parseFloat(closingPrev.afil_result);
     return global > 0 ? global : null;
   })();
 
@@ -931,15 +919,16 @@ function DashboardWrapper({
         progCurr={progCurr}
         progPrev={progPrev}
         ordersCurrMkt={(() => {
-          if (!closingCurr?.markets) return {};
-          const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+          const mkts = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+          const sumC = (field) => mkts.reduce((s,m) => s+(Number(closingCurr?.markets?.[m]?.[field])||0), 0);
+          const sumP = (field) => mkts.reduce((s,m) => s+(Number(closingPrev?.markets?.[m]?.[field])||0), 0);
           return {
-            orders: markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.orders_curr)||0), 0),
-            first:  markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.first_orders_curr)||0), 0),
-            firstRev: markets.reduce((s,m) => s+(Number(closingCurr.markets[m]?.first_orders_rev_curr)||0), 0),
-            ordersPrev: (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.orders_prev)||0),0); })(),
-            firstPrev:  (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.first_orders_prev)||0),0); })(),
-            firstRevPrev: (() => { const ms=scope==="total"?MC_MARKETS.map(m=>m.code):[scope]; return ms.reduce((s,m)=>s+(Number(closingCurr.markets[m]?.first_orders_rev_prev)||0),0); })(),
+            orders:       sumC("orders_curr"),
+            first:        sumC("first_orders_curr"),
+            firstRev:     sumC("first_orders_rev_curr"),
+            ordersPrev:   sumP("orders_curr"),
+            firstPrev:    sumP("first_orders_curr"),
+            firstRevPrev: sumP("first_orders_rev_curr"),
           };
         })()}
       />
@@ -3379,8 +3368,7 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Afiliação — Resultados globais">
-        <div className="grid grid-cols-3 gap-3">
-          <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => upField(p => ({...p, afil_prev: v}))} />
+        <div className="grid grid-cols-2 gap-3">
           <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
           <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => upField(p => ({...p, afil_result: v}))} />
         </div>
@@ -4750,16 +4738,14 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Margem global — Revenda">
-        <div className="grid grid-cols-2 gap-3">
-          <MCField label={`Margem ${year-1} %`} value={data.revenda_margin_prev||""} onChange={v => upField("revenda_margin_prev", v)} />
+        <div className="grid grid-cols-1 gap-3">
           <MCField label={`Margem ${year} %`} value={data.revenda_margin||""} onChange={v => upField("revenda_margin", v)} />
         </div>
       </MCCard>
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-green-700">
-          <div className="grid grid-cols-2 gap-3">
-            <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
+          <div className="grid grid-cols-1 gap-3">
             <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
           </div>
         </MCCard>
