@@ -1001,7 +1001,6 @@ function Dashboard({
   const color = TEAM_COLORS[scope];
   const noClosedDays = closedDay === 0;
   const [modal, setModal] = useState(null);
-  const [dailyOpen, setDailyOpen] = useState(false); // "faturado" | "pctGoal" | "pctExpected"
 
   return (
     <>
@@ -1577,6 +1576,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
   const noClosedDays = closedDay === 0;
   const scopeLabel = scope === "total" ? "Total" : scope;
   const [modal, setModal] = useState(null);
+  const [dailyOpen, setDailyOpen] = useState(false);
   const [histData, setHistData] = useState([]);
   const [mktHistData, setMktHistData] = useState([]);
   useEffect(() => {
@@ -2037,18 +2037,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: AFILIAÇÃO ── */}
-      {afilCurr != null && (
-        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
-          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"}>
-          {/* Distribuição por mercado afiliação — só no Total */}
-          {scope === "total" && afilByMkt.length > 0 && (
-            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
-          )}
-        </BigCard>
-      )}
-
       {/* ── CARD: PARCERIAS (Novas Parcerias + Por Mercado + Por Programa) ── */}
       {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
         const CARD_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
@@ -2128,6 +2116,18 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           </div>
         );
       })()}
+
+      {/* ── CARD: AFILIAÇÃO ── */}
+      {afilCurr != null && (
+        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
+          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
+          showObjective={scope === "total"}>
+          {/* Distribuição por mercado afiliação — só no Total */}
+          {scope === "total" && afilByMkt.length > 0 && (
+            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
+          )}
+        </BigCard>
+      )}
 
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
       {afilCurr != null && scope === "total" && (() => {
