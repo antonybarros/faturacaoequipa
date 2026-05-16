@@ -1000,7 +1000,8 @@ function Dashboard({
   const scopeLabel = scope === "total" ? "Total" : `Equipa ${scope}`;
   const color = TEAM_COLORS[scope];
   const noClosedDays = closedDay === 0;
-  const [modal, setModal] = useState(null); // "faturado" | "pctGoal" | "pctExpected"
+  const [modal, setModal] = useState(null);
+  const [dailyOpen, setDailyOpen] = useState(false); // "faturado" | "pctGoal" | "pctExpected"
 
   return (
     <>
@@ -1669,7 +1670,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           {showObjective && (
           <div className={DS.kpiBox}>
             <p className={DS.kpiLabel}>OBJETIVO {month.toUpperCase()} {year}</p>
-            <p className="text-2xl font-bold text-emerald-600">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
+            <p className="text-2xl font-bold text-slate-900">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
             {objective > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{fmtP((objective-prev)/prev*100,true)} vs {month.toLowerCase()} {year-1}</p>}
           </div>
           )}
@@ -1685,19 +1686,20 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           <div className={`grid grid-cols-4 gap-0 ${DS.divider}`}>
             {[
               {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
-              {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
+              {label:"Resultado", val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
               ...(!showObjective && totalResult > 0 && result > 0 ? [
-                {label:"% do total",  val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
-              ] : []),
-              ...(!showObjective && marginCurr != null ? [
-                {label:"Margem",
-                 val: `${marginCurr.toFixed(2)}%${marginPrev!=null?" ("+(marginCurr-marginPrev>=0?"+":"")+(marginCurr-marginPrev).toFixed(2)+"pp)":""}`,
-                 color: marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
+                {label:"% do total", val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
               ] : []),
               ...(showObjective ? [
-                {label:"Acima do objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
-                {label:"% do objetivo",     val: pctObj!=null?fmtP(pctObj):"—",    color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
-              ] : []),
+                {label:"vs objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
+                {label:"Margem", val: marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—",
+                 color: marginCurr==null?"text-slate-400":marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
+              ] : [
+                ...( marginCurr != null ? [
+                  {label:"Margem", val: `${marginCurr.toFixed(2)}%${marginPrev!=null?" ("+(marginCurr-marginPrev>=0?"+":"")+(marginCurr-marginPrev).toFixed(2)+"pp)":""}`,
+                   color: marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
+                ] : []),
+              ]),
             ].map((d,i) => (
               <div key={i} className={DS.col}>
                 <p className="text-xs text-slate-500 mb-1">{d.label}</p>
@@ -1831,8 +1833,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
               <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
               <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
-              <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#B4B2A9" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
             </BarChart>
           </ResponsiveContainer>
         </>)}
@@ -1845,7 +1847,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
               <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
               <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#B4B2A9" radius={[3,3,0,0]} maxBarSize={30}/>
               <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
             </BarChart>
           </ResponsiveContainer>
@@ -1913,24 +1915,18 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       )}
 
-      {/* ── CARD: AFILIAÇÃO ── */}
-      {afilCurr != null && (
-        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
-          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"}>
-          {/* Distribuição por mercado afiliação — só no Total */}
-          {scope === "total" && afilByMkt.length > 0 && (
-            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
-          )}
-        </BigCard>
-      )}
-
       {/* ── CARD: ENCOMENDAS — chart + table ── */}
       {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (() => {
+        const ticketMedio = ordersCurrMkt.orders > 0 && actual > 0 ? actual / ordersCurrMkt.orders : null;
+        const ticketMedioPrev = ordersCurrMkt.ordersPrev > 0 && prevYearActual > 0 ? prevYearActual / ordersCurrMkt.ordersPrev : null;
+        const ticketFirst = ordersCurrMkt.first > 0 && ordersCurrMkt.firstRev > 0 ? ordersCurrMkt.firstRev / ordersCurrMkt.first : null;
+        const ticketFirstPrev = ordersCurrMkt.firstPrev > 0 && ordersCurrMkt.firstRevPrev > 0 ? ordersCurrMkt.firstRevPrev / ordersCurrMkt.firstPrev : null;
         const encRows = [
-          {label:"Total encomendas",  curr:ordersCurrMkt.orders,   prev:ordersCurrMkt.ordersPrev,   isEur:false},
-          {label:"1ªs encomendas",    curr:ordersCurrMkt.first,    prev:ordersCurrMkt.firstPrev,    isEur:false},
-          {label:"Fat. 1ªs enc. (€)", curr:ordersCurrMkt.firstRev, prev:ordersCurrMkt.firstRevPrev, isEur:true},
+          {label:"Total encomendas",    curr:ordersCurrMkt.orders,   prev:ordersCurrMkt.ordersPrev,   isEur:false},
+          {label:"Ticket médio",        curr:ticketMedio,             prev:ticketMedioPrev,            isEur:true},
+          {label:"1ªs encomendas",      curr:ordersCurrMkt.first,    prev:ordersCurrMkt.firstPrev,    isEur:false},
+          {label:"Fat. 1ªs enc. (€)",   curr:ordersCurrMkt.firstRev, prev:ordersCurrMkt.firstRevPrev, isEur:true},
+          {label:"Ticket médio 1ªs enc.",curr:ticketFirst,            prev:ticketFirstPrev,            isEur:true},
         ];
         const encId = `enc-${scope}`;
         const fmt = (v,isEur) => v>0?(isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
@@ -2041,162 +2037,93 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
-      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — donut + table ── */}
-      {progCurr && progCurr.some(v=>v!=null) && (() => {
-        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        const combined = progLabels.map((l,i)=>({l,c:progCurr[i]||0,p:progPrev[i]||0}))
-          .filter(x=>x.c>0||x.p>0).sort((a,b)=>b.c-a.c);
-        const PROG_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-        const totalC = combined.reduce((s,x)=>s+x.c,0);
-        const size=180,cx=90,cy=90,r=68,ri=38;
-        let a=-Math.PI/2;
-        const slices = combined.filter(x=>x.c>0).map((x,i)=>{
-          const angle=(x.c/totalC)*2*Math.PI,ea=a+angle;
-          const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-          a=ea; return {...x,path,pct:(x.c/totalC*100).toFixed(1),color:PROG_COLORS[i%PROG_COLORS.length]};
-        });
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <svg width={size} height={size} className="shrink-0">
-                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
-                <text x={cx} y={cy-6} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
-                <text x={cx} y={cy+9} textAnchor="middle" fontSize={12} fontWeight="bold" fill="#1e293b">{new Intl.NumberFormat("fr-FR").format(totalC)}</text>
-              </svg>
-              <div className="flex-1 w-full">
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px"}}>
-                  <thead><tr>{["Programa",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
-                  <tbody>{slices.map((x,i)=>{
-                    const evo=x.p>0&&x.c>0?((x.c-x.p)/x.p*100):null;
-                    const pos=evo!=null&&evo>=0;
-                    const border=i<slices.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                    return (<tr key={i}>
-                      <td style={{padding:"8px",borderBottom:border}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
-                          <span style={{width:"8px",height:"8px",borderRadius:"2px",background:x.color,display:"inline-block",flexShrink:0}}></span>
-                          <span style={{color:"var(--color-text-primary)"}}>{x.l}</span>
-                        </span>
-                      </td>
-                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{x.p>0?new Intl.NumberFormat("fr-FR").format(x.p):"—"}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{new Intl.NumberFormat("fr-FR").format(x.c)} <span style={{fontSize:"11px",color:"#64748b"}}>({x.pct}%)</span></td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
-                    </tr>);
-                  })}</tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── CARD: AFILIAÇÃO ── */}
+      {afilCurr != null && (
+        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
+          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
+          showObjective={scope === "total"}>
+          {/* Distribuição por mercado afiliação — só no Total */}
+          {scope === "total" && afilByMkt.length > 0 && (
+            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
+          )}
+        </BigCard>
+      )}
 
-
-      {/* ── CARD: NOVOS PARCEIROS POR MERCADO (só Total) ── */}
-      {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
-        const COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-        const total = partnersByMkt.reduce((s,m)=>s+m.curr,0);
-        const size=180, cx=90, cy=90, r=68, ri=38;
-        let a=-Math.PI/2;
-        const slices = partnersByMkt.filter(m=>m.curr>0).map((m,i)=>{
-          const angle=(m.curr/total)*2*Math.PI, ea=a+angle;
-          const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-          a=ea; return {...m, path, pct:(m.curr/total*100).toFixed(1), color:COLORS[i%COLORS.length]};
-        });
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVOS PARCEIROS POR MERCADO</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <svg width={size} height={size} className="shrink-0">
-                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}/>)}
-                <text x={cx} y={cy-6} textAnchor="middle" fontSize={10} fill="#94a3b8">Total</text>
-                <text x={cx} y={cy+9} textAnchor="middle" fontSize={12} fontWeight="bold" fill="#1e293b">{new Intl.NumberFormat("fr-FR").format(total)}</text>
-              </svg>
-              <div className="flex-1 w-full">
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px"}}>
-                  <thead><tr>{["Mercado",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
-                  <tbody>{slices.map((m,i)=>{
-                    const evo=m.prev>0&&m.curr>0?((m.curr-m.prev)/m.prev*100):null;
-                    const pos=evo!=null&&evo>=0;
-                    const border=i<slices.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                    return (<tr key={i}>
-                      <td style={{padding:"8px",borderBottom:border}}>
-                        <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
-                          <span style={{width:"8px",height:"8px",borderRadius:"2px",background:m.color,display:"inline-block",flexShrink:0}}></span>
-                          <span style={{color:"var(--color-text-primary)"}}>{m.name}</span>
-                        </span>
-                      </td>
-                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{m.prev>0?new Intl.NumberFormat("fr-FR").format(m.prev):"—"}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{new Intl.NumberFormat("fr-FR").format(m.curr)} <span style={{fontSize:"11px",color:"#64748b"}}>({m.pct}%)</span></td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
-                    </tr>);
-                  })}</tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── CARD: MAPA DE NOVAS PARCERIAS (só Total) ── */}
+      {/* ── CARD: PARCERIAS (Novas Parcerias + Por Mercado + Por Programa) ── */}
       {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
         const CARD_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
         const CARD_TEXT   = ["#fff","#fff","#fff","#fff","#1A5C52","#1A5C52","#fff","#fff"];
-        const CARD_SUB    = ["#9FE1CB","#5BB8AC","#2E7D71","#2E7D71","#2E7D71","#2E7D71","#5BB8AC","#5BB8AC"];
         const ranked = [...partnersByMkt].sort((a,b)=>b.curr-a.curr);
         const totalCurr = ranked.reduce((s,m)=>s+m.curr,0);
         const totalPrev = ranked.reduce((s,m)=>s+m.prev,0);
         const evo = totalPrev>0&&totalCurr>0?((totalCurr-totalPrev)/totalPrev*100):null;
         const pos = evo!=null&&evo>=0;
         const fmt = n => new Intl.NumberFormat("fr-FR").format(n);
+        const mkDonut = (data, title, colors) => {
+          if (!data||!data.length) return null;
+          const tot = data.reduce((s,d)=>s+d.val,0); if(!tot) return null;
+          const size=160,cx=80,cy=80,r=60,ri=34; let a=-Math.PI/2;
+          const slices=data.filter(d=>d.val>0).map((d,i)=>{
+            const angle=(d.val/tot)*2*Math.PI,ea=a+angle;
+            const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
+            a=ea; return {...d,path,pct:(d.val/tot*100).toFixed(1),color:colors[i%colors.length]};
+          });
+          return (<>
+            <p className={DS.detailLabel} style={{marginTop:"1.5rem",marginBottom:"12px"}}>{title}</p>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <svg width={size} height={size} className="shrink-0">
+                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}><title>{s.name}: {fmt(s.val)} ({s.pct}%)</title></path>)}
+                <text x={cx} y={cy-4} textAnchor="middle" fontSize={9} fill="#94a3b8">Total</text>
+                <text x={cx} y={cy+9} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">{fmt(tot)}</text>
+              </svg>
+              <table style={{flex:1,borderCollapse:"collapse",fontSize:"12px",width:"100%"}}>
+                <thead><tr>{["",""+year-1,""+year,"%","Evo"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"4px 6px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",fontSize:"11px"}}>{h}</th>))}</tr></thead>
+                <tbody>{slices.map((x,i)=>{
+                  const evo2=x.prev>0&&x.val>0?((x.val-x.prev)/x.prev*100):null;
+                  const p2=evo2!=null&&evo2>=0;
+                  const border=i<slices.length-1?"0.5px solid var(--color-border-tertiary)":"none";
+                  return (<tr key={i}><td style={{padding:"5px 6px",borderBottom:border}}><span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><span style={{width:"7px",height:"7px",borderRadius:"2px",background:x.color,display:"inline-block",flexShrink:0}}></span><span style={{color:"var(--color-text-primary)"}}>{x.name}</span></span></td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{x.prev>0?fmt(x.prev):"—"}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{fmt(x.val)}</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border,fontSize:"11px"}}>{x.pct}%</td>
+                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:evo2==null?"var(--color-text-secondary)":p2?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo2==null?"—":`${p2?"+":""}${evo2.toFixed(1)}%`}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </div>
+          </>);
+        };
         return (
           <div className={DS.card}>
             <div><h2 className={DS.title}>NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – por mercado</p></div>
-            {/* Grid of market cards */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:"10px",marginBottom:"1rem"}}>
-              {ranked.map((m,i) => (
-                <div key={m.code} style={{
-                  background:"var(--color-background-secondary)",
-                  border:"0.5px solid var(--color-border-tertiary)",
-                  borderRadius:"var(--border-radius-md)",
-                  padding:"12px 14px",
-                  position:"relative",
-                }}>
-                  <span style={{
-                    position:"absolute",top:"10px",right:"10px",
-                    background:CARD_COLORS[i%CARD_COLORS.length],
-                    color:CARD_TEXT[i%CARD_TEXT.length],
-                    borderRadius:"50%",width:"20px",height:"20px",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:"11px",fontWeight:"500",
-                  }}>{i+1}</span>
+              {ranked.map((m,i)=>(
+                <div key={m.code} style={{background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px",position:"relative"}}>
+                  <span style={{position:"absolute",top:"10px",right:"10px",background:CARD_COLORS[i%CARD_COLORS.length],color:CARD_TEXT[i%CARD_TEXT.length],borderRadius:"50%",width:"20px",height:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"500"}}>{i+1}</span>
                   <p style={{fontSize:"11px",color:"var(--color-text-secondary)",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em",paddingRight:"24px"}}>{m.name}</p>
                   <p style={{fontSize:"22px",fontWeight:"500",margin:"0",color:"var(--color-text-primary)"}}>{fmt(m.curr)}</p>
-                  {m.prev > 0 && (() => {
-                    const e=(m.curr-m.prev)/m.prev*100;
-                    return <p style={{fontSize:"11px",fontWeight:"500",margin:"4px 0 0",color:e>=0?"#0F6E56":"#A32D2D"}}>{e>=0?"+":""}{e.toFixed(1)}%</p>;
-                  })()}
+                  {m.prev>0&&(()=>{const e=(m.curr-m.prev)/m.prev*100;return <p style={{fontSize:"11px",fontWeight:"500",margin:"4px 0 0",color:e>=0?"#0F6E56":"#A32D2D"}}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})()}
                 </div>
               ))}
-              {/* Total card */}
-              <div style={{
-                background:"#1D9E75",border:"2px solid #0F6E56",
-                borderRadius:"var(--border-radius-md)",padding:"12px 14px",
-              }}>
+              <div style={{background:"#1D9E75",border:"2px solid #0F6E56",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
                 <p style={{fontSize:"11px",color:"#9FE1CB",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em"}}>Total</p>
                 <p style={{fontSize:"26px",fontWeight:"500",margin:"0",color:"#fff"}}>{fmt(totalCurr)}</p>
               </div>
             </div>
-            {/* Table */}
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+            {mkDonut(ranked.map(m=>({name:m.name,val:m.curr,prev:m.prev})),"NOVOS PARCEIROS POR MERCADO",["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"])}
+            {progCurr&&progCurr.some(v=>v!=null)&&(()=>{
+              const progLabels=["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+              const pd=progLabels.map((l,i)=>({name:l,val:progCurr[i]||0,prev:progPrev[i]||0})).filter(x=>x.val>0||x.prev>0).sort((a,b)=>b.val-a.val);
+              return mkDonut(pd,"NOVOS PARCEIROS POR PROGRAMA",["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"]);
+            })()}
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1.5rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
               <thead><tr>{["",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
-              <tbody>
-                <tr>
-                  <td style={{padding:"8px",color:"var(--color-text-primary)",fontWeight:"500"}}>Total de parcerias</td>
-                  <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?fmt(totalPrev):"—"}</td>
-                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)"}}>{fmt(totalCurr)}</td>
-                  <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D"}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
-                </tr>
-              </tbody>
+              <tbody><tr>
+                <td style={{padding:"8px",color:"var(--color-text-primary)",fontWeight:"500"}}>Total de parcerias</td>
+                <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?fmt(totalPrev):"—"}</td>
+                <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)"}}>{fmt(totalCurr)}</td>
+                <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D"}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
+              </tr></tbody>
             </table>
           </div>
         );
@@ -2251,10 +2178,12 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         if (!chartData.some(d=>d.valor)) return null;
         return (
           <div className={DS.card}>
-            <div>
-              <h2 className={DS.title}>FATURAÇÃO DIÁRIA</h2>
-              <p className={DS.subtitle}>{scopeLabel2} · {month} {year} · valor faturado por dia</p>
-            </div>
+            <button onClick={()=>setDailyOpen(o=>!o)} className="w-full flex items-center justify-between">
+              <div><h2 className={DS.title}>FATURAÇÃO DIÁRIA</h2><p className={DS.subtitle}>{scopeLabel2} · {month} {year}</p></div>
+              <svg className={`w-5 h-5 text-slate-400 transition-transform ${dailyOpen?"rotate-180":""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            {dailyOpen && (<>
+            <p className="text-xs text-slate-400 mb-3 mt-2">Valor faturado por dia</p>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} margin={{top:10,right:8,left:8,bottom:0}}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
@@ -2306,7 +2235,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                         <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
                         <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-500"
-                            style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#6ee7b7",minWidth:barPct>0?"8px":"0"}}/>
+                            style={{width:`${barPct}%`,backgroundColor:isWeekend?"#B4B2A9":"#3A9E8F",minWidth:barPct>0?"8px":"0"}}/>
                         </div>
                         <div className="w-36 flex items-center gap-2 shrink-0">
                           <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
@@ -2319,6 +2248,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                 </div>
               </>);
             })()}
+            </>)}
           </div>
         );
       })()}
