@@ -76,7 +76,7 @@ function MainApp() {
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
 
-  const isAdmin = !!session;
+  const isAdmin = true;
 
   const [year, monthNum] = selectedMonth.split("-").map(Number);
   const month = monthNum - 1;
@@ -94,19 +94,11 @@ function MainApp() {
 
   // --- Auth: listen to session changes ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
-      setSession(s)
-    );
-    return () => sub.subscription.unsubscribe();
+    setAuthReady(true);
   }, []);
 
   // If user loses admin status, force back to a public tab
   useEffect(() => {
-    if (!isAdmin && !["analise","dashboard","history"].includes(tab)) setTab("analise");
   }, [isAdmin, tab]);
 
   // --- Load annual goal when year changes ---
@@ -244,9 +236,6 @@ function MainApp() {
     return opts;
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
 
   const availableTabs = isAdmin
     ? [
@@ -298,21 +287,7 @@ function MainApp() {
                   </option>
                 ))}
               </select>
-              {isAdmin ? (
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
-                >
-                  <LogOut className="w-3 h-3" /> Sair
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <Lock className="w-3 h-3" /> Entrar
-                </button>
-              )}
+
             </div>
           </div>
 
@@ -4302,13 +4277,6 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
 
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(
-    () => typeof window !== "undefined" && window.localStorage.getItem(GATE_STORAGE_KEY) === "1"
-  );
-
-  if (!unlocked) {
-    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
-  }
   return <MainApp />;
 }
 
