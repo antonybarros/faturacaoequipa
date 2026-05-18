@@ -867,15 +867,20 @@ function DashboardWrapper({
   // Afiliação
   const afilCurr = (() => {
     if (!closingCurr) return null;
-    // Try per-market sum first
     if (closingCurr.markets) {
       const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
       const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_result)||0), 0);
       if (t > 0) return t;
     }
-    // Fallback: global afil_result field
     const global = parseFloat(closingCurr.afil_result);
     return global > 0 ? global : null;
+  })();
+  // Total afil across ALL markets (for % calculation in individual market cards)
+  const totalAfilResult = (() => {
+    if (!closingCurr?.markets) return 0;
+    const t = MC_MARKETS.reduce((s,m) => s + (parseFloat(closingCurr.markets[m.code]?.afil_result)||0), 0);
+    if (t > 0) return t;
+    return parseFloat(closingCurr.afil_result) || 0;
   })();
   const afilPrev = (() => {
     if (!closingPrev) return null;
@@ -921,6 +926,7 @@ function DashboardWrapper({
         afilPrev={afilPrev}
         closingCurr={closingCurr}
         closingPrev={closingPrev}
+        totalAfilResult={totalAfilResult}
         originCurr={originCurr}
         originPrev={originPrev}
         progCurr={progCurr}
@@ -1567,7 +1573,7 @@ function ChartProg({ id, labels, d25, d26 }) {
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  closingCurr, closingPrev, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum }) {
+  closingCurr, closingPrev, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum, totalAfilResult = 0 }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -2229,7 +2235,8 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
           objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"} showMargem={false}>
+          showObjective={scope === "total"} showMargem={false}
+          totalResult={scope !== "total" ? totalAfilResult : 0}>
           {/* Distribuição por mercado afiliação — só no Total */}
           {scope === "total" && afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
@@ -2238,7 +2245,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       )}
 
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
-      {afilCurr != null && scope === "total" && (() => {
+      {afilCurr != null && (() => {
         const totalCurr = actual + (afilCurr||0);
         const totalPrev = (prevYearActual||0) + (afilPrev||0);
         const revPct = totalCurr>0?Math.round(actual/totalCurr*100):0;
