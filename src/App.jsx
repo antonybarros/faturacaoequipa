@@ -1645,7 +1645,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     val: "text-xl font-bold",
   };
 
-  function BigCard({ name, result, prev, objective, showObjective = true, totalResult = 0, children }) {
+  function BigCard({ name, result, prev, objective, showObjective = true, totalResult = 0, showMargem = true, children }) {
     const evoPct = prev > 0 ? ((result - prev) / prev * 100) : null;
     const evoAbs = prev != null ? result - prev : null;
     const aboveObj = objective > 0 ? result - objective : null;
@@ -1692,10 +1692,10 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
               ] : []),
               ...(showObjective ? [
                 {label:"vs objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
-                {label:"Margem", val: marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—",
-                 color: marginCurr==null?"text-slate-400":marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
+                ...(showMargem ? [{label:"Margem", val: marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—",
+                 color: marginCurr==null?"text-slate-400":marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"}] : []),
               ] : [
-                ...( marginCurr != null ? [
+                ...( showMargem && marginCurr != null ? [
                   {label:"Margem", val: `${marginCurr.toFixed(2)}%${marginPrev!=null?" ("+(marginCurr-marginPrev>=0?"+":"")+(marginCurr-marginPrev).toFixed(2)+"pp)":""}`,
                    color: marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
                 ] : []),
@@ -1880,7 +1880,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </BigCard>
 
       {/* ── CARD: MARGEM ── */}
-      {(marginCurr || marginPrev) && (
+      {scope === "total" && (marginCurr || marginPrev) && (
         <div className={DS.card}>
           <div>
             <h2 className={DS.title}>MARGEM</h2>
@@ -2084,19 +2084,26 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         return (
           <div className={DS.card}>
             <div><h2 className={DS.title}>NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – por mercado</p></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:"10px",marginBottom:"1rem"}}>
-              {ranked.map((m,i)=>(
-                <div key={m.code} style={{background:"var(--color-background-secondary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px",position:"relative"}}>
-                  <span style={{position:"absolute",top:"10px",right:"10px",background:CARD_COLORS[i%CARD_COLORS.length],color:CARD_TEXT[i%CARD_TEXT.length],borderRadius:"50%",width:"20px",height:"20px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"500"}}>{i+1}</span>
-                  <p style={{fontSize:"11px",color:"var(--color-text-secondary)",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em",paddingRight:"24px"}}>{m.name}</p>
-                  <p style={{fontSize:"22px",fontWeight:"500",margin:"0",color:"var(--color-text-primary)"}}>{fmt(m.curr)}</p>
-                  {m.prev>0&&(()=>{const e=(m.curr-m.prev)/m.prev*100;return <p style={{fontSize:"11px",fontWeight:"500",margin:"4px 0 0",color:e>=0?"#0F6E56":"#A32D2D"}}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})()}
-                </div>
-              ))}
-              <div style={{background:"#1D9E75",border:"2px solid #0F6E56",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-                <p style={{fontSize:"11px",color:"#9FE1CB",margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.04em"}}>Total</p>
-                <p style={{fontSize:"26px",fontWeight:"500",margin:"0",color:"#fff"}}>{fmt(totalCurr)}</p>
+            {/* KPI cards — estilo Leads */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+              {/* Total em destaque */}
+              <div className={DS.kpiBoxHL} style={{gridColumn:"span 1"}}>
+                <p className={DS.kpiLabel}>TOTAL</p>
+                <p className={DS.kpiValBig}>{fmt(totalCurr)}</p>
+                {evo!=null&&<p className={`text-sm font-bold mt-1 ${pos?"text-emerald-700":"text-red-600"}`}>{pos?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
               </div>
+              {/* Mercados */}
+              {ranked.map((m,i)=>{
+                const e=m.prev>0&&m.curr>0?((m.curr-m.prev)/m.prev*100):null;
+                const ep=e!=null&&e>=0;
+                return (
+                  <div key={m.code} className={DS.kpiBox}>
+                    <p className={DS.kpiLabel}>{m.name.toUpperCase()}</p>
+                    <p className={DS.kpiVal}>{fmt(m.curr)}</p>
+                    {e!=null&&<p className={`text-sm font-bold mt-1 ${ep?"text-emerald-700":"text-red-600"}`}>{ep?"+":""}{e.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
+                  </div>
+                );
+              })}
             </div>
             {mkDonut(ranked.map(m=>({name:m.name,val:m.curr,prev:m.prev})),"NOVOS PARCEIROS POR MERCADO",["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"])}
             {progCurr&&progCurr.some(v=>v!=null)&&(()=>{
@@ -2121,7 +2128,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
           objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"}>
+          showObjective={scope === "total"} showMargem={false}>
           {/* Distribuição por mercado afiliação — só no Total */}
           {scope === "total" && afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
