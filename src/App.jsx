@@ -891,6 +891,8 @@ function DashboardWrapper({
 
 
 
+  if (!stats) return <div className="text-center py-12 text-slate-400">A carregar…</div>;
+
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
@@ -2135,7 +2137,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       })()}
 
       {/* ── CARD: NOVAS PARCERIAS — mercados individuais ── */}
-      {scope !== "total" && (() => {
+      {scope !== "total" && closingCurr && (() => {
         const partnersCurr = Number(closingCurr?.markets?.[scope]?.partners_curr) || 0;
         const partnersPrev = Number(closingPrev?.markets?.[scope]?.partners_curr) || 0;
         if (!partnersCurr && !partnersPrev) return null;
