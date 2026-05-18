@@ -920,6 +920,7 @@ function DashboardWrapper({
         afilCurr={afilCurr}
         afilPrev={afilPrev}
         closingCurr={closingCurr}
+        closingPrev={closingPrev}
         originCurr={originCurr}
         originPrev={originPrev}
         progCurr={progCurr}
@@ -1566,7 +1567,7 @@ function ChartProg({ id, labels, d25, d26 }) {
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  closingCurr, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum }) {
+  closingCurr, closingPrev, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
