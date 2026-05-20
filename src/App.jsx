@@ -948,7 +948,7 @@ function ScopeTabs({ scope, setScope }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick }) {
+function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick, verticalDetail = false }) {
   const tones = {
     default: "bg-white border-slate-200",
     good: "bg-green-50 border-green-200",
@@ -962,16 +962,17 @@ function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick }) 
     >
       <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
         {Icon && <Icon className="w-4 h-4" />} {label}
-        {onClick && <span className="ml-auto text-slate-400 text-[10px] normal-case font-normal">ver detalhe →</span>}
+        {onClick && !verticalDetail && <span className="ml-auto text-slate-400 text-[10px] normal-case font-normal">ver detalhe →</span>}
       </div>
       <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
       {sub && <div className="mt-1 text-xs text-slate-600">{sub}</div>}
+      {onClick && verticalDetail && <div className="mt-2 text-slate-400 text-[10px] font-normal">ver detalhe →</div>}
     </div>
   );
 }
 
 function Dashboard({
-  stats, scope, month, year, totalDays, closedDay, isCurrentMonth, teamStats,
+  stats, scope, month, year, monthNum, totalDays, closedDay, isCurrentMonth, teamStats,
 }) {
   const {
     goal, dailyAvg, actual, expectedToDate, diff,
@@ -1017,9 +1018,12 @@ function Dashboard({
               icon={Euro}
               label={`Faturado até dia ${closedDay}`}
               value={fmtEur(actual)}
-              sub={`${closedDay} de ${totalDays} dias`}
+              sub={scope === "equipa_fr"
+                ? `${Math.round(closedDay / totalDays * 100)}% do mês`
+                : `${closedDay} de ${totalDays} dias`}
               tone="info"
               onClick={() => setModal("faturado")}
+              verticalDetail={scope === "equipa_fr"}
             />
             <StatCard
               icon={TrendingUp}
@@ -1142,6 +1146,86 @@ function Dashboard({
             superDaysCount={superDaysCount}
             superDaysTotal={superDaysTotal}
           />
+
+          {/* ── Gráfico diário com linha média por dia da semana (só Equipa FR) ── */}
+          {scope === "equipa_fr" && (() => {
+            const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+            // Calculate weekday averages from closed days (excl. supersales)
+            const byWeekday = Array.from({length:7}, (_,i) => ({total:0, count:0}));
+            daily.forEach(d => {
+              if (d.day > closedDay || d.supersales) return;
+              if (!d.value) return;
+              const wd = new Date(year, monthNum, d.day).getDay();
+              byWeekday[wd].total += d.value;
+              byWeekday[wd].count++;
+            });
+            const wdAvg = byWeekday.map(w => w.count > 0 ? Math.round(w.total / w.count) : null);
+            // Fallback: global avg if no data for that weekday
+            const globalAvg = closedDay > 0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.value).reduce((s,d)=>s+d.value,0) / closedDay) : 0;
+
+            // Build chart data for all days of month
+            const chartData = Array.from({length: totalDays}, (_, i) => {
+              const day = i + 1;
+              const wd = new Date(year, monthNum, day).getDay();
+              const actual = daily.find(d => d.day === day);
+              const expectedVal = wdAvg[wd] ?? globalAvg;
+              return {
+                day,
+                label: String(day),
+                actual: actual?.value || null,
+                expected: expectedVal,
+                supersales: actual?.supersales || false,
+                isFuture: day > closedDay,
+              };
+            });
+
+            const maxVal = Math.max(
+              ...chartData.map(d => Math.max(d.actual||0, d.expected||0))
+            );
+
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-900 mb-1">Faturação diária vs. média por dia da semana — Equipa FR</h3>
+                <p className="text-xs text-slate-500 mb-4">Barras = faturação real · Linha = média histórica do dia da semana · tracejado = dias futuros</p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartData} margin={{top:10,right:8,left:8,bottom:0}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+                    <XAxis dataKey="label" tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+                    <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={36}/>
+                    <Tooltip
+                      formatter={(v,name) => [fmtEur(v), name==="actual"?"Faturado":"Média esperada"]}
+                      labelFormatter={l=>`Dia ${l}`}
+                      contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}
+                    />
+                    <Bar dataKey="actual" maxBarSize={18} radius={[3,3,0,0]} name="actual">
+                      {chartData.map((d,i) => (
+                        <Cell key={i} fill={
+                          d.actual == null ? "transparent" :
+                          d.supersales ? "#F59E0B" :
+                          d.actual >= d.expected ? "#3A9E8F" : "#ef4444"
+                        }/>
+                      ))}
+                    </Bar>
+                    <Line
+                      type="stepAfter"
+                      dataKey="expected"
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      dot={false}
+                      strokeDasharray={chartData.map(d=>d.isFuture?"4 4":"0").join(" ")}
+                      name="expected"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500 flex-wrap">
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-500"/>Acima da média</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-red-400"/>Abaixo da média</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-400"/>Supersales</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block w-6 h-0.5 bg-slate-400 border-dashed"/>Média esperada</span>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <h3 className="font-semibold text-slate-900 mb-4">
