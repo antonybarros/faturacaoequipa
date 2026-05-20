@@ -3517,7 +3517,7 @@ function History({ annualGoal: annualGoalProp, currentYear }) {
 // Password gate — bloqueia toda a aplicação até a password ser introduzida
 // ============================================================
 const SITE_PASSWORD =
-  import.meta.env.VITE_SITE_PASSWORD || "Prozis12345";
+  import.meta.env.VITE_SITE_PASSWORD || "partnersfranca";
 const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
 
 // ─── CONSTANTES PARTILHADAS ───────────────────────────────────────────────────
@@ -4277,6 +4277,10 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
 
 
 export default function App() {
+  const [unlocked, setUnlocked] = React.useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem(GATE_STORAGE_KEY) === "1"
+  );
+  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
   return <MainApp />;
 }
 
