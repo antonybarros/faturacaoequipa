@@ -244,11 +244,13 @@ function MainApp() {
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
+        { id: "followup", label: "Parceiros" },
       ]
     : [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
         { id: "history", label: "Histórico" },
+        { id: "followup", label: "Parceiros" },
       ];
 
   return (
@@ -359,6 +361,7 @@ function MainApp() {
               />
             )}
 
+            {tab === "followup" && <PartnerFollowup />}
             {tab === "setup" && isAdmin && (
               <Setup
                 data={data}
@@ -4359,6 +4362,290 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
   );
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTNER FOLLOWUP — Separador de acompanhamento de novos parceiros
+// ═══════════════════════════════════════════════════════════════════════════
+function PartnerFollowup() {
+  const FOLLOWUP_DAYS = 30;
+  const GESTORES = ["Antony", "Gestor 2", "Gestor 3"];
+
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginErr, setLoginErr] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("all"); // all | pending | done
+
+  // Auth
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Load records for logged-in user
+  useEffect(() => {
+    if (!session) return;
+    loadRecords();
+  }, [session]);
+
+  const loadRecords = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("partner_followup")
+      .select("*")
+      .eq("gestor_email", session.user.email)
+      .order("created_at", { ascending: false });
+    if (!error) setRecords(data || []);
+    setLoading(false);
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginErr("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setLoginErr("Email ou password incorrectos.");
+    setLoggingIn(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!clientId.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("partner_followup").insert({
+      client_id: clientId.trim(),
+      note: note.trim() || null,
+      gestor_email: session.user.email,
+      status: "pending",
+    });
+    if (!error) {
+      setClientId("");
+      setNote("");
+      await loadRecords();
+    }
+    setSaving(false);
+  };
+
+  const updateStatus = async (id, status) => {
+    await supabase.from("partner_followup").update({ status }).eq("id", id);
+    await loadRecords();
+  };
+
+  const deleteRecord = async (id) => {
+    await supabase.from("partner_followup").delete().eq("id", id);
+    await loadRecords();
+  };
+
+  const getDaysInfo = (createdAt) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+    const daysLeft = FOLLOWUP_DAYS - diffDays;
+    return { diffDays, daysLeft, overdue: daysLeft <= 0 };
+  };
+
+  const filteredRecords = records.filter(r => {
+    if (filter === "pending") return r.status === "pending";
+    if (filter === "done") return r.status !== "pending";
+    return true;
+  });
+
+  const overdueCount = records.filter(r => {
+    const { overdue } = getDaysInfo(r.created_at);
+    return overdue && r.status === "pending";
+  }).length;
+
+  // ── Login screen ──
+  if (!authReady) return <div className="text-center py-12 text-slate-400 text-sm">A carregar…</div>;
+
+  if (!session) return (
+    <div className="max-w-sm mx-auto mt-12">
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 space-y-6">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+            <Lock className="w-6 h-6 text-emerald-600"/>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Acesso Gestores</h2>
+          <p className="text-sm text-slate-500 mt-1">Entra com o teu email e password</p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              placeholder="gestor@prozis.com"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Password</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              placeholder="••••••••"/>
+          </div>
+          {loginErr && <p className="text-xs text-red-600">{loginErr}</p>}
+          <button type="submit" disabled={loggingIn}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50">
+            {loggingIn ? "A entrar…" : "Entrar"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  // ── Main view ──
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Acompanhamento de Parceiros</h2>
+          <p className="text-sm text-slate-500">{session.user.email}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {overdueCount > 0 && (
+            <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
+              ⚠ {overdueCount} {overdueCount === 1 ? "alerta" : "alertas"}
+            </span>
+          )}
+          <button onClick={handleLogout}
+            className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1">
+            <LogOut className="w-3 h-3"/> Sair
+          </button>
+        </div>
+      </div>
+
+      {/* Add form */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <p className="text-sm font-semibold text-slate-700 mb-3">Registar novo parceiro</p>
+        <form onSubmit={handleAdd} className="flex gap-3 flex-wrap">
+          <input
+            type="text" value={clientId} onChange={e=>setClientId(e.target.value)}
+            placeholder="ID do cliente (ex: 123456)" required
+            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <input
+            type="text" value={note} onChange={e=>setNote(e.target.value)}
+            placeholder="Nota (opcional)"
+            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <button type="submit" disabled={saving || !clientId.trim()}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
+            {saving ? "A guardar…" : "+ Adicionar"}
+          </button>
+        </form>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2">
+        {[
+          { id:"all", label:`Todos (${records.length})` },
+          { id:"pending", label:`Por verificar (${records.filter(r=>r.status==="pending").length})` },
+          { id:"done", label:`Verificados (${records.filter(r=>r.status!=="pending").length})` },
+        ].map(f => (
+          <button key={f.id} onClick={()=>setFilter(f.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter===f.id?"bg-emerald-600 text-white":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Records list */}
+      {loading ? (
+        <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
+          {filter === "all" ? "Ainda não registaste nenhum parceiro." : "Nenhum registo nesta categoria."}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredRecords.map(r => {
+            const { diffDays, daysLeft, overdue } = getDaysInfo(r.created_at);
+            const isPending = r.status === "pending";
+            const isAlert = overdue && isPending;
+            return (
+              <div key={r.id} className={`bg-white rounded-xl border p-4 flex items-center gap-4 flex-wrap ${isAlert ? "border-red-300 bg-red-50" : "border-slate-200"}`}>
+                {/* Status indicator */}
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  r.status === "bought" ? "bg-emerald-500" :
+                  r.status === "not_bought" ? "bg-slate-400" :
+                  isAlert ? "bg-red-500 animate-pulse" : "bg-amber-400"
+                }`}/>
+
+                {/* Client ID */}
+                <div className="flex-1 min-w-[120px]">
+                  <p className="font-bold text-slate-900 text-sm">ID: {r.client_id}</p>
+                  {r.note && <p className="text-xs text-slate-500 mt-0.5">{r.note}</p>}
+                </div>
+
+                {/* Days info */}
+                <div className="text-center min-w-[100px]">
+                  <p className="text-xs text-slate-400">Registado há</p>
+                  <p className="font-semibold text-slate-700 text-sm">{diffDays} {diffDays===1?"dia":"dias"}</p>
+                </div>
+
+                {/* Alert / days left */}
+                <div className="text-center min-w-[110px]">
+                  {isPending ? (
+                    isAlert ? (
+                      <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">
+                        ⚠ Verificar agora
+                      </span>
+                    ) : (
+                      <span className="bg-amber-50 text-amber-700 text-xs font-medium px-2 py-1 rounded-full">
+                        {daysLeft} {daysLeft===1?"dia":"dias"} restantes
+                      </span>
+                    )
+                  ) : (
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      r.status==="bought" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {r.status==="bought" ? "✓ Fez compra" : "✗ Sem compra"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                {isPending && (
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={()=>updateStatus(r.id,"bought")}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      ✓ Fez compra
+                    </button>
+                    <button onClick={()=>updateStatus(r.id,"not_bought")}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      ✗ Não fez
+                    </button>
+                  </div>
+                )}
+
+                {/* Delete */}
+                <button onClick={()=>deleteRecord(r.id)}
+                  className="text-slate-300 hover:text-red-400 text-xs transition-colors shrink-0">
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [unlocked, setUnlocked] = React.useState(
