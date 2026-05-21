@@ -9,36 +9,22 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["PT", "IT", "ES", "FR", "CH-BNL-DEAT", "CZ-SK-GR-CY-PL", "USA", "OT"];
+const TEAMS = ["FR", "CH-BNL-DEAT"];
 const SCOPES = [
   { id: "total", label: "Total" },
-  { id: "PT", label: "Portugal" },
-  { id: "IT", label: "Itália" },
-  { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
   { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
-  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
-  { id: "USA", label: "USA" },
-  { id: "OT", label: "Outros" },
 ];
 // Equipas para "Análise comercial" — cada equipa agrega vários mercados
 const ANALISE_TEAMS = [
-  { id: "total",      label: "Total",      markets: ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"] },
-  { id: "equipa_pt",  label: "Equipa PT",  markets: ["PT","OT"] },
-  { id: "equipa_it",  label: "Equipa IT",  markets: ["IT"] },
-  { id: "equipa_es",  label: "Equipa ES",  markets: ["ES"] },
-  { id: "equipa_fr",  label: "Equipa FR",  markets: ["FR","CH-BNL-DEAT"] },
-  { id: "equipa_na",  label: "Equipa NA",  markets: ["CZ-SK-GR-CY-PL","USA"] },
+  { id: "equipa_fr", label: "Equipa FR", markets: ["FR","CH-BNL-DEAT"] },
 ];
 const ANALISE_COLORS = {
-  total: "#0f172a", equipa_pt: "#16a34a", equipa_it: "#2563eb",
-  equipa_es: "#dc2626", equipa_fr: "#9333ea", equipa_na: "#0891b2",
+  equipa_fr: "#9333ea",
 };
 
 const TEAM_COLORS = {
-  PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
-  FR: "#9333ea", "CH-BNL-DEAT": "#d97706",
-  "CZ-SK-GR-CY-PL": "#0891b2", USA: "#7c3aed", OT: "#64748b", total: "#0f172a",
+  FR: "#9333ea", "CH-BNL-DEAT": "#d97706", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -65,14 +51,13 @@ function MainApp() {
   const today = new Date();
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(monthKey(today));
   const [data, setData] = useState(emptyMonth());
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("analise");
   const [analiseScope, setAnaliseScope] = useState("total");
-  const [scope, setScope] = useState("total");
+  const [scope, setScope] = useState("equipa_fr");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
 
@@ -241,7 +226,6 @@ function MainApp() {
     ? [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
-        { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
         { id: "followup", label: "Parceiros" },
@@ -249,7 +233,6 @@ function MainApp() {
     : [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
-        { id: "history", label: "Histórico" },
         { id: "followup", label: "Parceiros" },
       ];
 
@@ -345,7 +328,6 @@ function MainApp() {
                 isCurrentMonth={isCurrentMonth}
               />
             )}
-            {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
 
 
             {tab === "entry" && isAdmin && (
@@ -368,15 +350,13 @@ function MainApp() {
                 setTotalGoal={setTotalGoal}
                 setTeamGoal={setTeamGoal}
                 distributeEqually={distributeEqually}
-                annualGoal={annualGoal}
-                saveAnnualGoal={saveAnnualGoal}
+                  saveAnnualGoal={saveAnnualGoal}
                 year={year}
               />
             )}
           </>
         )}
 
-        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
         <footer className="mt-12 text-center text-xs text-slate-400">
           Faturação da Equipa · {isAdmin ? "Modo administrador" : "Modo consulta"}
@@ -387,69 +367,6 @@ function MainApp() {
 }
 
 // ---- Login Modal ----
-function LoginModal({ onClose }) {
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setErr("");
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      setErr("Password incorreta");
-    } else {
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-        <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-          <Lock className="w-4 h-4" /> Acesso de administrador
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Introduz a password partilhada para registar dados.
-        </p>
-        <form onSubmit={submit} className="mt-4 space-y-3">
-          <input
-            type="password"
-            autoFocus
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-          {err && <div className="text-xs text-red-600">{err}</div>}
-          <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !password}
-              className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? "A entrar…" : "Entrar"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ---- Stats ----
 function computeScopeStats(data, scope, totalDays, closedDay, year, month) {
   const goal =
     scope === "total"
@@ -1498,19 +1415,6 @@ function LeadsMonthlyTable({ scope, year, monthNum }) {
 
 // ── Chart.js helper components for RevDashboard ──────────────────────────────
 // Loaded once from CDN; subsequent renders reuse the global Chart object
-function useChartJs(cb, deps) {
-  useEffect(() => {
-    const el = document.createElement("script");
-    el.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-    el.async = true;
-    el.onload = cb;
-    if (window.Chart) { cb(); return; }
-    document.head.appendChild(el);
-    return () => {};
-  }, deps);
-}
-
-
 function ChartGrouped({ id, labels, d25, d26 }) {
   useEffect(() => {
     const init = () => {
@@ -1588,50 +1492,6 @@ function ChartOrigin({ id, labels, d25, d26 }) {
   return null;
 }
 
-function ChartProg({ id, labels, d25, d26 }) {
-  useEffect(() => {
-    const init = () => {
-      const canvas = document.getElementById(id);
-      if (!canvas) return;
-      if (canvas._chartInstance) canvas._chartInstance.destroy();
-      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
-      const textColor = isDark ? "#e5e5e3" : "#444441";
-      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
-      canvas._chartInstance = new window.Chart(canvas, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
-            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
-          ]
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString("fr-FR")}` } } },
-          scales: {
-            y: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 } }, border: { display: false } },
-            x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
-          }
-        }
-      });
-    };
-    if (window.Chart) init();
-    else {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-      s.onload = init; document.head.appendChild(s);
-    }
-    return () => {
-      const canvas = document.getElementById(id);
-      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
-    };
-  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
-  return null;
-}
-
-// ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
@@ -2988,219 +2848,7 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
 
 
 // ── EntryRevenda — registo por valor do DIA (não acumulado) ──
-function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) {
-  const [entries, setEntries] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const RKEY = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
-  const today = new Date();
-  const todayDay = isCurrentMonth ? today.getDate() : null;
-
-  // Keep a ref to the latest entries so the debounced save always uses fresh data
-  const entriesRef = React.useRef(entries);
-  entriesRef.current = entries;
-
-  useEffect(() => {
-    setLoading(true);
-    supabase.from("billing_months").select("entries").eq("month_key", RKEY).maybeSingle()
-      .then(({ data: row }) => {
-        setEntries(row?.entries || {});
-        setLoading(false);
-      });
-  }, [RKEY]);
-
-  // Debounced auto-save — fires 800ms after the last change
-  const saveTimer = React.useRef(null);
-  const triggerAutoSave = () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    setSaved(false);
-    setSaving(false);
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true);
-      await supabase.from("billing_months").upsert(
-        { month_key: RKEY, total_goal: 0, team_goals: {}, entries: entriesRef.current, updated_at: new Date().toISOString() },
-        { onConflict: "month_key" }
-      );
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }, 800);
-  };
-
-  // Clear timer on unmount
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
-
-  const setField = (day, field, val) => {
-    setEntries(prev => ({
-      ...prev,
-      [day]: {
-        ...(prev[day] || {}),
-        [field]: typeof val === "boolean" ? val : val === "" ? "" : Number(val),
-      },
-    }));
-    triggerAutoSave();
-  };
-
-  // Compute totals per column (sum of all filled days)
-  const totals = useMemo(() => {
-    const t = { total: 0 };
-    TEAMS.forEach(tm => { t[tm] = 0; });
-    Object.values(entries).forEach(row => {
-      if (!row || typeof row !== "object") return;
-      TEAMS.forEach(tm => { t[tm] += Number(row[tm]) || 0; });
-    });
-    t.total = TEAMS.reduce((s, tm) => s + t[tm], 0);
-    return t;
-  }, [entries]);
-
-  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
-
-  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
-  const MONTH_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][monthNum];
-
-  const statusBadge = (
-    <div className="flex items-center gap-2 shrink-0 text-xs">
-      {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
-      {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
-    </div>
-  );
-
-  // ── 2025: formulário simples de total mensal por mercado ──
-  if (year === 2025) {
-    const monthTotal = entries["_total"] || {};
-    const grandTotal = TEAMS.reduce((s, t) => s + (Number(monthTotal[t]) || 0), 0);
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}
-            <span className="ml-2 text-xs font-normal text-slate-400">→ alimenta o separador <span className="text-blue-700 font-semibold">Revenda</span></span>
-          </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Insere o <strong>total mensal</strong> de faturação por mercado para {year}. Guardado automaticamente.
-            </p>
-          </div>
-          {statusBadge}
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {TEAMS.map(t => (
-              <div key={t} className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: TEAM_COLORS[t] }}>{t}</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={monthTotal[t] ?? ""}
-                  onChange={e => setField("_total", t, e.target.value)}
-                  placeholder="0"
-                  className="text-right px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-5 py-4 border border-slate-200">
-            <span className="text-sm font-medium text-slate-600">Total {MONTH_PT} {year}</span>
-            <span className="text-2xl font-bold text-slate-900">{grandTotal > 0 ? fmtEur(grandTotal) : "—"}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── 2026+: tabela dia a dia ──
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Introduz o valor <strong>faturado no próprio dia</strong> (não acumulado)
-            para cada mercado. Guardado automaticamente.
-          </p>
-        </div>
-        {statusBadge}
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-600">
-            <tr>
-              <th className="px-3 py-2 text-left sticky left-0 bg-slate-50">Dia</th>
-              <th className="px-3 py-2 text-right font-bold text-slate-900">Total dia</th>
-              {TEAMS.map(t => (
-                <th key={t} className="px-3 py-2 text-right" style={{ color: TEAM_COLORS[t] }}>{t}</th>
-              ))}
-              <th className="px-3 py-2 text-center text-amber-700">SS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {days.map(d => {
-              const row = entries[d] || {};
-              const isToday = todayDay === d;
-              const isClosed = d <= closedDay;
-              const isSupersales = row.supersales === true;
-              const dayTotal = TEAMS.reduce((s, t) => s + (Number(row[t]) || 0), 0);
-              const rowBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : isClosed ? "" : "bg-slate-50/40";
-              const stickyBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : "bg-white";
-              return (
-                <tr key={d} className={`border-t border-slate-100 ${rowBg}`}>
-                  <td className={`px-3 py-2 font-medium sticky left-0 align-top ${stickyBg}`}>
-                    {d}
-                    {isToday && <span className="ml-1 text-xs text-blue-600">(hoje)</span>}
-                    {isClosed && !isToday && <span className="ml-1 text-xs text-green-600">✓</span>}
-                  </td>
-                  <td className="px-2 py-1 text-right align-top">
-                    <div className="w-28 text-right px-2 py-1.5 font-bold text-slate-800">
-                      {dayTotal > 0 ? fmtEur(dayTotal) : <span className="text-slate-300">—</span>}
-                    </div>
-                  </td>
-                  {TEAMS.map(t => (
-                    <td key={t} className="px-2 py-1 text-right align-top">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={row[t] ?? ""}
-                        onChange={e => setField(d, t, e.target.value)}
-                        placeholder="0"
-                        className="w-24 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
-                      />
-                    </td>
-                  ))}
-                  <td className="px-2 py-1 text-center align-top">
-                    <label className="inline-flex items-center justify-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isSupersales}
-                        onChange={e => setField(d, "supersales", e.target.checked)}
-                        className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-2 focus:ring-amber-500 cursor-pointer accent-amber-600"
-                      />
-                    </label>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {/* Linha total */}
-            <tr className="border-t-2 border-slate-400 bg-slate-50 font-bold">
-              <td className="px-3 py-3 sticky left-0 bg-slate-50 text-slate-700 text-xs uppercase tracking-wide">Total</td>
-              <td className="px-2 py-3 text-right text-slate-900">{fmtEur(totals.total)}</td>
-              {TEAMS.map(t => (
-                <td key={t} className="px-2 py-3 text-right" style={{ color: TEAM_COLORS[t] }}>
-                  {totals[t] > 0 ? fmtEur(totals[t]) : <span className="text-slate-300">—</span>}
-                </td>
-              ))}
-              <td />
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal, saveAnnualGoal, year }) {
+function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, year }) {
   const equipas = ANALISE_TEAMS.filter(t => t.id !== "total");
   const sumEquipas = equipas.reduce((s, t) => s + (Number(data.teamGoals[t.id]) || 0), 0);
   const totalGoal = Number(data.totalGoal) || 0;
@@ -3309,327 +2957,6 @@ function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal,
 // ============================================================
 // History — visão anual por mês e equipa
 // ============================================================
-function History({ annualGoal: annualGoalProp, currentYear }) {
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [annualGoal, setAnnualGoal] = useState(annualGoalProp || 0);
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("billing_months")
-        .select("*")
-        .like("month_key", `${year}-%`)
-        .order("month_key", { ascending: true });
-      if (cancelled) return;
-      if (error) {
-        console.error(error);
-        setRows([]);
-      } else {
-        setRows(data || []);
-      }
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [year]);
-
-  const monthsData = useMemo(() => {
-    const byKey = {};
-    rows.forEach((r) => {
-      byKey[r.month_key] = r;
-    });
-    const result = [];
-    for (let m = 1; m <= 12; m++) {
-      const key = `${year}-${String(m).padStart(2, "0")}`;
-      const row = byKey[key];
-      const entries = row?.entries || {};
-      const teamGoals = row?.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0 };
-      const totalGoal = Number(row?.total_goal) || 0;
-
-      // Para cada âmbito, encontra o último valor acumulado preenchido
-      // (os valores são cumulativos → o último dia dá o total do mês)
-      const billed = { total: 0, PT: 0, IT: 0, ES: 0, FR: 0 };
-      Object.keys(entries)
-        .map((d) => Number(d))
-        .sort((a, b) => a - b)
-        .forEach((day) => {
-          const e = entries[day] || {};
-          ["total", "PT", "IT", "ES", "FR"].forEach((s) => {
-            const v = e[s];
-            if (
-              v !== undefined &&
-              v !== "" &&
-              v !== null &&
-              !Number.isNaN(Number(v))
-            ) {
-              billed[s] = Number(v);
-            }
-          });
-        });
-
-      result.push({
-        month: m,
-        monthName: MONTH_NAMES[m - 1],
-        shortName: MONTH_NAMES[m - 1].slice(0, 3),
-        totalGoal,
-        teamGoals,
-        billed,
-        pctTotal: totalGoal > 0 ? (billed.total / totalGoal) * 100 : 0,
-      });
-    }
-    return result;
-  }, [rows, year]);
-
-  const annualTotals = useMemo(() => {
-    const t = {
-      total: 0, PT: 0, IT: 0, ES: 0, FR: 0,
-      totalGoal: 0,
-      teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0 },
-    };
-    monthsData.forEach((m) => {
-      t.total += m.billed.total;
-      t.PT += m.billed.PT;
-      t.IT += m.billed.IT;
-      t.ES += m.billed.ES;
-      t.FR += m.billed.FR;
-      t.totalGoal += m.totalGoal;
-      TEAMS.forEach((team) => {
-        t.teamGoals[team] += Number(m.teamGoals[team]) || 0;
-      });
-    });
-    t.pctTotal = t.totalGoal > 0 ? (t.total / t.totalGoal) * 100 : 0;
-    return t;
-  }, [monthsData]);
-
-  const bestMonth = useMemo(() => {
-    const filled = monthsData.filter((m) => m.billed.total > 0);
-    if (filled.length === 0) return null;
-    return filled.reduce((a, b) => (b.billed.total > a.billed.total ? b : a));
-  }, [monthsData]);
-
-  // Load annual goal for selected year
-  useEffect(() => {
-    if (year === currentYear && annualGoalProp) {
-      setAnnualGoal(annualGoalProp);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data: row } = await supabase
-        .from("billing_months")
-        .select("total_goal")
-        .eq("month_key", `${year}-annual`)
-        .maybeSingle();
-      if (!cancelled) setAnnualGoal(Number(row?.total_goal) || 0);
-    })();
-    return () => { cancelled = true; };
-  }, [year, annualGoalProp, currentYear]);
-
-  const yearOptions = useMemo(() => {
-    const current = today.getFullYear();
-    return [current - 2, current - 1, current, current + 1];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const maxBilled = Math.max(...monthsData.map((m) => m.billed.total), 1);
-  const monthsWithData = monthsData.filter((m) => m.billed.total > 0).length;
-
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Histórico anual</h2>
-
-        </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-slate-500" />
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-16 text-slate-400">
-          <div className="text-4xl mb-3">⏳</div>
-          <div className="text-sm">A carregar histórico…</div>
-        </div>
-      ) : (
-        <>
-          {/* KPI summary cards */}
-          {(() => {
-            const pctAnual = annualGoal > 0 ? (annualTotals.total / annualGoal) * 100 : null;
-            const isAnualOver = pctAnual !== null && pctAnual >= 100;
-            return (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="text-xs uppercase tracking-wide text-blue-600 font-medium">Total faturado</div>
-                  <div className="text-2xl font-bold text-slate-900 mt-1">{fmtEur(annualTotals.total)}</div>
-                  <div className="text-xs text-blue-600 mt-1">{year}</div>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <div className="text-xs uppercase tracking-wide text-slate-500 font-medium">Objetivo anual</div>
-                  <div className="text-2xl font-bold text-slate-900 mt-1">{annualGoal > 0 ? fmtEur(annualGoal) : "—"}</div>
-                  <div className="text-xs text-slate-400 mt-1">{annualGoal > 0 ? `${year}` : "não definido"}</div>
-                </div>
-                <div className={`rounded-xl p-4 border ${pctAnual === null ? "bg-white border-slate-200" : isAnualOver ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
-                  <div className={`text-xs uppercase tracking-wide font-medium ${pctAnual === null ? "text-slate-500" : isAnualOver ? "text-green-600" : "text-amber-600"}`}>% do objetivo anual feito</div>
-                  <div className="text-2xl font-bold text-slate-900 mt-1">{pctAnual !== null ? fmtPct(pctAnual) : "—"}</div>
-                  <div className="text-xs text-slate-400 mt-1">{pctAnual !== null ? `${fmtEur(annualTotals.total)} de ${fmtEur(annualGoal)}` : "sem objetivo definido"}</div>
-                </div>
-              </div>
-            );
-          })()}
-
-
-
-          {/* Monthly cards grid */}
-          <div>
-            <h3 className="font-semibold text-slate-800 mb-3">Detalhe mensal</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {monthsData.map((m) => {
-                const hasData = m.billed.total > 0 || TEAMS.some((t) => m.billed[t] > 0);
-                const today2 = new Date();
-                const isCurrentMonth2 = m.month === today2.getMonth() + 1 && year === today2.getFullYear();
-                const isPastMonth2 = new Date(year, m.month, 0) < new Date(today2.getFullYear(), today2.getMonth(), 1);
-                const isOver = m.pctTotal >= 100;
-                const isOngoing = !isPastMonth2 && isCurrentMonth2 && !isOver;
-                // Border + bar color logic
-                const borderClass = !hasData
-                  ? "border-slate-100 opacity-50"
-                  : isOver
-                  ? "border-green-400"
-                  : isOngoing
-                  ? "border-amber-400"
-                  : isPastMonth2 && hasData
-                  ? "border-red-300"
-                  : "border-slate-200";
-                const barColor = isOver ? "bg-green-500" : isOngoing ? "bg-amber-400" : isPastMonth2 && hasData ? "bg-red-400" : "bg-blue-400";
-                const barWidth = isOver ? 100 : m.totalGoal > 0 ? Math.min((m.billed.total / m.totalGoal) * 100, 100) : 0;
-                return (
-                  <div key={m.month} className={`bg-white rounded-xl border-2 p-4 ${borderClass}`}>
-                    {/* Month header */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-semibold text-slate-800">{m.monthName}</span>
-                      {hasData && m.totalGoal > 0 && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isOver ? "bg-green-100 text-green-700" : isOngoing ? "bg-amber-100 text-amber-700" : isPastMonth2 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-600"}`}>
-                          {fmtPct(m.pctTotal)}
-                        </span>
-                      )}
-                    </div>
-                    {/* Total + bar */}
-                    <div className="text-xl font-bold text-slate-900">{hasData ? fmtEur(m.billed.total) : "—"}</div>
-                    {m.totalGoal > 0 && (
-                      <div className="text-xs text-slate-400 mt-0.5">obj. {fmtEur(m.totalGoal)}</div>
-                    )}
-                    {hasData && (
-                      <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${barColor}`}
-                          style={{ width: `${barWidth}%` }}
-                        />
-                      </div>
-                    )}
-                    {/* Teams mini row */}
-                    {hasData && (
-                      <div className="mt-3 grid grid-cols-4 gap-1">
-                        {TEAMS.map((t) => {
-                          const billed = m.billed[t];
-                          const goal = Number(m.teamGoals[t]) || 0;
-                          const pctOfGoal = goal > 0 ? (billed / goal) * 100 : null;
-                          const pctOfTotal = m.billed.total > 0 && billed > 0 ? (billed / m.billed.total) * 100 : null;
-                          return (
-                            <div key={t} className="text-center">
-                              <div className="text-[10px] font-bold" style={{ color: TEAM_COLORS[t] }}>{t}</div>
-                              <div className="text-[11px] font-semibold text-slate-700 mt-0.5">
-                                {billed > 0 ? `${(billed / 1000).toFixed(0)}k` : "—"}
-                              </div>
-                              {pctOfTotal !== null && (
-                                <div className="text-[9px] font-medium text-slate-400">
-                                  {fmtPct(pctOfTotal)}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Annual totals footer */}
-          <div className="bg-slate-800 text-white rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Total {year}</h3>
-
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div>
-                <div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
-                <div className="text-lg font-bold mt-1">{fmtEur(annualTotals.total)}</div>
-
-              </div>
-              {TEAMS.map((t) => (
-                <div key={t}>
-                  <div className="text-xs uppercase tracking-wide font-bold" style={{ color: TEAM_COLORS[t] }}>{t}</div>
-                  <div className="text-lg font-bold mt-1">{annualTotals[t] > 0 ? fmtEur(annualTotals[t]) : "—"}</div>
-
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// Password gate — bloqueia toda a aplicação até a password ser introduzida
-// ============================================================
-const SITE_PASSWORD =
-  import.meta.env.VITE_SITE_PASSWORD || "partnersfranca";
-const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
-
-// ─── CONSTANTES PARTILHADAS ───────────────────────────────────────────────────
-
-const MC_MARKETS = [
-  { code: "PT",          name: "Portugal" },
-  { code: "IT",          name: "Itália" },
-  { code: "ES",          name: "Espanha" },
-  { code: "FR",          name: "França" },
-  { code: "CH-BNL-DEAT", name: "CH-BNL-DEAT" },
-  { code: "CZ-SK-GR-CY-PL", name: "CZ-SK-GR-CY-PL" },
-  { code: "USA",         name: "USA" },
-  { code: "OT",          name: "Outros" },
-];
-
-const MC_PROGRAMS = [
-  "Professionals","Elite","Progym","Proteams",
-  "Probox","Performance","Horeca","Corporate",
-];
-
-const MC_MONTHS_PT = [
-  "","Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
-];
-
 function mcKey(year, monthNum) {
   return `closing-${year}-${String(monthNum+1).padStart(2,"0")}`;
 }
@@ -4060,127 +3387,6 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
 // ─── RELATÓRIO (auto-fill version) ───────────────────────────────────────────
 
-function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth, isAdmin }) {
-  const [afilScope, setAfilScope] = useState("total");
-  const [afilData, setAfilData] = useState({
-    totalGoal: 0,
-    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
-    entries: {},
-  });
-  const [loading, setLoading] = useState(true);
-  const today = new Date();
-  const selectedMonth = `${year}-${String(monthNum + 1).padStart(2, "0")}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const afilKey = `afil-${selectedMonth}`;
-      const { data: row } = await supabase
-        .from("billing_months")
-        .select("*")
-        .eq("month_key", afilKey)
-        .maybeSingle();
-      if (cancelled) return;
-      if (row) {
-        setAfilData({
-          totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
-          entries: row.entries || {},
-        });
-      } else {
-        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 }, entries: {} });
-      }
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [selectedMonth]);
-
-  const stats = useMemo(
-    () => computeScopeStats(afilData, afilScope, totalDays, closedDay, year, monthNum),
-    [afilData, afilScope, totalDays, closedDay, year, monthNum]
-  );
-  const teamStats = useMemo(
-    () => ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"].map((t) => ({
-      team: t,
-      ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
-    })),
-    [afilData, totalDays, closedDay, year, monthNum]
-  );
-
-  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
-
-  const scopeColor = TEAM_COLORS[afilScope] || "#0f172a";
-  const scopeLabel = AFILIACAO_SCOPES.find(s => s.id === afilScope)?.label || afilScope;
-
-  return (
-    <div className="space-y-5">
-      <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
-      <div className="space-y-5">
-      {/* Scope tabs */}
-      <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
-        {AFILIACAO_SCOPES.map((s) => {
-          const active = afilScope === s.id;
-          const color = TEAM_COLORS[s.id];
-          return (
-            <button
-              key={s.id}
-              onClick={() => setAfilScope(s.id)}
-              className={`flex-1 min-w-[70px] px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
-                active ? "text-white" : "text-slate-600 hover:bg-slate-100"
-              }`}
-              style={active ? { backgroundColor: color } : undefined}
-            >
-              {s.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {stats.goal === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center mt-4">
-          <Target className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <h3 className="font-semibold text-slate-900">
-            {afilScope === "total"
-              ? "Sem objetivo total definido para este mês"
-              : `Sem objetivo definido para ${scopeLabel}`}
-          </h3>
-          <p className="text-sm text-slate-600 mt-1">
-            O administrador ainda não configurou este âmbito.
-          </p>
-        </div>
-      ) : (
-        <Dashboard
-          stats={stats}
-          scope={afilScope}
-          month={month}
-          year={year}
-          totalDays={totalDays}
-          closedDay={closedDay}
-          isCurrentMonth={isCurrentMonth}
-          teamStats={teamStats}
-        />
-      )}
-    </div>
-    </div>
-  );
-}
-
-// ---- Tab vazia ----
-function TabVazia({ titulo }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-        <TrendingUp className="w-8 h-8 text-slate-300" />
-      </div>
-      <h3 className="text-lg font-semibold text-slate-500">{titulo}</h3>
-      <p className="text-sm mt-1">Brevemente disponível</p>
-    </div>
-  );
-}
-
-
-// ── RegistoHub — separador "Registo" com sub-tabs ──
 function MargemRegisto({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -4272,64 +3478,6 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
   );
 }
 
-function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAdmin }) {
-  const [subTab, setSubTab] = useState("revenda");
-
-  const subTabs = [
-    { id: "revenda",    label: "Revenda",          color: "bg-blue-500" },
-    { id: "afiliacao",  label: "Afiliação",         color: "bg-orange-500" },
-    { id: "encomendas", label: "Encomendas",        color: "bg-blue-600" },
-    { id: "leads",      label: "Leads / Parcerias", color: "bg-purple-500" },
-    { id: "margem",     label: "Margem",            color: "bg-green-600" },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Sub-tab bar */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {subTabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setSubTab(t.id)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-              subTab === t.id
-                ? `${t.color} text-white`
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Sub-tab content */}
-      {subTab === "revenda" && (
-        <EntryRevenda
-          monthNum={monthNum}
-          year={year}
-          totalDays={totalDays}
-          closedDay={closedDay}
-          isCurrentMonth={isCurrentMonth}
-        />
-      )}
-      {subTab === "afiliacao" && (
-        <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
-      )}
-      {subTab === "encomendas" && (
-        <Encomendas monthNum={monthNum} year={year} isAdmin={isAdmin} />
-      )}
-      {subTab === "leads" && (
-        <LeadsParcerias monthNum={monthNum} year={year} isAdmin={isAdmin} />
-      )}
-      {subTab === "margem" && (
-        <MargemRegisto monthNum={monthNum} year={year} isAdmin={isAdmin} />
-      )}
-    </div>
-  );
-}
-
-
-// ── EntryHub — Registo Diário com sub-tabs ──────────────────────────────────
 function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
   const [subTab, setSubTab] = useState("registo");
   const subTabs = [
