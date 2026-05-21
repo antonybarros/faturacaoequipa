@@ -582,7 +582,7 @@ function computeTeamScopeStats(data, teamDef, totalDays, closedDay, year, month)
 function AnaliseScopeTabs({ scope, setScope }) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
-      {ANALISE_TEAMS.map((s) => {
+      {ANALISE_TEAMS.filter(t => t.id === "equipa_fr").map((s) => {
         const active = scope === s.id;
         const color = ANALISE_COLORS[s.id];
         return (
@@ -847,7 +847,7 @@ function DashboardWrapper({
 function ScopeTabs({ scope, setScope }) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
-      {SCOPES.map((s) => {
+      {SCOPES.filter(s => ["total","FR","CH-BNL-DEAT"].includes(s.id)).map((s) => {
         const active = scope === s.id;
         const color = TEAM_COLORS[s.id];
         return (
@@ -3091,7 +3091,7 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
         </div>
       </MCCard>
 
-      {MC_MARKETS.map(m => (
+      {MC_MARKETS.filter(m => ["FR","CH-BNL-DEAT"].includes(m.code)).map(m => (
         <MCCard key={m.code} title={m.name} accent="text-orange-600">
           <div className="grid grid-cols-1 gap-3">
             <MCField label="Afiliação (€)" value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
@@ -3217,7 +3217,7 @@ function Encomendas({ monthNum, year, isAdmin }) {
         );
       })()}
 
-      {MC_MARKETS.map(m => (
+      {MC_MARKETS.filter(m => ["FR","CH-BNL-DEAT"].includes(m.code)).map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
           <div className="grid grid-cols-3 gap-3">
             <MCField label="Encomendas" value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
@@ -3328,7 +3328,7 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
       </MCCard>
 
       {/* ── Cards por mercado ── */}
-      {MC_MARKETS.map(m => (
+      {MC_MARKETS.filter(m => ["FR","CH-BNL-DEAT"].includes(m.code)).map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
           {/* Leads + Parceiros */}
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -3444,7 +3444,7 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
         </div>
       </MCCard>
 
-      {MC_MARKETS.map(m => (
+      {MC_MARKETS.filter(m => ["FR","CH-BNL-DEAT"].includes(m.code)).map(m => (
         <MCCard key={m.code} title={m.name} accent="text-green-700">
           <div className="grid grid-cols-1 gap-3">
             <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
