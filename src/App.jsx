@@ -247,30 +247,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           subColor={stats.projWithSS>=stats.goal?C.green:C.red} small />
       </div>
 
-      {/* Chart */}
-      <div style={T.card}>
-        <p style={T.sectionTitle}>Evolução acumulada vs objetivo</p>
-        <div style={{ display:"flex", gap:16, fontSize:12, color:C.muted, marginBottom:12 }}>
-          {[{c:C.green,l:String(year)},{c:"#9333ea",l:"Objetivo"}].map(({c,l})=>(
-            <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
-              <span style={{ width:16, height:2, background:c, display:"inline-block", borderRadius:1 }}></span>{l}
-            </span>
-          ))}
-        </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData} margin={{ top:4, right:8, left:8, bottom:0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={4} />
-            <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":v} tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={40} />
-            <Tooltip formatter={(v,n)=>[fmtEur(v),n==="atual"?year:"Objetivo"]} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:12, background:C.bg }} />
-            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" />}
-            <Line type="monotone" dataKey="atual" stroke={C.green} strokeWidth={2} dot={false} connectNulls />
-            {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Row — parceiros + primeiras compras */}
+      {/* Row 4 — parceiros + primeiras compras */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
           sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
@@ -283,6 +260,29 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
           sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
           subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
+      </div>
+
+      {/* Chart */}
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Evolução acumulada vs objetivo</p>
+        <div style={{ display:"flex", gap:16, fontSize:12, color:C.muted, marginBottom:12 }}>
+          {[{c:C.green,l:"Resultado"},{c:"#9333ea",l:"Objetivo"}].map(({c,l})=>(
+            <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
+              <span style={{ width:16, height:2, background:c, display:"inline-block", borderRadius:1 }}></span>{l}
+            </span>
+          ))}
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData} margin={{ top:4, right:8, left:8, bottom:0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={4} />
+            <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":v} tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={40} />
+            <Tooltip formatter={(v,n)=>[fmtEur(v),n==="atual"?"Resultado":"Objetivo"]} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:12, background:C.bg }} />
+            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" />}
+            <Line type="monotone" dataKey="atual" stroke={C.green} strokeWidth={2} dot={false} connectNulls />
+            {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       <div style={T.card}>
