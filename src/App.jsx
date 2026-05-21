@@ -93,7 +93,9 @@ function computeStats(daily, teamGoals, totalDays, closedDay) {
   const dailyAvg = closedDay>0 ? Math.round(actual/closedDay) : 0;
   const neededPerDay = goal>0&&rem>0 ? Math.round((goal-actual)/rem) : null;
   const remaining = goal>0 ? goal-actual : null;
-  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining };
+  const firstRevActual = Number(teamGoals?.equipa_fr_first_rev)||0;
+  const firstRevGoal = Number(teamGoals?.equipa_fr_first_rev_goal)||0;
+  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining, firstRevActual, firstRevGoal };
 }
 
 function Modal({ title, subtitle, onClose, children }) {
@@ -218,18 +220,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           subColor={stats.vsExpected==null?undefined:stats.vsExpected>=0?C.green:C.red} />
       </div>
 
-      {/* Row 2 — parceiros */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
-        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
-          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
-          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
-          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
-        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
-          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
-          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
-      </div>
-
-      {/* Row 3 — projeções */}
+      {/* Row 2 — projeções */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Média / dia" value={stats.dailyAvg>0?fmtEur(stats.dailyAvg):"—"}
           sub={stats.neededPerDay?`é preciso ${fmtEur(stats.neededPerDay)}/dia para atingir 100% do objetivo`:undefined}
@@ -263,6 +254,21 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
             {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Row — parceiros + primeiras compras */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
+        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
+          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
+          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
+          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
+        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
+          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
+          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
+        <StatCard label="Faturação primeiras compras"
+          value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
+          sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
+          subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
