@@ -57,7 +57,7 @@ function MainApp() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("analise");
   const [analiseScope, setAnaliseScope] = useState("equipa_fr");
-  const [scope, setScope] = useState("equipa_fr");
+  const [scope, setScope] = useState("total");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
 
@@ -645,7 +645,7 @@ function AnaliseDashboardWrapper({
       <AnaliseScopeTabs scope={scope} setScope={setScope} />
       <Dashboard
         stats={stats}
-        scope={teamDef.label}
+        scope={teamDef.id}
         month={month}
         year={year}
         totalDays={totalDays}
