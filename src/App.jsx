@@ -3,21 +3,24 @@ import { createClient } from "@supabase/supabase-js";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-
 const MARKETS = [{ id: "FR", label: "França" }, { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" }];
 const MARKET_COLORS = { FR: "#9333ea", "CH-BNL-DEAT": "#d97706" };
 const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "partnersfranca";
 const GATE_KEY = "faturacao_gate_v2";
 const today = new Date();
-
 const monthKey = (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`;
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 const fmt = (n) => new Intl.NumberFormat("fr-FR").format(Math.round(n));
 const fmtEur = (n) => `${fmt(n)} €`;
-const pct = (a, b) => b > 0 ? `${a >= b ? "+" : ""}${((a - b) / b * 100).toFixed(1)}%` : null;
+const C = { bg:"#fff", card:"#F7F6F3", border:"#E8E6E0", text:"#2C2C2A", muted:"#888780", green:"#1D9E75", red:"#E24B4A" };
+const T = {
+  card: { background:C.card, borderRadius:12, padding:"1.1rem 1.25rem" },
+  label: { fontSize:11, color:C.muted, textTransform:"uppercase", letterSpacing:".06em", margin:"0 0 8px", fontWeight:500 },
+  value: { fontSize:22, fontWeight:500, margin:0, color:C.text },
+  sectionTitle: { fontSize:11, color:C.muted, textTransform:"uppercase", letterSpacing:".06em", fontWeight:500, margin:"0 0 14px" },
+};
 
-// ── Password Gate ──────────────────────────────────────────────────────────────
 function PasswordGate({ onUnlock }) {
   const [pw, setPw] = useState(""), [err, setErr] = useState("");
   const submit = (e) => {
@@ -26,98 +29,88 @@ function PasswordGate({ onUnlock }) {
     else { setErr("Password incorrecta"); setPw(""); }
   };
   return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"var(--color-background-tertiary)" }}>
-      <div style={{ background:"var(--color-background-primary)", border:"0.5px solid var(--color-border-tertiary)", borderRadius:16, padding:"2.5rem 2rem", width:320, textAlign:"center" }}>
-        <div style={{ width:48, height:48, borderRadius:"50%", background:"var(--color-background-info)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 1rem" }}>
-          <svg width="20" height="20" fill="none" stroke="var(--color-text-info)" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:C.bg }}>
+      <div style={{ background:C.bg, border:`0.5px solid ${C.border}`, borderRadius:16, padding:"2.5rem 2rem", width:320, textAlign:"center" }}>
+        <div style={{ width:48, height:48, borderRadius:"50%", background:"#E1F5EE", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 1rem" }}>
+          <svg width="20" height="20" fill="none" stroke={C.green} strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-        <p style={{ fontWeight:500, fontSize:18, margin:"0 0 4px", color:"var(--color-text-primary)" }}>Faturação da Equipa</p>
-        <p style={{ fontSize:13, color:"var(--color-text-secondary)", margin:"0 0 1.5rem" }}>Acesso restrito</p>
+        <p style={{ fontWeight:500, fontSize:18, margin:"0 0 4px", color:C.text }}>Faturação da Equipa</p>
+        <p style={{ fontSize:13, color:C.muted, margin:"0 0 1.5rem" }}>Acesso restrito</p>
         <form onSubmit={submit}>
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Password" autoFocus style={{ width:"100%", marginBottom:12, boxSizing:"border-box" }} />
-          {err && <p style={{ fontSize:12, color:"var(--color-text-danger)", margin:"0 0 10px" }}>{err}</p>}
-          <button type="submit" style={{ width:"100%", padding:"9px", background:"#1D9E75", color:"#fff", border:"none", borderRadius:8, fontWeight:500, cursor:"pointer", fontSize:14 }}>Entrar</button>
+          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" autoFocus
+            style={{ width:"100%", marginBottom:12, boxSizing:"border-box", border:`0.5px solid ${C.border}`, borderRadius:8, padding:"9px 12px", fontSize:14, outline:"none", background:C.bg, color:C.text }} />
+          {err && <p style={{ fontSize:12, color:C.red, margin:"0 0 10px" }}>{err}</p>}
+          <button type="submit" style={{ width:"100%", padding:"9px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontWeight:500, cursor:"pointer", fontSize:14 }}>Entrar</button>
         </form>
       </div>
     </div>
   );
 }
 
-// ── Data ───────────────────────────────────────────────────────────────────────
 async function loadMonthData(year, month) {
   const { data } = await supabase.from("billing_months").select("entries,team_goals").eq("month_key", monthKey(year, month)).maybeSingle();
-  return data || { entries: {}, team_goals: {} };
+  return data || { entries:{}, team_goals:{} };
 }
 
 function buildDaily(entries, totalDays) {
-  const daily = [];
-  let lastFR = 0, lastCH = 0, prevCumul = 0;
-  for (let d = 1; d <= totalDays; d++) {
+  const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
+  for (let d=1; d<=totalDays; d++) {
     const e = entries[d] || {};
-    if (e.FR !== undefined) lastFR = Number(e.FR) || 0;
-    if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"]) || 0;
+    if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+    if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
     const cumul = lastFR + lastCH;
-    const dayValue = cumul - prevCumul;
-    daily.push({ day: d, FR: lastFR, CH: lastCH, cumul, dayValue: cumul > prevCumul ? dayValue : 0, supersales: e.supersales === true });
+    daily.push({ day:d, FR:lastFR, CH:lastCH, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true });
     prevCumul = cumul;
   }
   return daily;
 }
 
 function computeStats(daily, teamGoals, totalDays, closedDay) {
-  const goal = Number(teamGoals?.equipa_fr) || 0;
-  const closedDaily = daily.filter(d => d.day <= closedDay);
-  const actual = closedDaily.length > 0 ? closedDaily[closedDaily.length - 1].cumul : 0;
-  const expected = goal > 0 && closedDay > 0 ? Math.round(goal / totalDays * closedDay) : null;
-  const vsExpected = expected != null ? actual - expected : null;
-
-  const normalDays = closedDaily.filter(d => !d.supersales && d.dayValue > 0);
-  const ssDays = closedDaily.filter(d => d.supersales && d.dayValue > 0);
-  const avgNormal = normalDays.length > 0 ? Math.round(normalDays.reduce((s, d) => s + d.dayValue, 0) / normalDays.length) : 0;
-  const avgSS = ssDays.length > 0 ? Math.round(ssDays.reduce((s, d) => s + d.dayValue, 0) / ssDays.length) : 0;
-  const remainingDays = totalDays - closedDay;
-
-  const projNoSS = avgNormal > 0 ? actual + avgNormal * remainingDays : null;
-  const projWithSS = avgNormal > 0 && avgSS > 0 ? actual + avgNormal * (remainingDays - 1) + avgSS : projNoSS;
-
-  const dailyAvg = closedDay > 0 ? Math.round(actual / closedDay) : 0;
-  const neededPerDay = goal > 0 && remainingDays > 0 ? Math.round((goal - actual) / remainingDays) : null;
-
-  return { goal, actual, expected, vsExpected, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays, closedDay };
+  const goal = Number(teamGoals?.equipa_fr)||0;
+  const closed = daily.filter(d=>d.day<=closedDay);
+  const actual = closed.length>0 ? closed[closed.length-1].cumul : 0;
+  const expected = goal>0&&closedDay>0 ? Math.round(goal/totalDays*closedDay) : null;
+  const vsExpected = expected!=null ? actual-expected : null;
+  const vsExpPct = expected>0 ? ((actual-expected)/expected*100) : null;
+  const normal = closed.filter(d=>!d.supersales&&d.dayValue>0);
+  const ss = closed.filter(d=>d.supersales&&d.dayValue>0);
+  const avgNormal = normal.length>0 ? Math.round(normal.reduce((s,d)=>s+d.dayValue,0)/normal.length) : 0;
+  const avgSS = ss.length>0 ? Math.round(ss.reduce((s,d)=>s+d.dayValue,0)/ss.length) : 0;
+  const rem = totalDays-closedDay;
+  const projNoSS = avgNormal>0 ? actual+avgNormal*rem : null;
+  const projWithSS = avgNormal>0&&avgSS>0 ? actual+avgNormal*(rem-1)+avgSS : projNoSS;
+  const dailyAvg = closedDay>0 ? Math.round(actual/closedDay) : 0;
+  const neededPerDay = goal>0&&rem>0 ? Math.round((goal-actual)/rem) : null;
+  return { goal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay };
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────────
 function DailyModal({ daily, closedDay, onClose }) {
-  const rows = daily.filter(d => d.day <= closedDay && d.cumul > 0);
+  const rows = daily.filter(d=>d.day<=closedDay&&d.cumul>0);
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:"var(--color-background-primary)", borderRadius:16, border:"0.5px solid var(--color-border-tertiary)", width:"100%", maxWidth:480, maxHeight:"80vh", overflow:"hidden", display:"flex", flexDirection:"column" }}>
-        <div style={{ padding:"1.25rem 1.25rem 1rem", borderBottom:"0.5px solid var(--color-border-tertiary)", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+    <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
+      <div style={{ background:C.bg, borderRadius:16, width:"100%", maxWidth:480, maxHeight:"85vh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <div style={{ padding:"1.25rem", borderBottom:`0.5px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
           <div>
-            <p style={{ fontWeight:500, fontSize:16, margin:0, color:"var(--color-text-primary)" }}>Faturado diário — detalhe</p>
-            <p style={{ fontSize:13, color:"var(--color-text-secondary)", margin:"3px 0 0" }}>Equipa FR · {closedDay} dias fechados</p>
+            <p style={{ fontWeight:500, fontSize:16, margin:0, color:C.text }}>Faturado diário — detalhe</p>
+            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · {closedDay} dias fechados</p>
           </div>
-          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--color-text-secondary)", fontSize:20, padding:0, lineHeight:1 }}>×</button>
+          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:C.muted, fontSize:24, padding:"0 4px", lineHeight:1 }}>×</button>
         </div>
-        <div style={{ overflow:"auto", flex:1 }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-            <thead>
-              <tr style={{ borderBottom:"0.5px solid var(--color-border-tertiary)" }}>
-                {["Dia","Acumulado","+Nesse dia"].map((h,i) => (
-                  <th key={h} style={{ padding:"10px 1.25rem", textAlign:i===0?"left":"right", color:"var(--color-text-secondary)", fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
-                ))}
-              </tr>
+        <div style={{ overflowY:"auto", flex:1 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
+            <thead style={{ position:"sticky", top:0, background:C.bg, zIndex:1 }}>
+              <tr>{["DIA","ACUMULADO","+NESSE DIA"].map((h,i)=>(
+                <th key={h} style={{ padding:"10px 1.25rem", textAlign:i===0?"left":"right", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".06em", borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
+              ))}</tr>
             </thead>
-            <tbody>
-              {rows.map((d,i) => (
-                <tr key={d.day} style={{ borderBottom:"0.5px solid var(--color-border-tertiary)", background: d.supersales ? "var(--color-background-warning)" : "transparent" }}>
-                  <td style={{ padding:"10px 1.25rem", color:"var(--color-text-primary)", fontWeight:500 }}>{d.day}{d.supersales ? " ⚡" : ""}</td>
-                  <td style={{ padding:"10px 1.25rem", textAlign:"right", fontWeight:500, color:"var(--color-text-primary)" }}>{fmtEur(d.cumul)}</td>
-                  <td style={{ padding:"10px 1.25rem", textAlign:"right", color:"var(--color-text-secondary)" }}>+{fmtEur(d.dayValue)}</td>
-                </tr>
-              ))}
-            </tbody>
+            <tbody>{rows.map(d=>(
+              <tr key={d.day} style={{ borderBottom:`0.5px solid #F7F6F3`, background:d.supersales?"#FAEEDA":"transparent" }}>
+                <td style={{ padding:"11px 1.25rem", color:C.text, fontWeight:500 }}>{d.day}{d.supersales?" ⚡":""}</td>
+                <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>
+                <td style={{ padding:"11px 1.25rem", textAlign:"right", color:C.muted }}>+{fmtEur(d.dayValue)}</td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
       </div>
@@ -125,161 +118,124 @@ function DailyModal({ daily, closedDay, onClose }) {
   );
 }
 
-// ── UI primitives ──────────────────────────────────────────────────────────────
-const card = { background:"var(--color-background-primary)", border:"0.5px solid var(--color-border-tertiary)", borderRadius:12, padding:"1.25rem" };
-
-function StatCard({ label, value, sub, subColor, onClick, highlight }) {
+function StatCard({ label, value, sub, subColor, onClick, highlight, small }) {
+  const [hov, setHov] = useState(false);
   return (
-    <div onClick={onClick} style={{ ...card, cursor: onClick ? "pointer" : "default",
-      border: highlight ? "2px solid #1D9E75" : "0.5px solid var(--color-border-tertiary)",
-      transition:"box-shadow .15s" }}
-      onMouseEnter={e => onClick && (e.currentTarget.style.borderColor = "#1D9E75")}
-      onMouseLeave={e => onClick && !highlight && (e.currentTarget.style.borderColor = "var(--color-border-tertiary)")}>
-      <p style={{ fontSize:11, color:"var(--color-text-secondary)", textTransform:"uppercase", letterSpacing:".06em", margin:"0 0 8px" }}>{label}</p>
-      <p style={{ fontSize:22, fontWeight:500, margin:0, color:"var(--color-text-primary)" }}>{value}</p>
-      {sub && <p style={{ fontSize:12, margin:"6px 0 0", color: subColor || "var(--color-text-secondary)" }}>{sub}</p>}
-      {onClick && <p style={{ fontSize:11, color:"var(--color-text-secondary)", margin:"8px 0 0" }}>ver detalhe →</p>}
+    <div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{ ...T.card, ...(highlight?{border:`2px solid ${C.green}`}:{}), ...(onClick?{cursor:"pointer"}:{}), ...(hov&&onClick?{background:"#EEEDE8"}:{}) }}>
+      <p style={T.label}>{label}</p>
+      <p style={{ ...T.value, fontSize:small?18:22 }}>{value}</p>
+      {sub && <p style={{ fontSize:12, margin:"6px 0 0", color:subColor||C.muted }}>{sub}</p>}
+      {onClick && <p style={{ fontSize:11, color:C.green, margin:"8px 0 0" }}>ver detalhe →</p>}
     </div>
   );
 }
 
-function SectionTitle({ children }) {
-  return <p style={{ fontSize:12, color:"var(--color-text-secondary)", textTransform:"uppercase", letterSpacing:".06em", fontWeight:500, margin:"0 0 12px" }}>{children}</p>;
-}
-
-// ── Análise ────────────────────────────────────────────────────────────────────
 function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   const [showModal, setShowModal] = useState(false);
   const [prevEntries, setPrevEntries] = useState({});
-
-  useEffect(() => {
-    loadMonthData(year - 1, month).then(d => setPrevEntries(d.entries || {}));
-  }, [year, month]);
-
-  const daily = useMemo(() => buildDaily(entries, totalDays), [entries, totalDays]);
-  const prevDaily = useMemo(() => buildDaily(prevEntries, daysInMonth(year - 1, month)), [prevEntries, year, month]);
-  const stats = useMemo(() => computeStats(daily, teamGoals, totalDays, closedDay), [daily, teamGoals, totalDays, closedDay]);
-  const prevStats = useMemo(() => computeStats(prevDaily, {}, daysInMonth(year - 1, month), daysInMonth(year - 1, month)), [prevDaily, year, month]);
-
-  const evoPct = prevStats.actual > 0 ? ((stats.actual - prevStats.actual) / prevStats.actual * 100) : null;
-  const vsExpPct = stats.expected > 0 ? ((stats.actual - stats.expected) / stats.expected * 100) : null;
-
-  const chartData = daily.map((d, i) => ({
-    day: d.day,
-    atual: d.day <= closedDay ? d.cumul : null,
-    anterior: prevDaily[i]?.cumul ?? null,
-    objetivo: stats.goal > 0 ? Math.round(stats.goal / totalDays * d.day) : null,
+  useEffect(()=>{ loadMonthData(year-1,month).then(d=>setPrevEntries(d.entries||{})); },[year,month]);
+  const daily = useMemo(()=>buildDaily(entries,totalDays),[entries,totalDays]);
+  const prevDaily = useMemo(()=>buildDaily(prevEntries,daysInMonth(year-1,month)),[prevEntries,year,month]);
+  const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay),[daily,teamGoals,totalDays,closedDay]);
+  const chartData = daily.map((d,i)=>({
+    day:d.day, atual:d.day<=closedDay?d.cumul:null,
+    anterior:prevDaily[i]?.cumul??null,
+    objetivo:stats.goal>0?Math.round(stats.goal/totalDays*d.day):null,
   }));
-
-  const barData = daily.filter(d => d.day <= closedDay && d.dayValue > 0).map(d => ({
-    day: d.day, value: d.dayValue, ss: d.supersales,
-  }));
-
-  const mktData = MARKETS.map(m => {
-    const last = daily[closedDay - 1];
-    return { label: m.label, value: last ? (m.id === "FR" ? last.FR : last.CH) : 0, color: MARKET_COLORS[m.id] };
-  });
-  const mktTotal = mktData.reduce((s, m) => s + m.value, 0);
+  const barData = daily.filter(d=>d.day<=closedDay&&d.dayValue>0).map(d=>({day:d.day,value:d.dayValue,ss:d.supersales}));
+  const mktData = MARKETS.map(m=>{ const l=daily[closedDay-1]; return {label:m.label,value:l?(m.id==="FR"?l.FR:l.CH):0,color:MARKET_COLORS[m.id]}; });
+  const mktTotal = mktData.reduce((s,m)=>s+m.value,0);
+  const pctMonth = Math.round(closedDay/totalDays*100);
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {showModal && <DailyModal daily={daily} closedDay={closedDay} onClose={() => setShowModal(false)} />}
+      {showModal && <DailyModal daily={daily} closedDay={closedDay} onClose={()=>setShowModal(false)} />}
 
-      {/* KPI row 1 */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
-        <StatCard label="Faturado" value={fmtEur(stats.actual)}
-          sub={evoPct != null ? `${evoPct >= 0 ? "+" : ""}${evoPct.toFixed(1)}% vs ${year - 1}` : undefined}
-          subColor={evoPct == null ? undefined : evoPct >= 0 ? "#1D9E75" : "var(--color-text-danger)"}
-          onClick={() => setShowModal(true)} highlight />
-        <StatCard label={`Esperado ao dia ${closedDay}`}
-          value={stats.expected ? fmtEur(stats.expected) : "—"}
-          sub={`${closedDay} de ${totalDays} dias · ${Math.round(closedDay / totalDays * 100)}% do mês`} />
-        <StatCard label={stats.vsExpected != null && stats.vsExpected >= 0 ? "Acima do esperado" : "Abaixo do esperado"}
-          value={stats.vsExpected != null ? fmtEur(Math.abs(stats.vsExpected)) : "—"}
-          sub={vsExpPct != null ? `${vsExpPct >= 0 ? "+" : ""}${vsExpPct.toFixed(1)}% vs linha esperada` : undefined}
-          subColor={stats.vsExpected == null ? undefined : stats.vsExpected >= 0 ? "#1D9E75" : "var(--color-text-danger)"} />
-      </div>
-
-      {/* KPI row 2 */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
-        <StatCard label="Objetivo" value={stats.goal > 0 ? fmtEur(stats.goal) : "Sem objetivo"}
-          sub={stats.goal > 0 ? `${Math.round(stats.actual / stats.goal * 100)}% realizado` : undefined}
-          subColor={stats.goal > 0 && stats.actual < stats.goal ? "var(--color-text-danger)" : "#1D9E75"} />
-        <StatCard label="Média / dia" value={stats.dailyAvg > 0 ? fmtEur(stats.dailyAvg) : "—"}
-          sub={stats.neededPerDay ? `precisa ${fmtEur(stats.neededPerDay)}` : undefined}
-          subColor={stats.neededPerDay && stats.neededPerDay > stats.dailyAvg ? "var(--color-text-danger)" : "#1D9E75"} />
-        <StatCard label="Projeção sem SS"
-          value={stats.projNoSS ? fmtEur(stats.projNoSS) : "—"}
-          sub={stats.projNoSS && stats.goal > 0 ? (stats.projNoSS >= stats.goal ? "acima do objetivo" : "abaixo do objetivo") : `média ${stats.avgNormal > 0 ? fmtEur(stats.avgNormal) : "—"}/dia`}
-          subColor={stats.projNoSS >= stats.goal ? "#1D9E75" : "var(--color-text-danger)"} />
-        <StatCard label="Projeção com SS"
-          value={stats.projWithSS ? fmtEur(stats.projWithSS) : "—"}
-          sub={stats.projWithSS && stats.goal > 0 ? (stats.projWithSS >= stats.goal ? "acima do objetivo" : "abaixo do objetivo") : `SS médio ${stats.avgSS > 0 ? fmtEur(stats.avgSS) : "sem dados"}`}
-          subColor={stats.projWithSS >= stats.goal ? "#1D9E75" : "var(--color-text-danger)"} />
+        <StatCard label="Faturado" value={fmtEur(stats.actual)} sub={`${closedDay} de ${totalDays} dias · ${pctMonth}% do mês`} onClick={()=>setShowModal(true)} highlight />
+        <StatCard label="Objetivo" value={stats.goal>0?fmtEur(stats.goal):"Sem objetivo"}
+          sub={stats.goal>0?`${Math.round(stats.actual/stats.goal*100)}% realizado`:undefined}
+          subColor={stats.goal>0&&stats.actual<stats.goal?C.red:C.green} />
+        <StatCard label={`Esperado ao dia ${closedDay}`} value={stats.expected?fmtEur(stats.expected):"—"} sub="linha linear do objetivo" />
+        <StatCard label={stats.vsExpected!=null&&stats.vsExpected>=0?"Acima do esperado":"Abaixo do esperado"}
+          value={stats.vsExpected!=null?fmtEur(Math.abs(stats.vsExpected)):"—"}
+          sub={stats.vsExpPct!=null?`${stats.vsExpPct>=0?"+":""}${stats.vsExpPct.toFixed(1)}% vs esperado`:undefined}
+          subColor={stats.vsExpected==null?undefined:stats.vsExpected>=0?C.green:C.red} />
       </div>
 
-      {/* Charts */}
-      <div style={card}>
-        <SectionTitle>Evolução acumulada vs objetivo</SectionTitle>
-        <div style={{ display:"flex", gap:16, fontSize:12, color:"var(--color-text-secondary)", marginBottom:12 }}>
-          {[{c:"#1D9E75",l:String(year)},{c:"#B4B2A9",l:String(year-1),dash:true},{c:"#9333ea",l:"Objetivo",dash:true}].map(({c,l,dash}) => (
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
+        <StatCard label="Média / dia" value={stats.dailyAvg>0?fmtEur(stats.dailyAvg):"—"}
+          sub={stats.neededPerDay?`precisa ${fmtEur(stats.neededPerDay)}/dia`:undefined}
+          subColor={stats.neededPerDay&&stats.neededPerDay>stats.dailyAvg?C.red:C.green} small />
+        <StatCard label="Projeção sem Supersales" value={stats.projNoSS?fmtEur(stats.projNoSS):"—"}
+          sub={stats.projNoSS&&stats.goal>0?(stats.projNoSS>=stats.goal?"↑ acima do objetivo":"↓ abaixo do objetivo"):`média ${stats.avgNormal>0?fmtEur(stats.avgNormal):"—"}/dia`}
+          subColor={stats.projNoSS>=stats.goal?C.green:C.red} small />
+        <StatCard label="Projeção com Supersales" value={stats.projWithSS?fmtEur(stats.projWithSS):"—"}
+          sub={stats.projWithSS&&stats.goal>0?(stats.projWithSS>=stats.goal?"↑ acima do objetivo":"↓ abaixo do objetivo"):`SS médio ${stats.avgSS>0?fmtEur(stats.avgSS):"sem dados"}`}
+          subColor={stats.projWithSS>=stats.goal?C.green:C.red} small />
+      </div>
+
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Evolução acumulada vs objetivo</p>
+        <div style={{ display:"flex", gap:16, fontSize:12, color:C.muted, marginBottom:12 }}>
+          {[{c:C.green,l:String(year)},{c:"#B4B2A9",l:String(year-1)},{c:"#9333ea",l:"Objetivo"}].map(({c,l})=>(
             <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
-              <span style={{ width:16, height:2, background:c, display:"inline-block", borderRadius:1, borderTop: dash ? `2px dashed ${c}` : "none" }}></span>{l}
+              <span style={{ width:16, height:2, background:c, display:"inline-block", borderRadius:1 }}></span>{l}
             </span>
           ))}
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top:4, right:8, left:8, bottom:0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#888" }} axisLine={false} tickLine={false} interval={4} />
-            <YAxis tickFormatter={v => v >= 1000 ? Math.round(v/1000)+"k" : v} tick={{ fontSize:10, fill:"#888" }} axisLine={false} tickLine={false} width={40} />
-            <Tooltip formatter={(v,n) => [fmtEur(v), n==="atual" ? year : n==="anterior" ? year-1 : "Objetivo"]} labelFormatter={l => `Dia ${l}`} contentStyle={{ borderRadius:8, border:"0.5px solid var(--color-border-tertiary)", fontSize:12 }} />
-            {closedDay > 0 && closedDay < totalDays && <ReferenceLine x={closedDay} stroke="#ccc" strokeDasharray="3 3" />}
-            <Line type="monotone" dataKey="atual" stroke="#1D9E75" strokeWidth={2} dot={false} connectNulls />
+            <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={4} />
+            <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":v} tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={40} />
+            <Tooltip formatter={(v,n)=>[fmtEur(v),n==="atual"?year:n==="anterior"?year-1:"Objetivo"]} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:12, background:C.bg }} />
+            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" />}
+            <Line type="monotone" dataKey="atual" stroke={C.green} strokeWidth={2} dot={false} connectNulls />
             <Line type="monotone" dataKey="anterior" stroke="#B4B2A9" strokeWidth={1.5} dot={false} strokeDasharray="4 3" connectNulls />
-            {stats.goal > 0 && <Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
+            {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-        <div style={card}>
-          <SectionTitle>Faturação diária</SectionTitle>
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Faturação diária</p>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={barData} margin={{ top:4, right:4, left:0, bottom:0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize:9, fill:"#888" }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => Math.round(v/1000)+"k"} tick={{ fontSize:9, fill:"#888" }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip formatter={v => fmtEur(v)} labelFormatter={l => `Dia ${l}`} contentStyle={{ borderRadius:8, border:"0.5px solid var(--color-border-tertiary)", fontSize:11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={v=>Math.round(v/1000)+"k"} tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip formatter={v=>fmtEur(v)} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:11, background:C.bg }} />
               <Bar dataKey="value" radius={[3,3,0,0]} maxBarSize={18}>
-                {barData.map((d,i) => <Cell key={i} fill={d.ss ? "#d97706" : "#1D9E75"} />)}
+                {barData.map((d,i)=><Cell key={i} fill={d.ss?"#d97706":C.green} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {barData.some(d => d.ss) && (
-            <div style={{ display:"flex", gap:12, marginTop:8, fontSize:11, color:"var(--color-text-secondary)" }}>
-              <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:"#1D9E75", display:"inline-block" }}></span>Normal</span>
+          {barData.some(d=>d.ss)&&(
+            <div style={{ display:"flex", gap:12, marginTop:8, fontSize:11, color:C.muted }}>
+              <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:C.green, display:"inline-block" }}></span>Normal</span>
               <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:"#d97706", display:"inline-block" }}></span>Supersales</span>
             </div>
           )}
         </div>
-
-        <div style={card}>
-          <SectionTitle>Por mercado</SectionTitle>
-          {mktData.map(m => (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Por mercado</p>
+          {mktData.map(m=>(
             <div key={m.label} style={{ marginBottom:12 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                <span style={{ fontSize:13, color:"var(--color-text-primary)" }}>{m.label}</span>
-                <span style={{ fontSize:13, fontWeight:500, color:"var(--color-text-primary)" }}>{fmtEur(m.value)}{mktTotal > 0 ? ` · ${Math.round(m.value/mktTotal*100)}%` : ""}</span>
+                <span style={{ fontSize:13, color:C.text }}>{m.label}</span>
+                <span style={{ fontSize:13, fontWeight:500, color:C.text }}>{fmtEur(m.value)}{mktTotal>0?` · ${Math.round(m.value/mktTotal*100)}%`:""}</span>
               </div>
-              <div style={{ height:6, background:"var(--color-background-secondary)", borderRadius:3, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${mktTotal > 0 ? Math.round(m.value/mktTotal*100) : 0}%`, background:m.color, borderRadius:3 }} />
+              <div style={{ height:6, background:"#E8E6E0", borderRadius:3, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:`${mktTotal>0?Math.round(m.value/mktTotal*100):0}%`, background:m.color, borderRadius:3 }} />
               </div>
             </div>
           ))}
-          <div style={{ marginTop:12, paddingTop:10, borderTop:"0.5px solid var(--color-border-tertiary)", display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:12, color:"var(--color-text-secondary)" }}>Dias fechados</span>
-            <span style={{ fontSize:13, fontWeight:500 }}>{closedDay} / {totalDays}</span>
+          <div style={{ marginTop:12, paddingTop:10, borderTop:`0.5px solid ${C.border}`, display:"flex", justifyContent:"space-between" }}>
+            <span style={{ fontSize:12, color:C.muted }}>Dias fechados</span>
+            <span style={{ fontSize:13, fontWeight:500, color:C.text }}>{closedDay} / {totalDays}</span>
           </div>
         </div>
       </div>
@@ -287,63 +243,48 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   );
 }
 
-// ── Main App ───────────────────────────────────────────────────────────────────
 function MainApp() {
   const [tab, setTab] = useState("analise");
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
   const [monthData, setMonthData] = useState({ entries:{}, team_goals:{} });
   const [loading, setLoading] = useState(true);
-
   const [year, mIdx] = selMonth.split("-").map(Number);
-  const month = mIdx - 1;
+  const month = mIdx-1;
   const totalDays = daysInMonth(year, month);
-  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
-  const isPast = new Date(year, month+1, 0) < new Date(today.getFullYear(), today.getMonth(), 1);
-  const closedDay = isPast ? totalDays : isCurrentMonth ? Math.max(0, today.getDate()-1) : 0;
-
-  useEffect(() => {
-    setLoading(true);
-    loadMonthData(year, month).then(d => { setMonthData(d); setLoading(false); });
-  }, [year, month]);
-
-  const monthOptions = Array.from({length:12}, (_,i) => {
-    const d = new Date(today.getFullYear(), today.getMonth()-i, 1);
-    return { value: monthKey(d.getFullYear(), d.getMonth()), label: `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` };
-  });
-
+  const isCurrentMonth = year===today.getFullYear()&&month===today.getMonth();
+  const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
+  const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
+  useEffect(()=>{ setLoading(true); loadMonthData(year,month).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month]);
+  const monthOptions = Array.from({length:12},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
   return (
-    <div style={{ minHeight:"100vh", background:"var(--color-background-tertiary)" }}>
+    <div style={{ minHeight:"100vh", background:C.bg }}>
       <div style={{ maxWidth:920, margin:"0 auto", padding:"1.25rem 1rem" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem" }}>
           <div>
-            <p style={{ fontSize:20, fontWeight:500, margin:0, color:"var(--color-text-primary)" }}>Faturação da Equipa</p>
-            <p style={{ fontSize:13, color:"var(--color-text-secondary)", margin:"3px 0 0" }}>Equipa FR · França + CH-BNL-DEAT</p>
+            <p style={{ fontSize:20, fontWeight:500, margin:0, color:C.text }}>Faturação da Equipa</p>
+            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · França + CH-BNL-DEAT</p>
           </div>
-          <select value={selMonth} onChange={e => setSelMonth(e.target.value)}
-            style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:"0.5px solid var(--color-border-tertiary)", background:"var(--color-background-primary)", color:"var(--color-text-primary)" }}>
-            {monthOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
+            style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
+            {monthOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-
-        <div style={{ display:"flex", gap:0, borderBottom:"0.5px solid var(--color-border-tertiary)", marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Análise"},{id:"registo",l:"Registo"},{id:"parceiros",l:"Parceiros"}].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ padding:"9px 20px", borderRadius:0, border:"none", borderBottom: tab===t.id ? "2px solid #1D9E75" : "2px solid transparent",
-                background:"transparent", color: tab===t.id ? "#1D9E75" : "var(--color-text-secondary)",
-                fontWeight: tab===t.id ? 500 : 400, fontSize:14, cursor:"pointer" }}>
+        <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
+          {[{id:"analise",l:"Análise"},{id:"registo",l:"Registo"},{id:"parceiros",l:"Parceiros"}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
+                background:"transparent", color:tab===t.id?C.green:C.muted, fontWeight:tab===t.id?500:400, fontSize:14, cursor:"pointer" }}>
               {t.l}
             </button>
           ))}
         </div>
-
         {loading ? (
-          <div style={{ textAlign:"center", padding:"4rem 0", color:"var(--color-text-secondary)", fontSize:14 }}>A carregar…</div>
-        ) : tab === "analise" ? (
-          <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay}
-            entries={monthData.entries || {}} teamGoals={monthData.team_goals || {}} />
+          <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
+        ) : tab==="analise" ? (
+          <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ) : (
-          <div style={{ textAlign:"center", padding:"4rem 0", color:"var(--color-text-secondary)", fontSize:14 }}>
-            {tab === "registo" ? "Separador Registo — em breve" : "Separador Parceiros — em breve"}
+          <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
+            {tab==="registo"?"Separador Registo — em breve":"Separador Parceiros — em breve"}
           </div>
         )}
       </div>
@@ -352,7 +293,7 @@ function MainApp() {
 }
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(() => { try { return localStorage.getItem(GATE_KEY)==="1"; } catch { return false; } });
-  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  const [unlocked, setUnlocked] = useState(()=>{ try { return localStorage.getItem(GATE_KEY)==="1"; } catch { return false; } });
+  if (!unlocked) return <PasswordGate onUnlock={()=>setUnlocked(true)} />;
   return <MainApp />;
 }
