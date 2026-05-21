@@ -193,8 +193,22 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
     objetivo:stats.goal>0?Math.round(stats.goal/totalDays*d.day):null,
   }));
   const barData = daily.filter(d=>d.day<=closedDay&&d.dayValue>0).map(d=>({day:d.day,value:d.dayValue,ss:d.supersales}));
-  const mktData = MARKETS.map(m=>{ const l=daily[closedDay-1]; return {label:m.label,value:l?(m.id==="FR"?l.FR:l.CH):0,color:MARKET_COLORS[m.id]}; });
-  const mktTotal = mktData.reduce((s,m)=>s+m.value,0);
+
+  // Weekday averages from closed non-SS days
+  const wdTotals = Array.from({length:7},()=>({sum:0,count:0}));
+  daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.dayValue>0).forEach(d=>{
+    const wd = new Date(year, month, d.day).getDay();
+    wdTotals[wd].sum += d.dayValue;
+    wdTotals[wd].count++;
+  });
+  const globalAvg = closedDay>0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.dayValue>0).reduce((s,d)=>s+d.dayValue,0)/Math.max(closedDay,1)) : 0;
+  const wdAvgs = wdTotals.map(w=>w.count>0?Math.round(w.sum/w.count):globalAvg);
+
+  // All days bar data (including future days with wdAvg only)
+  const allDaysBar = daily.map(d=>{
+    const wd = new Date(year, month, d.day).getDay();
+    return { day:d.day, value:d.day<=closedDay?d.dayValue:0, ss:d.supersales, wdAvg:wdAvgs[wd]||globalAvg };
+  });
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
@@ -271,44 +285,41 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
       </div>
 
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"1rem" }}>
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Faturação diária</p>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={barData} margin={{ top:4, right:4, left:0, bottom:0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v=>Math.round(v/1000)+"k"} tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip formatter={v=>fmtEur(v)} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:11, background:C.bg }} />
-              <Bar dataKey="value" radius={[3,3,0,0]} maxBarSize={18}>
-                {barData.map((d,i)=><Cell key={i} fill={d.ss?"#d97706":C.green} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          {barData.some(d=>d.ss)&&(
-            <div style={{ display:"flex", gap:12, marginTop:8, fontSize:11, color:C.muted }}>
-              <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:C.green, display:"inline-block" }}></span>Normal</span>
-              <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:"#d97706", display:"inline-block" }}></span>Supersales</span>
-            </div>
-          )}
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Faturação diária vs. média por dia da semana</p>
+        <div style={{ display:"flex", gap:16, fontSize:11, color:C.muted, marginBottom:12 }}>
+          <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:C.green, display:"inline-block" }}></span>Acima da média</span>
+          <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:C.red, display:"inline-block" }}></span>Abaixo da média</span>
+          <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:8, height:8, borderRadius:2, background:"#d97706", display:"inline-block" }}></span>Supersales</span>
+          <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#9333ea", display:"inline-block", borderRadius:1 }}></span>Média esperada</span>
         </div>
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Por mercado</p>
-          {mktData.map(m=>(
-            <div key={m.label} style={{ marginBottom:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                <span style={{ fontSize:13, color:C.text }}>{m.label}</span>
-                <span style={{ fontSize:13, fontWeight:500, color:C.text }}>{fmtEur(m.value)}{mktTotal>0?` · ${Math.round(m.value/mktTotal*100)}%`:""}</span>
-              </div>
-              <div style={{ height:6, background:"#E8E6E0", borderRadius:3, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${mktTotal>0?Math.round(m.value/mktTotal*100):0}%`, background:m.color, borderRadius:3 }} />
-              </div>
-            </div>
-          ))}
-          <div style={{ marginTop:12, paddingTop:10, borderTop:`0.5px solid ${C.border}`, display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:12, color:C.muted }}>Dias fechados</span>
-            <span style={{ fontSize:13, fontWeight:500, color:C.text }}>{closedDay} / {totalDays}</span>
-          </div>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={allDaysBar} margin={{ top:4, right:8, left:0, bottom:0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
+            <XAxis dataKey="day" tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={2} />
+            <YAxis tickFormatter={v=>Math.round(v/1000)+"k"} tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={28} />
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (!active||!payload?.length) return null;
+                const d = payload[0]?.payload;
+                return (
+                  <div style={{ background:C.bg, border:`0.5px solid ${C.border}`, borderRadius:8, padding:"8px 12px", fontSize:12 }}>
+                    <p style={{ margin:"0 0 4px", fontWeight:500, color:C.text }}>Dia {label}</p>
+                    {d.value>0&&<p style={{ margin:"0 0 2px", color:C.text }}>Faturado: {fmtEur(d.value)}</p>}
+                    <p style={{ margin:0, color:C.muted }}>Média esperada: {fmtEur(d.wdAvg)}</p>
+                  </div>
+                );
+              }}
+            />
+            <Bar dataKey="value" radius={[3,3,0,0]} maxBarSize={16}>
+              {allDaysBar.map((d,i)=><Cell key={i} fill={d.value===0?"transparent":d.ss?"#d97706":d.value>=d.wdAvg?C.green:C.red} />)}
+            </Bar>
+            <Line type="stepAfter" dataKey="wdAvg" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="4 3" />
+          </BarChart>
+        </ResponsiveContainer>
+        <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", fontSize:12, color:C.muted }}>
+          <span>Dias fechados: {closedDay} / {totalDays}</span>
+          {barData.some(d=>d.ss)&&<span>⚡ dias com Supersales</span>}
         </div>
       </div>
     </div>
