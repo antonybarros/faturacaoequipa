@@ -247,21 +247,6 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           subColor={stats.projWithSS>=stats.goal?C.green:C.red} small />
       </div>
 
-      {/* Row 4 — parceiros + primeiras compras */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
-        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
-          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
-          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
-          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
-        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
-          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
-          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
-        <StatCard label="Faturação primeiras compras"
-          value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
-          sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
-          subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
-      </div>
-
       {/* Chart */}
       <div style={T.card}>
         <p style={T.sectionTitle}>Evolução acumulada vs objetivo</p>
@@ -321,6 +306,21 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           <span>Dias fechados: {closedDay} / {totalDays}</span>
           {barData.some(d=>d.ss)&&<span>⚡ dias com Supersales</span>}
         </div>
+      </div>
+
+      {/* Row 5 — parceiros + primeiras compras */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
+        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
+          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
+          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
+          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
+        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
+          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
+          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
+        <StatCard label="Faturação primeiras compras"
+          value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
+          sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
+          subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
       </div>
     </div>
   );
