@@ -43,7 +43,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
+  teamGoals: { equipa_fr: 0, FR: 0, "CH-BNL-DEAT": 0 },
   entries: {},
 });
 
@@ -119,7 +119,7 @@ function MainApp() {
       } else if (row) {
         setData({
           totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0 },
+          teamGoals: row.team_goals || { equipa_fr: 0, FR: 0, "CH-BNL-DEAT": 0 },
           entries: row.entries || {},
         });
       } else {
@@ -191,7 +191,7 @@ function MainApp() {
     save((prev) => {
       const each = Math.round((Number(prev.totalGoal) || 0) / (ANALISE_TEAMS.length - 1)); // excl. total
       const goals = {};
-      ANALISE_TEAMS.filter(t => t.id !== "total").forEach(t => { goals[t.id] = each; });
+      ANALISE_TEAMS.forEach(t => { goals[t.id] = each; });
       return { ...prev, teamGoals: goals };
     });
 
