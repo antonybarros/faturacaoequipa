@@ -9,22 +9,36 @@ import {
 } from "lucide-react";
 import { supabase, ADMIN_EMAIL } from "./supabase.js";
 
-const TEAMS = ["FR", "CH-BNL-DEAT"];
+const TEAMS = ["PT", "IT", "ES", "FR", "CH-BNL-DEAT", "CZ-SK-GR-CY-PL", "USA", "OT"];
 const SCOPES = [
   { id: "total", label: "Total" },
+  { id: "PT", label: "Portugal" },
+  { id: "IT", label: "Itália" },
+  { id: "ES", label: "Espanha" },
   { id: "FR", label: "França" },
   { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
+  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
+  { id: "USA", label: "USA" },
+  { id: "OT", label: "Outros" },
 ];
 // Equipas para "Análise comercial" — cada equipa agrega vários mercados
 const ANALISE_TEAMS = [
-  { id: "equipa_fr", label: "Equipa FR", markets: ["FR","CH-BNL-DEAT"] },
+  { id: "total",      label: "Total",      markets: ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"] },
+  { id: "equipa_pt",  label: "Equipa PT",  markets: ["PT","OT"] },
+  { id: "equipa_it",  label: "Equipa IT",  markets: ["IT"] },
+  { id: "equipa_es",  label: "Equipa ES",  markets: ["ES"] },
+  { id: "equipa_fr",  label: "Equipa FR",  markets: ["FR","CH-BNL-DEAT"] },
+  { id: "equipa_na",  label: "Equipa NA",  markets: ["CZ-SK-GR-CY-PL","USA"] },
 ];
 const ANALISE_COLORS = {
-  equipa_fr: "#9333ea",
+  total: "#0f172a", equipa_pt: "#16a34a", equipa_it: "#2563eb",
+  equipa_es: "#dc2626", equipa_fr: "#9333ea", equipa_na: "#0891b2",
 };
 
 const TEAM_COLORS = {
-  FR: "#9333ea", "CH-BNL-DEAT": "#d97706", total: "#0f172a",
+  PT: "#16a34a", IT: "#2563eb", ES: "#dc2626",
+  FR: "#9333ea", "CH-BNL-DEAT": "#d97706",
+  "CZ-SK-GR-CY-PL": "#0891b2", USA: "#7c3aed", OT: "#64748b", total: "#0f172a",
 };
 
 const monthKey = (d) =>
@@ -43,7 +57,7 @@ const MONTH_NAMES = [
 
 const emptyMonth = () => ({
   totalGoal: 0,
-  teamGoals: { equipa_fr: 0, FR: 0, "CH-BNL-DEAT": 0 },
+  teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
   entries: {},
 });
 
@@ -51,17 +65,18 @@ function MainApp() {
   const today = new Date();
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(monthKey(today));
   const [data, setData] = useState(emptyMonth());
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("analise");
-  const [analiseScope, setAnaliseScope] = useState("equipa_fr");
+  const [analiseScope, setAnaliseScope] = useState("total");
   const [scope, setScope] = useState("total");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
 
-  const isAdmin = true;
+  const isAdmin = !!session;
 
   const [year, monthNum] = selectedMonth.split("-").map(Number);
   const month = monthNum - 1;
@@ -79,11 +94,19 @@ function MainApp() {
 
   // --- Auth: listen to session changes ---
   useEffect(() => {
-    setAuthReady(true);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
+      setSession(s)
+    );
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   // If user loses admin status, force back to a public tab
   useEffect(() => {
+    if (!isAdmin && !["analise","dashboard","history"].includes(tab)) setTab("analise");
   }, [isAdmin, tab]);
 
   // --- Load annual goal when year changes ---
@@ -119,7 +142,7 @@ function MainApp() {
       } else if (row) {
         setData({
           totalGoal: Number(row.total_goal) || 0,
-          teamGoals: row.team_goals || { equipa_fr: 0, FR: 0, "CH-BNL-DEAT": 0 },
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0 },
           entries: row.entries || {},
         });
       } else {
@@ -189,9 +212,9 @@ function MainApp() {
   };
   const distributeEqually = () =>
     save((prev) => {
-      const each = Math.round((Number(prev.totalGoal) || 0) / Math.max(ANALISE_TEAMS.length, 1));
+      const each = Math.round((Number(prev.totalGoal) || 0) / (ANALISE_TEAMS.length - 1)); // excl. total
       const goals = {};
-      ANALISE_TEAMS.forEach(t => { goals[t.id] = each; });
+      ANALISE_TEAMS.filter(t => t.id !== "total").forEach(t => { goals[t.id] = each; });
       return { ...prev, teamGoals: goals };
     });
 
@@ -221,19 +244,23 @@ function MainApp() {
     return opts;
   }, []);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   const availableTabs = isAdmin
     ? [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
-        { id: "entry", label: "Registo" },
+        { id: "relatorio", label: "Relatório" },
+        { id: "history", label: "Histórico" },
+        { id: "entry", label: "Registo Diário" },
         { id: "setup", label: "Objetivos" },
-        { id: "followup", label: "Parceiros" },
       ]
     : [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
-        { id: "followup", label: "Parceiros" },
+        { id: "history", label: "Histórico" },
       ];
 
   return (
@@ -272,7 +299,21 @@ function MainApp() {
                   </option>
                 ))}
               </select>
-
+              {isAdmin ? (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                >
+                  <LogOut className="w-3 h-3" /> Sair
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="flex items-center gap-1 text-xs font-medium px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Lock className="w-3 h-3" /> Entrar
+                </button>
+              )}
             </div>
           </div>
 
@@ -328,8 +369,11 @@ function MainApp() {
                 isCurrentMonth={isCurrentMonth}
               />
             )}
+            {tab === "history" && <History annualGoal={annualGoal} currentYear={year} />}
 
-
+            {tab === "relatorio" && isAdmin && (
+              <Relatorio monthNum={month} year={year} />
+            )}
             {tab === "entry" && isAdmin && (
               <EntryHub
                 data={data}
@@ -343,19 +387,21 @@ function MainApp() {
               />
             )}
 
-            {tab === "followup" && <PartnerFollowup />}
             {tab === "setup" && isAdmin && (
               <Setup
                 data={data}
                 setTotalGoal={setTotalGoal}
                 setTeamGoal={setTeamGoal}
                 distributeEqually={distributeEqually}
+                annualGoal={annualGoal}
+                saveAnnualGoal={saveAnnualGoal}
                 year={year}
               />
             )}
           </>
         )}
 
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
 
         <footer className="mt-12 text-center text-xs text-slate-400">
           Faturação da Equipa · {isAdmin ? "Modo administrador" : "Modo consulta"}
@@ -366,6 +412,69 @@ function MainApp() {
 }
 
 // ---- Login Modal ----
+function LoginModal({ onClose }) {
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: ADMIN_EMAIL,
+      password,
+    });
+    setLoading(false);
+    if (error) {
+      setErr("Password incorreta");
+    } else {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+        <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <Lock className="w-4 h-4" /> Acesso de administrador
+        </h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Introduz a password partilhada para registar dados.
+        </p>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+          {err && <div className="text-xs text-red-600">{err}</div>}
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "A entrar…" : "Entrar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---- Stats ----
 function computeScopeStats(data, scope, totalDays, closedDay, year, month) {
   const goal =
     scope === "total"
@@ -645,7 +754,7 @@ function AnaliseDashboardWrapper({
       <AnaliseScopeTabs scope={scope} setScope={setScope} />
       <Dashboard
         stats={stats}
-        scope={teamDef.id}
+        scope={teamDef.label}
         month={month}
         year={year}
         totalDays={totalDays}
@@ -660,10 +769,31 @@ function AnaliseDashboardWrapper({
 function DashboardWrapper({
   data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
 }) {
-  // Resumo uses same data as Análise comercial (billing_months/YYYY-MM)
+  // From January 2025 onwards, use Registo Revenda (daily values) as data source
+  const useRevendaReg = year >= 2025;
+  const revendaKey = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
+
+  const [revendaEntries, setRevendaEntries] = useState(null);
+  useEffect(() => {
+    if (!useRevendaReg) { setRevendaEntries(null); return; }
+    supabase.from("billing_months").select("entries").eq("month_key", revendaKey).maybeSingle()
+      .then(({ data: row }) => {
+        setRevendaEntries(row?.entries || {});
+      });
+  }, [revendaKey, useRevendaReg]);
+
+  // Build effective data: if using Registo Revenda, convert daily→cumulative
+  const effectiveData = useMemo(() => {
+    if (!useRevendaReg || revendaEntries === null) return data;
+    return {
+      ...data,
+      entries: dailyToCumulative(revendaEntries, TEAMS),
+    };
+  }, [data, useRevendaReg, revendaEntries]);
+
   const stats = useMemo(
-    () => computeScopeStats(data, scope, totalDays, closedDay, year, monthNum),
-    [data, scope, totalDays, closedDay, year, monthNum]
+    () => computeScopeStats(effectiveData, scope, totalDays, closedDay, year, monthNum),
+    [effectiveData, scope, totalDays, closedDay, year, monthNum]
   );
 
   // Load prev year data + closing data (margem, encomendas)
@@ -673,11 +803,20 @@ function DashboardWrapper({
 
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
-    // Prev year billing — same source as current year (billing_months)
-    supabase.from("billing_months").select("entries").eq("month_key", prevKey).maybeSingle()
+    // Prev year billing — also try revenda-daily for prev year if applicable
+    const prevUseReg = (year - 1) >= 2025;
+    const prevDataKey = prevUseReg
+      ? `revenda-daily-${year - 1}-${String(monthNum + 1).padStart(2, "0")}`
+      : prevKey;
+
+    supabase.from("billing_months").select("entries").eq("month_key", prevDataKey).maybeSingle()
       .then(({ data: row }) => {
         if (!row?.entries) { setPrevYearActual(null); return; }
-        const entries = row.entries;
+        let entries = row.entries;
+        if (prevUseReg) {
+          // Convert daily to cumulative to extract final value
+          entries = dailyToCumulative(entries, TEAMS);
+        }
         const days = Object.keys(entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
         if (!days.length) { setPrevYearActual(null); return; }
         const lastEntry = entries[String(days[days.length - 1])] || {};
@@ -696,7 +835,7 @@ function DashboardWrapper({
     loadClosing(year - 1, monthNum).then(setClosingPrev);
   }, [year, monthNum, scope]);
 
-  // YoY faturação
+  // YoY faturação — use displayActual (may differ from stats.actual when using Registo Revenda)
   const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
@@ -715,9 +854,20 @@ function DashboardWrapper({
     const v = closing.markets?.[marketCode]?.margin_curr;
     return v ? parseFloat(v) : null;
   };
-  // marginPrev comes from closingPrev (prev year's closing) using margin_curr field
+  // margin_prev is stored in closingCurr (the current month's closing record),
+  // not in closingPrev (which is the previous year's closing record).
+  const getMarginPrev = (closing, marketCode) => {
+    if (!closing) return null;
+    if (marketCode === "total") {
+      if (closing.revenda_margin_prev) return parseFloat(closing.revenda_margin_prev);
+      const vals = MC_MARKETS.map(m => parseFloat(closing.markets?.[m.code]?.margin_prev)).filter(v => !isNaN(v) && v > 0);
+      return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) / vals.length : null;
+    }
+    const v = closing.markets?.[marketCode]?.margin_prev;
+    return v ? parseFloat(v) : null;
+  };
   const marginCurr = getMargin(closingCurr, scope);
-  const marginPrev = getMargin(closingPrev, scope); // reads margin_curr from prev year closing
+  const marginPrev = getMarginPrev(closingCurr, scope); // reads margin_prev from current closing record
 
   // Encomendas — aggregate across all markets (total) or specific market
   const sumField = (closing, field) => {
@@ -734,76 +884,66 @@ function DashboardWrapper({
   const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
   const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
   const leadsCurr     = sumField(closingCurr, "leads_curr");
-  const leadsPrev     = sumField(closingPrev, "leads_curr"); // read from prev year closing
-
-  // Origem das leads
-  const getOrigin = (closing, field) => {
-    if (!closing?.markets) return null;
-    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-    const t = markets.reduce((s,m) => s + (Number(closing.markets[m]?.[field])||0), 0);
-    return t > 0 ? t : null;
-  };
-  const originFields = ["leads_bap","leads_ang","leads_outras"];
-  const originCurr = originFields.map(f => getOrigin(closingCurr, f+"_curr"));
-  const originPrev = originFields.map(f => getOrigin(closingPrev, f+"_curr"));
-
-  // Novos parceiros por programa
-  const progFields = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
-  const progCurr = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_curr"));
-  const progPrev = progFields.map(f => getOrigin(closingPrev, "prog_"+f+"_curr"));
-
-  // Novos parceiros por mercado (para card Total)
-  const partnersByMkt = MC_MARKETS.map(m => ({
-    name: m.name, code: m.code,
-    curr: Number(closingCurr?.markets?.[m.code]?.partners_curr) || 0,
-    prev: Number(closingPrev?.markets?.[m.code]?.partners_curr) || 0,
-  })).filter(m => m.curr > 0 || m.prev > 0).sort((a,b) => b.curr - a.curr);
+  const leadsPrev     = sumField(closingPrev, "leads_curr");
   // Afiliação
   const afilCurr = (() => {
     if (!closingCurr) return null;
+    // Try per-market sum first
     if (closingCurr.markets) {
       const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
       const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_result)||0), 0);
       if (t > 0) return t;
     }
+    // Fallback: global afil_result field
     const global = parseFloat(closingCurr.afil_result);
     return global > 0 ? global : null;
   })();
-  // Total afil across ALL markets (for % calculation in individual market cards)
-  const totalAfilResult = (() => {
-    if (!closingCurr?.markets) return 0;
-    const t = MC_MARKETS.reduce((s,m) => s + (parseFloat(closingCurr.markets[m.code]?.afil_result)||0), 0);
-    if (t > 0) return t;
-    return parseFloat(closingCurr.afil_result) || 0;
-  })();
   const afilPrev = (() => {
-    if (!closingPrev) return null;
-    // Read afil_result from prev year closing
-    if (closingPrev.markets) {
+    if (!closingCurr) return null; // prev year stored in current closing as afil_prev
+    // Try per-market afil_prev
+    if (closingCurr.markets) {
       const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-      const t = markets.reduce((s,m) => s + (parseFloat(closingPrev.markets[m]?.afil_result)||0), 0);
+      const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_prev)||0), 0);
       if (t > 0) return t;
     }
-    const global = parseFloat(closingPrev.afil_result);
+    // Fallback: global afil_prev field
+    const global = parseFloat(closingCurr.afil_prev);
     return global > 0 ? global : null;
   })();
 
+  // Fallback: if billing data is empty, try to read total from Registo Revenda closing
+  // This covers months where data was entered via the simple 2025 form
+  const revendaActual = stats.actual > 0 ? stats.actual : (() => {
+    if (!closingCurr) return 0;
+    // Try _total from revenda closing (2025 format stored in closing)
+    const rev = closingCurr?.revenda_total;
+    if (rev) return Number(rev);
+    return 0;
+  })();
 
-
-  if (!stats) return <div className="text-center py-12 text-slate-400">A carregar…</div>;
+  // Use revendaActual instead of stats.actual for YoY comparison display
+  const displayActual = revendaActual || stats.actual;
 
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
 
-<RevDashboard
+      {useRevendaReg && (
+        <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+          <span className="font-semibold">📋 Fonte:</span> Registo Revenda (valores diários)
+          {revendaEntries && Object.keys(revendaEntries).filter(k => !isNaN(Number(k))).length === 0 && (
+            <span className="ml-1 text-orange-600 font-medium">— ainda sem dados registados</span>
+          )}
+        </div>
+      )}
+
+      <RevDashboard
         stats={stats}
         scope={scope}
         month={month}
         year={year}
         totalDays={totalDays}
         closedDay={closedDay}
-        data={data}
         isCurrentMonth={isCurrentMonth}
         prevYearActual={prevYearActual}
         marginCurr={marginCurr}
@@ -818,27 +958,8 @@ function DashboardWrapper({
         leadsPrev={leadsPrev}
         afilCurr={afilCurr}
         afilPrev={afilPrev}
+        effectiveData={effectiveData}
         closingCurr={closingCurr}
-        closingPrev={closingPrev}
-        totalAfilResult={totalAfilResult}
-        originCurr={originCurr}
-        originPrev={originPrev}
-        progCurr={progCurr}
-        progPrev={progPrev}
-        partnersByMkt={partnersByMkt}
-        ordersCurrMkt={(() => {
-          const mkts = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-          const sumC = (field) => mkts.reduce((s,m) => s+(Number(closingCurr?.markets?.[m]?.[field])||0), 0);
-          const sumP = (field) => mkts.reduce((s,m) => s+(Number(closingPrev?.markets?.[m]?.[field])||0), 0);
-          return {
-            orders:       sumC("orders_curr"),
-            first:        sumC("first_orders_curr"),
-            firstRev:     sumC("first_orders_rev_curr"),
-            ordersPrev:   sumP("orders_curr"),
-            firstPrev:    sumP("first_orders_curr"),
-            firstRevPrev: sumP("first_orders_rev_curr"),
-          };
-        })()}
       />
     </div>
   );
@@ -867,7 +988,7 @@ function ScopeTabs({ scope, setScope }) {
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick, verticalDetail = false }) {
+function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick }) {
   const tones = {
     default: "bg-white border-slate-200",
     good: "bg-green-50 border-green-200",
@@ -881,17 +1002,16 @@ function StatCard({ icon: Icon, label, value, sub, tone = "default", onClick, ve
     >
       <div className="flex items-center gap-2 text-slate-600 text-xs font-medium uppercase tracking-wide">
         {Icon && <Icon className="w-4 h-4" />} {label}
-        {onClick && !verticalDetail && <span className="ml-auto text-slate-400 text-[10px] normal-case font-normal">ver detalhe →</span>}
+        {onClick && <span className="ml-auto text-slate-400 text-[10px] normal-case font-normal">ver detalhe →</span>}
       </div>
       <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
       {sub && <div className="mt-1 text-xs text-slate-600">{sub}</div>}
-      {onClick && verticalDetail && <div className="mt-2 text-slate-400 text-[10px] font-normal">ver detalhe →</div>}
     </div>
   );
 }
 
 function Dashboard({
-  stats, scope, month, year, monthNum, totalDays, closedDay, isCurrentMonth, teamStats,
+  stats, scope, month, year, totalDays, closedDay, isCurrentMonth, teamStats,
 }) {
   const {
     goal, dailyAvg, actual, expectedToDate, diff,
@@ -904,7 +1024,7 @@ function Dashboard({
   const scopeLabel = scope === "total" ? "Total" : `Equipa ${scope}`;
   const color = TEAM_COLORS[scope];
   const noClosedDays = closedDay === 0;
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(null); // "faturado" | "pctGoal" | "pctExpected"
 
   return (
     <>
@@ -937,12 +1057,9 @@ function Dashboard({
               icon={Euro}
               label={`Faturado até dia ${closedDay}`}
               value={fmtEur(actual)}
-              sub={scope === "equipa_fr"
-                ? `${Math.round(closedDay / totalDays * 100)}% do mês`
-                : `${closedDay} de ${totalDays} dias`}
+              sub={`${closedDay} de ${totalDays} dias`}
               tone="info"
               onClick={() => setModal("faturado")}
-              verticalDetail={scope === "equipa_fr"}
             />
             <StatCard
               icon={TrendingUp}
@@ -1065,86 +1182,6 @@ function Dashboard({
             superDaysCount={superDaysCount}
             superDaysTotal={superDaysTotal}
           />
-
-          {/* ── Gráfico diário com linha média por dia da semana (só Equipa FR) ── */}
-          {scope === "equipa_fr" && (() => {
-            const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-            // Calculate weekday averages from closed days (excl. supersales)
-            const byWeekday = Array.from({length:7}, (_,i) => ({total:0, count:0}));
-            daily.forEach(d => {
-              if (d.day > closedDay || d.supersales) return;
-              if (!d.value) return;
-              const wd = new Date(year, monthNum, d.day).getDay();
-              byWeekday[wd].total += d.value;
-              byWeekday[wd].count++;
-            });
-            const wdAvg = byWeekday.map(w => w.count > 0 ? Math.round(w.total / w.count) : null);
-            // Fallback: global avg if no data for that weekday
-            const globalAvg = closedDay > 0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.value).reduce((s,d)=>s+d.value,0) / closedDay) : 0;
-
-            // Build chart data for all days of month
-            const chartData = Array.from({length: totalDays}, (_, i) => {
-              const day = i + 1;
-              const wd = new Date(year, monthNum, day).getDay();
-              const actual = daily.find(d => d.day === day);
-              const expectedVal = wdAvg[wd] ?? globalAvg;
-              return {
-                day,
-                label: String(day),
-                actual: actual?.value || null,
-                expected: expectedVal,
-                supersales: actual?.supersales || false,
-                isFuture: day > closedDay,
-              };
-            });
-
-            const maxVal = Math.max(
-              ...chartData.map(d => Math.max(d.actual||0, d.expected||0))
-            );
-
-            return (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-semibold text-slate-900 mb-1">Faturação diária vs. média por dia da semana — Equipa FR</h3>
-                <p className="text-xs text-slate-500 mb-4">Barras = faturação real · Linha = média histórica do dia da semana · tracejado = dias futuros</p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={chartData} margin={{top:10,right:8,left:8,bottom:0}}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                    <XAxis dataKey="label" tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-                    <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={36}/>
-                    <Tooltip
-                      formatter={(v,name) => [fmtEur(v), name==="actual"?"Faturado":"Média esperada"]}
-                      labelFormatter={l=>`Dia ${l}`}
-                      contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}
-                    />
-                    <Bar dataKey="actual" maxBarSize={18} radius={[3,3,0,0]} name="actual">
-                      {chartData.map((d,i) => (
-                        <Cell key={i} fill={
-                          d.actual == null ? "transparent" :
-                          d.supersales ? "#F59E0B" :
-                          d.actual >= d.expected ? "#3A9E8F" : "#ef4444"
-                        }/>
-                      ))}
-                    </Bar>
-                    <Line
-                      type="stepAfter"
-                      dataKey="expected"
-                      stroke="#94a3b8"
-                      strokeWidth={1.5}
-                      dot={false}
-                      strokeDasharray={chartData.map(d=>d.isFuture?"4 4":"0").join(" ")}
-                      name="expected"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="flex items-center gap-5 mt-2 text-xs text-slate-500 flex-wrap">
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-emerald-500"/>Acima da média</span>
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-red-400"/>Abaixo da média</span>
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-400"/>Supersales</span>
-                  <span className="flex items-center gap-1.5"><span className="inline-block w-6 h-0.5 bg-slate-400 border-dashed"/>Média esperada</span>
-                </div>
-              </div>
-            );
-          })()}
 
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <h3 className="font-semibold text-slate-900 mb-4">
@@ -1347,154 +1384,11 @@ function Dashboard({
 }
 
 
-
-
-// ── LeadsMonthlyTable — tabela mensal de leads até ao mês actual ─────────────
-function LeadsMonthlyTable({ scope, year, monthNum }) {
-  const [rows, setRows] = useState(null);
-  const MONTH_LABELS = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
-
-  useEffect(() => {
-    (async () => {
-      const months = Array.from({length: monthNum + 1}, (_, i) => i);
-      const data = await Promise.all(months.map(async mi => {
-        const key25 = `closing-${year-1}-${String(mi+1).padStart(2,"0")}`;
-        const key26 = `closing-${year}-${String(mi+1).padStart(2,"0")}`;
-        const get = async (key) => {
-          const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
-          if (!row?.entries) return null;
-          const mkts = scope === "total" ? MC_MARKETS.map(m=>m.code) : [scope];
-          return mkts.reduce((s,m) => s+(Number(row.entries?.markets?.[m]?.leads_curr)||0), 0) || null;
-        };
-        const [v25, v26] = await Promise.all([get(key25), get(key26)]);
-        return {month: MONTH_LABELS[mi], v25, v26};
-      }));
-      setRows(data);
-    })();
-  }, [scope, year, monthNum]);
-
-  if (!rows || !rows.some(r=>r.v25||r.v26)) return null;
-
-  return (
-    <div className="overflow-x-auto mt-2">
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-        <thead>
-          <tr>
-            <th style={{textAlign:"left",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",minWidth:"80px"}}></th>
-            {rows.map((r,i)=>(
-              <th key={i} style={{textAlign:"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",minWidth:"60px"}}>{r.month}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {[
-            {label:String(year-1), vals:rows.map(r=>r.v25), bold:false},
-            {label:String(year),   vals:rows.map(r=>r.v26), bold:true},
-            {label:"EVOLUÇÃO",     vals:rows.map(r=>r.v25>0&&r.v26>0?((r.v26-r.v25)/r.v25*100):null), isEvo:true},
-          ].map((row,ri)=>(
-            <tr key={ri}>
-              <td style={{padding:"8px",color:"var(--color-text-secondary)",fontWeight:row.bold?"500":"normal",borderBottom:ri<2?"0.5px solid var(--color-border-tertiary)":"none",fontSize:"12px"}}>{row.label}</td>
-              {row.vals.map((v,i)=>{
-                const pos = v!=null&&v>=0;
-                return (
-                  <td key={i} style={{padding:"8px",textAlign:"right",fontWeight:row.bold?"600":"normal",
-                    color:row.isEvo?(v==null?"var(--color-text-secondary)":v>=0?"#0F6E56":"#A32D2D"):(row.bold?"var(--color-text-primary)":"var(--color-text-secondary)"),
-                    borderBottom:ri<2?"0.5px solid var(--color-border-tertiary)":"none"}}>
-                    {v==null?"—":row.isEvo?`${v>=0?"+":""}${v.toFixed(2)}%`:new Intl.NumberFormat("fr-FR").format(Math.round(v))}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── Chart.js helper components for RevDashboard ──────────────────────────────
-// Loaded once from CDN; subsequent renders reuse the global Chart object
-function ChartGrouped({ id, labels, d25, d26 }) {
-  useEffect(() => {
-    const init = () => {
-      const canvas = document.getElementById(id);
-      if (!canvas) return;
-      if (canvas._chartInstance) canvas._chartInstance.destroy();
-      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
-      const textColor = isDark ? "#e5e5e3" : "#444441";
-      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
-      canvas._chartInstance = new window.Chart(canvas, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor:"#B4B2A9", borderRadius:4, borderWidth:0 },
-            { label: String(new Date().getFullYear()),   data: d26, backgroundColor:"#1D9E75", borderRadius:4, borderWidth:0 },
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")}` } } },
-          scales: {
-            x: { grid:{ display:false }, ticks:{ color:textColor, font:{size:12}, autoSkip:false }, border:{ display:false } },
-            y: { grid:{ color:gridColor }, ticks:{ color:textColor, font:{size:11} }, border:{ display:false } }
-          }
-        }
-      });
-    };
-    if (window.Chart) init();
-    else { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"; s.onload=init; document.head.appendChild(s); }
-    return () => { const c=document.getElementById(id); if(c?._chartInstance){c._chartInstance.destroy();c._chartInstance=null;} };
-  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
-  return null;
-}
-
-function ChartOrigin({ id, labels, d25, d26 }) {
-  useEffect(() => {
-    const init = () => {
-      const canvas = document.getElementById(id);
-      if (!canvas) return;
-      if (canvas._chartInstance) canvas._chartInstance.destroy();
-      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
-      const textColor = isDark ? "#e5e5e3" : "#444441";
-      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
-      canvas._chartInstance = new window.Chart(canvas, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
-            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")}` } } },
-          scales: {
-            x: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 }, autoSkip: false }, border: { display: false } },
-            y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
-          }
-        }
-      });
-    };
-    if (window.Chart) init();
-    else {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-      s.onload = init; document.head.appendChild(s);
-    }
-    return () => {
-      const canvas = document.getElementById(id);
-      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
-    };
-  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
-  return null;
-}
-
+// ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  closingCurr, closingPrev, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt, partnersByMkt, monthNum, totalAfilResult = 0 }) {
+  effectiveData, closingCurr }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1506,7 +1400,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
   const noClosedDays = closedDay === 0;
   const scopeLabel = scope === "total" ? "Total" : scope;
   const [modal, setModal] = useState(null);
-  const [dailyOpen, setDailyOpen] = useState(false);
   const [histData, setHistData] = useState([]);
   const [mktHistData, setMktHistData] = useState([]);
   useEffect(() => {
@@ -1516,12 +1409,13 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getTotal = async (y) => {
-            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const converted = dailyToCumulative(row.entries, TEAMS);
+            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = row.entries[String(days[days.length-1])];
+            const last = converted[String(days[days.length-1])];
             return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0) || null;
           };
           const [v25, v26] = await Promise.all([getTotal(year-1), getTotal(year)]);
@@ -1540,12 +1434,13 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getVal = async (y) => {
-            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const converted = dailyToCumulative(row.entries, TEAMS);
+            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = row.entries[String(days[days.length-1])];
+            const last = converted[String(days[days.length-1])];
             return Number(last?.[scope]) || null;
           };
           const [v25, v26] = await Promise.all([getVal(year-1), getVal(year)]);
@@ -1575,7 +1470,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
     val: "text-xl font-bold",
   };
 
-  function BigCard({ name, result, prev, objective, showObjective = true, totalResult = 0, showMargem = true, children }) {
+  function BigCard({ name, result, prev, objective, showObjective = true, totalResult = 0, children }) {
     const evoPct = prev > 0 ? ((result - prev) / prev * 100) : null;
     const evoAbs = prev != null ? result - prev : null;
     const aboveObj = objective > 0 ? result - objective : null;
@@ -1600,7 +1495,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           {showObjective && (
           <div className={DS.kpiBox}>
             <p className={DS.kpiLabel}>OBJETIVO {month.toUpperCase()} {year}</p>
-            <p className="text-2xl font-bold text-slate-900">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
+            <p className="text-2xl font-bold text-emerald-600">{objective > 0 ? fmtE(objective) : <span className="text-slate-400 text-base">Sem objetivo</span>}</p>
             {objective > 0 && prev > 0 && <p className="text-xs text-emerald-700 mt-1">{fmtP((objective-prev)/prev*100,true)} vs {month.toLowerCase()} {year-1}</p>}
           </div>
           )}
@@ -1616,20 +1511,14 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           <div className={`grid grid-cols-4 gap-0 ${DS.divider}`}>
             {[
               {label:`Evolução vs ${year-1}`, val: fmtP(evoPct,true), color: pos?"text-emerald-600":"text-red-600"},
-              {label:"Resultado", val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
+              {label:"Ganho absoluto",         val: evoAbs!=null?`${evoAbs>=0?"+":""}${fmtE(evoAbs)}`:"—", color:"text-slate-900"},
               ...(!showObjective && totalResult > 0 && result > 0 ? [
-                {label:"% do total", val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
+                {label:"% do total",  val: `${(result/totalResult*100).toFixed(1)}%`, color:"text-slate-700"},
               ] : []),
               ...(showObjective ? [
-                {label:"vs objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
-                ...(showMargem ? [{label:"Margem", val: marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—",
-                 color: marginCurr==null?"text-slate-400":marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"}] : []),
-              ] : [
-                ...( showMargem && marginCurr != null ? [
-                  {label:"Margem", val: `${marginCurr.toFixed(2)}%${marginPrev!=null?" ("+(marginCurr-marginPrev>=0?"+":"")+(marginCurr-marginPrev).toFixed(2)+"pp)":""}`,
-                   color: marginPrev==null?"text-slate-700":marginCurr>=marginPrev?"text-emerald-600":"text-red-600"},
-                ] : []),
-              ]),
+                {label:"Acima do objetivo", val: aboveObj!=null?fmtE(aboveObj):"—", color: aboveObj==null?"text-slate-400":aboveObj>=0?"text-emerald-600":"text-red-600"},
+                {label:"% do objetivo",     val: pctObj!=null?fmtP(pctObj):"—",    color: pctObj==null?"text-slate-400":pctObj>=100?"text-emerald-600":"text-red-600"},
+              ] : []),
             ].map((d,i) => (
               <div key={i} className={DS.col}>
                 <p className="text-xs text-slate-500 mb-1">{d.label}</p>
@@ -1719,13 +1608,10 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
   // ── Data for charts ─────────────────────────────────────────────────────────
   const getLastMktVal = (code) => {
-    if (!stats?.daily) return 0;
-    // Use the last cumulative value from stats.daily for this scope
-    // For per-market, read directly from data.entries last day
-    const entries = data?.entries || {};
-    const days = Object.keys(entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    if (!effectiveData?.entries) return 0;
+    const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
     if (!days.length) return 0;
-    return Number(entries[String(days[days.length-1])][code]) || 0;
+    return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
   };
   const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
   const COLORS_AFIL = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
@@ -1747,41 +1633,11 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </div>
 
       {/* ── CARD: REVENDA ── */}
-      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!data?.entries) return 0; const days=Object.keys(data.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=data.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
-        {/* Distribuição por mercado — só no Total */}
-        {scope === "total" && revendaByMkt.length > 0 && (
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!effectiveData?.entries) return 0; const days=Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=effectiveData.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
+        {/* Distribuição por mercado — dentro do card Revenda */}
+        {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
-
-        {/* Histórico dentro do card Revenda */}
-        {scope === "total" && histData.some(r=>r[year-1]||r[year]) && (<>
-          <p className={DS.detailLabel} style={{marginTop:"0.5rem"}}>HISTÓRICO {year-1} VS {year}</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={histData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#B4B2A9" radius={[3,3,0,0]} maxBarSize={30}/>
-              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </>)}
-        {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (<>
-          <p className={DS.detailLabel} style={{marginTop:"0.5rem"}}>HISTÓRICO {year-1} VS {year}</p>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={mktHistData} margin={{top:16,right:8,left:8,bottom:0}} barCategoryGap="25%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)} tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
-              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]} contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
-              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
-              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#B4B2A9" radius={[3,3,0,0]} maxBarSize={30}/>
-              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
-            </BarChart>
-          </ResponsiveContainer>
-        </>)}
         {/* Médias diárias */}
         {closedDay > 0 && (
           <div className={DS.detailBox}>
@@ -1810,7 +1666,7 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </BigCard>
 
       {/* ── CARD: MARGEM ── */}
-      {scope === "total" && (marginCurr || marginPrev) && (
+      {(marginCurr || marginPrev) && (
         <div className={DS.card}>
           <div>
             <h2 className={DS.title}>MARGEM</h2>
@@ -1845,328 +1701,70 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       )}
 
-      {/* ── CARD: ENCOMENDAS — chart + table ── */}
-      {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (() => {
-        const ticketMedio = ordersCurrMkt.orders > 0 && actual > 0 ? actual / ordersCurrMkt.orders : null;
-        const ticketMedioPrev = ordersCurrMkt.ordersPrev > 0 && prevYearActual > 0 ? prevYearActual / ordersCurrMkt.ordersPrev : null;
-        const ticketFirst = ordersCurrMkt.first > 0 && ordersCurrMkt.firstRev > 0 ? ordersCurrMkt.firstRev / ordersCurrMkt.first : null;
-        const ticketFirstPrev = ordersCurrMkt.firstPrev > 0 && ordersCurrMkt.firstRevPrev > 0 ? ordersCurrMkt.firstRevPrev / ordersCurrMkt.firstPrev : null;
-        const encRows = [
-          {label:"Total encomendas",    curr:ordersCurrMkt.orders,   prev:ordersCurrMkt.ordersPrev,   isEur:false},
-          {label:"Ticket médio",        curr:ticketMedio,             prev:ticketMedioPrev,            isEur:true},
-          {label:"1ªs encomendas",      curr:ordersCurrMkt.first,    prev:ordersCurrMkt.firstPrev,    isEur:false},
-          {label:"Fat. 1ªs enc. (€)",   curr:ordersCurrMkt.firstRev, prev:ordersCurrMkt.firstRevPrev, isEur:true},
-          {label:"Ticket médio 1ªs enc.",curr:ticketFirst,            prev:ticketFirstPrev,            isEur:true},
-        ];
-        const encId = `enc-${scope}`;
-        const fmt = (v,isEur) => v>0?(isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>ENCOMENDAS</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
-              </span>
-              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
-                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
-              </span>
-            </div>
-            <div style={{position:"relative",width:"100%",height:"200px"}}>
-              <canvas id={encId} role="img" aria-label={`Encomendas ${year-1} vs ${year}`}></canvas>
-            </div>
-            <ChartGrouped id={encId} labels={encRows.map(r=>r.label)} d25={encRows.map(r=>r.prev||0)} d26={encRows.map(r=>r.curr||0)} />
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1rem",borderTop:"0.5px solid var(--color-border-tertiary)",paddingTop:"0.5rem"}}>
-              <thead><tr>
-                {["Métrica",""+year-1,""+year,"Evolução"].map((h,i)=>(
-                  <th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {encRows.map((row,i)=>{
-                  const evo=row.prev>0&&row.curr>0?((row.curr-row.prev)/row.prev*100):null;
-                  const pos=evo!=null&&evo>=0;
-                  const border=i<encRows.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                  return (
-                    <tr key={i}>
-                      <td style={{padding:"8px",color:"var(--color-text-primary)",borderBottom:border}}>{row.label}</td>
-                      <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{fmt(row.prev,row.isEur)}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{fmt(row.curr,row.isEur)}</td>
-                      <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D",borderBottom:border}}>
-                        {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* ── CARD: ENCOMENDAS ── */}
+      {(ordersCurr || ordersPrev) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>ENCOMENDAS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
           </div>
-        );
-      })()}
-
-      {/* ── CARD: LEADS ── */}
-      {(leadsCurr || leadsPrev || (originCurr && originCurr.some(v=>v!=null))) && (() => {
-        const ORIGIN_LABELS_SHORT = ["Be A Partner","Vindas de angariadores","Outras fontes"];
-        const leadsEvo = leadsCurr&&leadsPrev>0?((leadsCurr-leadsPrev)/leadsPrev*100):null;
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>LEADS</h2><p className={DS.subtitle}>{month} {year}</p></div>
-
-            {/* 3 KPI cards — Total, Be A Partner, Outras fontes */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className={`${DS.kpiBoxHL}`}>
-                <p className={DS.kpiLabel}>TOTAL DE LEADS</p>
-                <p className={DS.kpiValBig}>{leadsCurr!=null?new Intl.NumberFormat("fr-FR").format(Math.round(leadsCurr)):"—"}</p>
-                {leadsEvo!=null&&<p className={`text-sm font-bold mt-1 ${leadsEvo>=0?"text-emerald-700":"text-red-600"}`}>{leadsEvo>=0?"+":""}{leadsEvo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
-              </div>
-              {originCurr && originCurr[0]!=null && (() => {
-                const evo = originPrev[0]>0&&originCurr[0]>0?((originCurr[0]-originPrev[0])/originPrev[0]*100):null;
-                return (
-                  <div className={DS.kpiBox}>
-                    <p className={DS.kpiLabel}>BE A PARTNER</p>
-                    <p className={DS.kpiVal}>{new Intl.NumberFormat("fr-FR").format(Math.round(originCurr[0]))}</p>
-                    {evo!=null&&<p className={`text-sm font-bold mt-1 ${evo>=0?"text-emerald-700":"text-red-600"}`}>{evo>=0?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
+          {[
+            {label:"Total encomendas", prev:ordersPrev, curr:ordersCurr, fmt:v=>v!=null?Math.round(v).toString():"—"},
+            {label:"1ªs encomendas",   prev:firstPrev,  curr:firstCurr,  fmt:v=>v!=null?Math.round(v).toString():"—"},
+            {label:"Fat. 1ªs enc. (€)",prev:firstRevPrev, curr:firstRevCurr, fmt:v=>v!=null?fmtEur(v):"—"},
+          ].map((row,i)=>{
+            const evo=row.prev>0&&row.curr!=null?((row.curr-row.prev)/row.prev*100):null;
+            const pos=evo!=null&&evo>=0;
+            return (
+              <div key={i} className={DS.detailBox}>
+                <p className={DS.detailLabel}>{row.label}</p>
+                <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{row.fmt(row.prev)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{row.fmt(row.curr)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                    <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
+                      {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
+                    </p>
                   </div>
-                );
-              })()}
-              {originCurr && (originCurr[1]!=null||originCurr[2]!=null) && (() => {
-                const outrasTotal = (originCurr[1]||0)+(originCurr[2]||0);
-                const outrasPrev  = (originPrev[1]||0)+(originPrev[2]||0);
-                const evo = outrasPrev>0&&outrasTotal>0?((outrasTotal-outrasPrev)/outrasPrev*100):null;
-                return (
-                  <div className={DS.kpiBox}>
-                    <p className={DS.kpiLabel}>OUTRAS FONTES</p>
-                    <p className={DS.kpiVal}>{new Intl.NumberFormat("fr-FR").format(Math.round(outrasTotal))}</p>
-                    {evo!=null&&<p className={`text-sm font-bold mt-1 ${evo>=0?"text-emerald-700":"text-red-600"}`}>{evo>=0?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Tabela mensal — meses até ao mês actual */}
-            <LeadsMonthlyTable scope={scope} year={year} monthNum={monthNum} />
-
-            {/* Origem das leads */}
-            {originCurr && originCurr.some(v=>v!=null) && (() => {
-              const labels = ORIGIN_LABELS_SHORT;
-              const d25 = originPrev.map(v=>v||0);
-              const d26 = originCurr.map(v=>v||0);
-              const chartId = `origin-${scope}`;
-              return (<>
-                <p className={DS.detailLabel} style={{marginTop:"1rem"}}>ORIGEM DAS LEADS</p>
-                <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
-                  <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}</span>
-                  <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}><span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}</span>
                 </div>
-                <div style={{position:"relative",width:"100%",height:"200px"}}>
-                  <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
-                </div>
-                <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
-              </>);
-            })()}
-          </div>
-        );
-      })()}
-
-      {/* ── CARD: NOVAS PARCERIAS — mercados individuais ── */}
-      {scope !== "total" && closingCurr && (() => {
-        const partnersCurr = Number(closingCurr?.markets?.[scope]?.partners_curr) || 0;
-        const partnersPrev = Number(closingPrev?.markets?.[scope]?.partners_curr) || 0;
-        if (!partnersCurr && !partnersPrev) return null;
-        const evo = partnersPrev > 0 && partnersCurr > 0 ? ((partnersCurr - partnersPrev) / partnersPrev * 100) : null;
-        const pos = evo != null && evo >= 0;
-
-        // Prog data for this market
-        const PROG_FIELDS = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
-        const PROG_LABELS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        const PROG_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-        const progData = PROG_FIELDS.map((f,i) => ({
-          name: PROG_LABELS[i],
-          val: Number(closingCurr?.markets?.[scope]?.["prog_"+f+"_curr"]) || 0,
-          prev: Number(closingPrev?.markets?.[scope]?.["prog_"+f+"_curr"]) || 0,
-        })).filter(x => x.val > 0 || x.prev > 0).sort((a,b) => b.val - a.val);
-        const progTotal = progData.reduce((s,x) => s + x.val, 0);
-        const fmt = n => new Intl.NumberFormat("fr-FR").format(n);
-
-        // Donut slices
-        let a = -Math.PI / 2;
-        const size = 160, cx = 80, cy = 80, r = 60, ri = 34;
-        const slices = progData.filter(x => x.val > 0).map((x, i) => {
-          const angle = (x.val / progTotal) * 2 * Math.PI, ea = a + angle;
-          const path = `M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-          a = ea;
-          return { ...x, path, pct: (x.val / progTotal * 100).toFixed(1), color: PROG_COLORS[i % PROG_COLORS.length] };
-        });
-
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p></div>
-
-            {/* KPI cards */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className={DS.kpiBox}>
-                <p className={DS.kpiLabel}>NOVOS PARCEIROS {year-1}</p>
-                <p className={DS.kpiVal}>{partnersPrev > 0 ? fmt(partnersPrev) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
               </div>
-              <div className={DS.kpiBoxHL}>
-                <p className={DS.kpiLabel}>NOVOS PARCEIROS {year}</p>
-                <p className={DS.kpiValBig}>{partnersCurr > 0 ? fmt(partnersCurr) : <span className="text-slate-400 text-base">Sem dados</span>}</p>
-                {evo != null && <p className={`text-sm font-bold mt-1 ${pos ? "text-emerald-700" : "text-red-600"}`}>{pos ? "+" : ""}{evo.toFixed(2)}% vs {year-1}</p>}
-              </div>
-              <div className={DS.kpiBox}>
-                <p className={DS.kpiLabel}>EVOLUÇÃO</p>
-                <p className={`text-2xl font-bold ${evo == null ? "text-slate-400" : pos ? "text-emerald-600" : "text-red-600"}`}>
-                  {evo == null ? "—" : `${pos ? "+" : ""}${evo.toFixed(2)}%`}
-                </p>
-              </div>
-            </div>
-
-            {/* Novos Parceiros por Programa */}
-            {slices.length > 0 && (<>
-              <p className={DS.detailLabel} style={{marginTop:"1.5rem",marginBottom:"12px"}}>NOVOS PARCEIROS POR PROGRAMA</p>
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                <svg width={size} height={size} className="shrink-0">
-                  {slices.map((s,i) => (
-                    <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}>
-                      <title>{s.name}: {fmt(s.val)} ({s.pct}%)</title>
-                    </path>
-                  ))}
-                  <text x={cx} y={cy-4} textAnchor="middle" fontSize={9} fill="#94a3b8">Total</text>
-                  <text x={cx} y={cy+9} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">{fmt(progTotal)}</text>
-                </svg>
-                <table style={{flex:1,borderCollapse:"collapse",fontSize:"12px",width:"100%"}}>
-                  <thead><tr>
-                    {["",String(year-1),String(year),"%","Evo"].map((h,i) => (
-                      <th key={i} style={{textAlign:i===0?"left":"right",padding:"4px 6px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",fontSize:"11px"}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>{slices.map((x,i) => {
-                    const evo2 = x.prev > 0 && x.val > 0 ? ((x.val - x.prev) / x.prev * 100) : null;
-                    const p2 = evo2 != null && evo2 >= 0;
-                    const border = i < slices.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none";
-                    return (
-                      <tr key={i}>
-                        <td style={{padding:"5px 6px",borderBottom:border}}>
-                          <span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}>
-                            <span style={{width:"7px",height:"7px",borderRadius:"2px",background:x.color,display:"inline-block",flexShrink:0}}></span>
-                            <span style={{color:"var(--color-text-primary)"}}>{x.name}</span>
-                          </span>
-                        </td>
-                        <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{x.prev > 0 ? fmt(x.prev) : "—"}</td>
-                        <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{fmt(x.val)}</td>
-                        <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border,fontSize:"11px"}}>{x.pct}%</td>
-                        <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:evo2==null?"var(--color-text-secondary)":p2?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo2==null?"—":`${p2?"+":""}${evo2.toFixed(1)}%`}</td>
-                      </tr>
-                    );
-                  })}</tbody>
-                </table>
-              </div>
-            </>)}
-          </div>
-        );
-      })()}
-
-      {/* ── CARD: PARCERIAS (Novas Parcerias + Por Mercado + Por Programa) ── */}
-      {scope === "total" && partnersByMkt && partnersByMkt.length > 0 && (() => {
-        const CARD_COLORS = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
-        const CARD_TEXT   = ["#fff","#fff","#fff","#fff","#1A5C52","#1A5C52","#fff","#fff"];
-        const ranked = [...partnersByMkt].sort((a,b)=>b.curr-a.curr);
-        const totalCurr = ranked.reduce((s,m)=>s+m.curr,0);
-        const totalPrev = ranked.reduce((s,m)=>s+m.prev,0);
-        const evo = totalPrev>0&&totalCurr>0?((totalCurr-totalPrev)/totalPrev*100):null;
-        const pos = evo!=null&&evo>=0;
-        const fmt = n => new Intl.NumberFormat("fr-FR").format(n);
-        const mkDonut = (data, title, colors) => {
-          if (!data||!data.length) return null;
-          const tot = data.reduce((s,d)=>s+d.val,0); if(!tot) return null;
-          const size=160,cx=80,cy=80,r=60,ri=34; let a=-Math.PI/2;
-          const slices=data.filter(d=>d.val>0).map((d,i)=>{
-            const angle=(d.val/tot)*2*Math.PI,ea=a+angle;
-            const path=`M ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} L ${cx+r*Math.cos(a)} ${cy+r*Math.sin(a)} A ${r} ${r} 0 ${angle>Math.PI?1:0} 1 ${cx+r*Math.cos(ea)} ${cy+r*Math.sin(ea)} L ${cx+ri*Math.cos(ea)} ${cy+ri*Math.sin(ea)} A ${ri} ${ri} 0 ${angle>Math.PI?1:0} 0 ${cx+ri*Math.cos(a)} ${cy+ri*Math.sin(a)} Z`;
-            a=ea; return {...d,path,pct:(d.val/tot*100).toFixed(1),color:colors[i%colors.length]};
-          });
-          return (<>
-            <p className={DS.detailLabel} style={{marginTop:"1.5rem",marginBottom:"12px"}}>{title}</p>
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <svg width={size} height={size} className="shrink-0">
-                {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth={2}><title>{s.name}: {fmt(s.val)} ({s.pct}%)</title></path>)}
-                <text x={cx} y={cy-4} textAnchor="middle" fontSize={9} fill="#94a3b8">Total</text>
-                <text x={cx} y={cy+9} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e293b">{fmt(tot)}</text>
-              </svg>
-              <table style={{flex:1,borderCollapse:"collapse",fontSize:"12px",width:"100%"}}>
-                <thead><tr>{["",""+year-1,""+year,"%","Evo"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"4px 6px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)",fontSize:"11px"}}>{h}</th>))}</tr></thead>
-                <tbody>{slices.map((x,i)=>{
-                  const evo2=x.prev>0&&x.val>0?((x.val-x.prev)/x.prev*100):null;
-                  const p2=evo2!=null&&evo2>=0;
-                  const border=i<slices.length-1?"0.5px solid var(--color-border-tertiary)":"none";
-                  return (<tr key={i}><td style={{padding:"5px 6px",borderBottom:border}}><span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><span style={{width:"7px",height:"7px",borderRadius:"2px",background:x.color,display:"inline-block",flexShrink:0}}></span><span style={{color:"var(--color-text-primary)"}}>{x.name}</span></span></td>
-                    <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border}}>{x.prev>0?fmt(x.prev):"—"}</td>
-                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)",borderBottom:border}}>{fmt(x.val)}</td>
-                    <td style={{padding:"5px 6px",textAlign:"right",color:"var(--color-text-secondary)",borderBottom:border,fontSize:"11px"}}>{x.pct}%</td>
-                    <td style={{padding:"5px 6px",textAlign:"right",fontWeight:"500",color:evo2==null?"var(--color-text-secondary)":p2?"#0F6E56":"#A32D2D",borderBottom:border}}>{evo2==null?"—":`${p2?"+":""}${evo2.toFixed(1)}%`}</td>
-                  </tr>);
-                })}</tbody>
-              </table>
-            </div>
-          </>);
-        };
-        return (
-          <div className={DS.card}>
-            <div><h2 className={DS.title}>NOVAS PARCERIAS</h2><p className={DS.subtitle}>{month} {year} – por mercado</p></div>
-            {/* KPI cards — estilo Leads */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
-              {/* Total em destaque */}
-              <div className={DS.kpiBoxHL} style={{gridColumn:"span 1"}}>
-                <p className={DS.kpiLabel}>TOTAL</p>
-                <p className={DS.kpiValBig}>{fmt(totalCurr)}</p>
-                {evo!=null&&<p className={`text-sm font-bold mt-1 ${pos?"text-emerald-700":"text-red-600"}`}>{pos?"+":""}{evo.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
-              </div>
-              {/* Mercados */}
-              {ranked.map((m,i)=>{
-                const e=m.prev>0&&m.curr>0?((m.curr-m.prev)/m.prev*100):null;
-                const ep=e!=null&&e>=0;
-                return (
-                  <div key={m.code} className={DS.kpiBox}>
-                    <p className={DS.kpiLabel}>{m.name.toUpperCase()}</p>
-                    <p className={DS.kpiVal}>{fmt(m.curr)}</p>
-                    {e!=null&&<p className={`text-sm font-bold mt-1 ${ep?"text-emerald-700":"text-red-600"}`}>{ep?"+":""}{e.toFixed(2)}% vs {month.toLowerCase()} {year-1}</p>}
-                  </div>
-                );
-              })}
-            </div>
-            {mkDonut(ranked.map(m=>({name:m.name,val:m.curr,prev:m.prev})),"NOVOS PARCEIROS POR MERCADO",["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"])}
-            {progCurr&&progCurr.some(v=>v!=null)&&(()=>{
-              const progLabels=["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-              const pd=progLabels.map((l,i)=>({name:l,val:progCurr[i]||0,prev:progPrev[i]||0})).filter(x=>x.val>0||x.prev>0).sort((a,b)=>b.val-a.val);
-              return mkDonut(pd,"NOVOS PARCEIROS POR PROGRAMA",["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"]);
-            })()}
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"13px",marginTop:"1.5rem",borderTop:"0.5px solid var(--color-border-tertiary)"}}>
-              <thead><tr>{["",""+year-1,""+year,"Evolução"].map((h,i)=>(<th key={i} style={{textAlign:i===0?"left":"right",padding:"6px 8px",color:"var(--color-text-secondary)",fontWeight:"500",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>{h}</th>))}</tr></thead>
-              <tbody><tr>
-                <td style={{padding:"8px",color:"var(--color-text-primary)",fontWeight:"500"}}>Total de parcerias</td>
-                <td style={{padding:"8px",textAlign:"right",color:"var(--color-text-secondary)"}}>{totalPrev>0?fmt(totalPrev):"—"}</td>
-                <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:"var(--color-text-primary)"}}>{fmt(totalCurr)}</td>
-                <td style={{padding:"8px",textAlign:"right",fontWeight:"500",color:evo==null?"var(--color-text-secondary)":pos?"#0F6E56":"#A32D2D"}}>{evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}</td>
-              </tr></tbody>
-            </table>
-          </div>
-        );
-      })()}
+            );
+          })}
+        </div>
+      )}
 
       {/* ── CARD: AFILIAÇÃO ── */}
       {afilCurr != null && (
         <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
           objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"} showMargem={false}
-          totalResult={scope !== "total" ? totalAfilResult : 0}>
-          {/* Distribuição por mercado afiliação — só no Total */}
-          {scope === "total" && afilByMkt.length > 0 && (
+          showObjective={scope === "total"}>
+          {afilByMkt.length > 0 && (
             <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
           )}
         </BigCard>
       )}
 
+      {/* ── CARD: LEADS ── */}
+      {(leadsCurr || leadsPrev) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>LEADS</h2>
+            <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+          </div>
+          <div className={DS.detailBox}>
+            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{leadsPrev!=null?Math.round(leadsPrev):"—"}</p></div>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{leadsCurr!=null?Math.round(leadsCurr):"—"}</p></div>
+              <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
+                {leadsCurr!=null&&leadsPrev>0?(()=>{const e=(leadsCurr-leadsPrev)/leadsPrev*100;return <p className={`text-xl font-bold ${e>=0?"text-emerald-600":"text-red-600"}`}>{e>=0?"+":""}{e.toFixed(1)}%</p>;})():<p className="text-xl font-bold text-slate-400">—</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
-      {afilCurr != null && (() => {
+      {afilCurr != null && scope === "total" && (() => {
         const totalCurr = actual + (afilCurr||0);
         const totalPrev = (prevYearActual||0) + (afilPrev||0);
         const revPct = totalCurr>0?Math.round(actual/totalCurr*100):0;
@@ -2197,13 +1795,102 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         );
       })()}
 
+      {/* ── CARD: FATURAÇÃO POR DIA DE SEMANA ── */}
+      {closedDay > 0 && (() => {
+        const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+        const byWeekday = Array.from({length:7},(_,i)=>({label:DAYS_PT[i],total:0,count:0,ssTotal:0,ssCount:0}));
+        daily.forEach(d=>{
+          if(d.day>closedDay) return;
+          const val=d.value;
+          if(val==null||val===0) return;
+          const wd=d.weekday!==undefined?d.weekday:new Date(year,monthNum,d.day).getDay();
+          if(d.supersales){byWeekday[wd].ssTotal+=val;byWeekday[wd].ssCount++;}
+          else{byWeekday[wd].total+=val;byWeekday[wd].count++;}
+        });
+        const ordered=[1,2,3,4,5,6,0].map(i=>({...byWeekday[i],avg:byWeekday[i].count>0?Math.round(byWeekday[i].total/byWeekday[i].count):null}));
+        const maxAvg=Math.max(...ordered.map(d=>d.avg||0));
+        if(!maxAvg) return null;
+        const barColor=TEAM_COLORS[scope]||"#2563eb";
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>MÉDIA POR DIA DA SEMANA</h2>
+              <p className={DS.subtitle}>Excluindo dias de Supersales · (Nx) = nº de dias</p>
+            </div>
+            <div className="space-y-3">
+              {ordered.map((d,i)=>{
+                const barPct=maxAvg>0&&d.avg?(d.avg/maxAvg*100):0;
+                const isWeekend=i>=5;
+                return (
+                  <div key={d.label} className="flex items-center gap-3">
+                    <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
+                    <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{width:`${barPct}%`,backgroundColor:isWeekend?"#94a3b8":"#6ee7b7",minWidth:barPct>0?"8px":"0"}}/>
+                    </div>
+                    <div className="w-36 flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
+                      {d.count>0&&<span className="text-xs text-slate-400">({d.count}x)</span>}
+                      {d.ssCount>0&&<span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-400">Média = valor diário médio excluindo dias de Supersales</p>
+          </div>
+        );
+      })()}
 
+      {/* ── CARD: HISTÓRICO 2025 vs 2026 (só Total) ── */}
+      {scope === "total" && histData.some(r=>r[year-1]||r[year]) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
+            <p className={DS.subtitle}>Faturação mensal comparativa · actualiza automaticamente</p>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={histData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
+                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#8B4513" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
-
+      {/* ── 7. Per-market historical chart (non-total scopes) ── */}
+      {scope !== "total" && mktHistData.some(r=>r[year-1]||r[year]) && (
+        <div className={DS.card}>
+          <div>
+            <h2 className={DS.title}>HISTÓRICO {year-1} VS {year}</h2>
+            <p className={DS.subtitle}>{SCOPES.find(s=>s.id===scope)?.label} · faturação mensal comparativa</p>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={mktHistData} margin={{top:20,right:8,left:8,bottom:0}} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
+              <XAxis dataKey="month" tick={{fontSize:11,fill:"#94a3b8"}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?Math.round(v/1000)+"k":String(v)}
+                tick={{fontSize:10,fill:"#94a3b8"}} axisLine={false} tickLine={false} width={44}/>
+              <Tooltip formatter={(v,name)=>[new Intl.NumberFormat("fr-FR").format(v)+" €",name]}
+                contentStyle={{borderRadius:"8px",border:"1px solid #e2e8f0",fontSize:"12px"}}/>
+              <Legend iconType="square" iconSize={10} formatter={v=><span style={{fontSize:"11px",color:"#64748b"}}>{v}</span>}/>
+              <Bar dataKey={String(year-1)} name={String(year-1)} fill="#F4A261" radius={[3,3,0,0]} maxBarSize={30}/>
+              <Bar dataKey={String(year)} name={String(year)} fill="#3A9E8F" radius={[3,3,0,0]} maxBarSize={30}/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* ── 8. Daily revenue chart for each market ── */}
-      {closedDay > 0 && (() => {
-        const scopeLabel2 = scope === "total" ? "Total" : (SCOPES.find(s=>s.id===scope)?.label || scope);
+      {scope !== "total" && closedDay > 0 && (() => {
+        const scopeLabel2 = SCOPES.find(s=>s.id===scope)?.label || scope;
         const chartData = daily
           .filter(d => d.day <= closedDay)
           .map(d => ({
@@ -2214,12 +1901,10 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         if (!chartData.some(d=>d.valor)) return null;
         return (
           <div className={DS.card}>
-            <button onClick={()=>setDailyOpen(o=>!o)} className="w-full flex items-center justify-between">
-              <div><h2 className={DS.title}>FATURAÇÃO DIÁRIA</h2><p className={DS.subtitle}>{scopeLabel2} · {month} {year}</p></div>
-              <svg className={`w-5 h-5 text-slate-400 transition-transform ${dailyOpen?"rotate-180":""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
-            </button>
-            {dailyOpen && (<>
-            <p className="text-xs text-slate-400 mb-3 mt-2">Valor faturado por dia</p>
+            <div>
+              <h2 className={DS.title}>FATURAÇÃO DIÁRIA</h2>
+              <p className={DS.subtitle}>{scopeLabel2} · {month} {year} · valor faturado por dia</p>
+            </div>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} margin={{top:10,right:8,left:8,bottom:0}}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
@@ -2244,47 +1929,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-amber-400"/>Supersales</span>
               </div>
             )}
-
-            {/* Média por dia da semana — dentro do mesmo card */}
-            {(() => {
-              const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-              const byWeekday = Array.from({length:7},(_,i)=>({label:DAYS_PT[i],total:0,count:0,ssTotal:0,ssCount:0}));
-              daily.forEach(d=>{
-                if(d.day>closedDay) return;
-                const val=d.value; if(val==null||val===0) return;
-                const wd=d.weekday!==undefined?d.weekday:new Date(year,monthNum,d.day).getDay();
-                if(d.supersales){byWeekday[wd].ssTotal+=val;byWeekday[wd].ssCount++;}
-                else{byWeekday[wd].total+=val;byWeekday[wd].count++;}
-              });
-              const ordered=[1,2,3,4,5,6,0].map(i=>({...byWeekday[i],avg:byWeekday[i].count>0?Math.round(byWeekday[i].total/byWeekday[i].count):null}));
-              const maxAvg=Math.max(...ordered.map(d=>d.avg||0));
-              if(!maxAvg) return null;
-              return (<>
-                <p className={DS.detailLabel} style={{marginTop:"1.5rem"}}>MÉDIA POR DIA DA SEMANA</p>
-                <p className="text-xs text-slate-400 mb-3">Excluindo dias de Supersales · (Nx) = nº de dias</p>
-                <div className="space-y-3">
-                  {ordered.map((d,i)=>{
-                    const barPct=maxAvg>0&&d.avg?(d.avg/maxAvg*100):0;
-                    const isWeekend=i>=5;
-                    return (
-                      <div key={d.label} className="flex items-center gap-3">
-                        <div className="w-8 text-sm font-semibold text-slate-600 shrink-0 text-right">{d.label}</div>
-                        <div className="flex-1 bg-slate-100 rounded-full h-8 overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500"
-                            style={{width:`${barPct}%`,backgroundColor:isWeekend?"#B4B2A9":"#3A9E8F",minWidth:barPct>0?"8px":"0"}}/>
-                        </div>
-                        <div className="w-36 flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-bold text-slate-800">{d.avg!=null?new Intl.NumberFormat("fr-FR").format(d.avg)+" €/dia":"—"}</span>
-                          {d.count>0&&<span className="text-xs text-slate-400">({d.count}x)</span>}
-                          {d.ssCount>0&&<span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">+SS</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>);
-            })()}
-            </>)}
           </div>
         );
       })()}
@@ -2847,14 +2491,248 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
 
 
 // ── EntryRevenda — registo por valor do DIA (não acumulado) ──
-function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, year }) {
-  const equipas = ANALISE_TEAMS;
+function EntryRevenda({ monthNum, year, totalDays, closedDay, isCurrentMonth }) {
+  const [entries, setEntries] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const RKEY = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
+  const today = new Date();
+  const todayDay = isCurrentMonth ? today.getDate() : null;
+
+  // Keep a ref to the latest entries so the debounced save always uses fresh data
+  const entriesRef = React.useRef(entries);
+  entriesRef.current = entries;
+
+  useEffect(() => {
+    setLoading(true);
+    supabase.from("billing_months").select("entries").eq("month_key", RKEY).maybeSingle()
+      .then(({ data: row }) => {
+        setEntries(row?.entries || {});
+        setLoading(false);
+      });
+  }, [RKEY]);
+
+  // Debounced auto-save — fires 800ms after the last change
+  const saveTimer = React.useRef(null);
+  const triggerAutoSave = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaved(false);
+    setSaving(false);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      await supabase.from("billing_months").upsert(
+        { month_key: RKEY, total_goal: 0, team_goals: {}, entries: entriesRef.current, updated_at: new Date().toISOString() },
+        { onConflict: "month_key" }
+      );
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }, 800);
+  };
+
+  // Clear timer on unmount
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  const setField = (day, field, val) => {
+    setEntries(prev => ({
+      ...prev,
+      [day]: {
+        ...(prev[day] || {}),
+        [field]: typeof val === "boolean" ? val : val === "" ? "" : Number(val),
+      },
+    }));
+    triggerAutoSave();
+  };
+
+  // Compute totals per column (sum of all filled days)
+  const totals = useMemo(() => {
+    const t = { total: 0 };
+    TEAMS.forEach(tm => { t[tm] = 0; });
+    Object.values(entries).forEach(row => {
+      if (!row || typeof row !== "object") return;
+      TEAMS.forEach(tm => { t[tm] += Number(row[tm]) || 0; });
+    });
+    t.total = TEAMS.reduce((s, tm) => s + t[tm], 0);
+    return t;
+  }, [entries]);
+
+  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
+
+  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const MONTH_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"][monthNum];
+
+  const statusBadge = (
+    <div className="flex items-center gap-2 shrink-0 text-xs">
+      {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
+      {saved && !saving && <span className="text-green-600 font-medium">✓ Guardado</span>}
+    </div>
+  );
+
+  // ── 2025: formulário simples de total mensal por mercado ──
+  if (year === 2025) {
+    const monthTotal = entries["_total"] || {};
+    const grandTotal = TEAMS.reduce((s, t) => s + (Number(monthTotal[t]) || 0), 0);
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}
+            <span className="ml-2 text-xs font-normal text-slate-400">→ alimenta o separador <span className="text-blue-700 font-semibold">Revenda</span></span>
+          </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Insere o <strong>total mensal</strong> de faturação por mercado para {year}. Guardado automaticamente.
+            </p>
+          </div>
+          {statusBadge}
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {TEAMS.map(t => (
+              <div key={t} className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: TEAM_COLORS[t] }}>{t}</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={monthTotal[t] ?? ""}
+                  onChange={e => setField("_total", t, e.target.value)}
+                  placeholder="0"
+                  className="text-right px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-5 py-4 border border-slate-200">
+            <span className="text-sm font-medium text-slate-600">Total {MONTH_PT} {year}</span>
+            <span className="text-2xl font-bold text-slate-900">{grandTotal > 0 ? fmtEur(grandTotal) : "—"}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 2026+: tabela dia a dia ──
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-200 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-slate-900">Registo Revenda — {MONTH_PT} {year}</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Introduz o valor <strong>faturado no próprio dia</strong> (não acumulado)
+            para cada mercado. Guardado automaticamente.
+          </p>
+        </div>
+        {statusBadge}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+            <tr>
+              <th className="px-3 py-2 text-left sticky left-0 bg-slate-50">Dia</th>
+              <th className="px-3 py-2 text-right font-bold text-slate-900">Total dia</th>
+              {TEAMS.map(t => (
+                <th key={t} className="px-3 py-2 text-right" style={{ color: TEAM_COLORS[t] }}>{t}</th>
+              ))}
+              <th className="px-3 py-2 text-center text-amber-700">SS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map(d => {
+              const row = entries[d] || {};
+              const isToday = todayDay === d;
+              const isClosed = d <= closedDay;
+              const isSupersales = row.supersales === true;
+              const dayTotal = TEAMS.reduce((s, t) => s + (Number(row[t]) || 0), 0);
+              const rowBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : isClosed ? "" : "bg-slate-50/40";
+              const stickyBg = isSupersales ? "bg-amber-50" : isToday ? "bg-blue-50" : "bg-white";
+              return (
+                <tr key={d} className={`border-t border-slate-100 ${rowBg}`}>
+                  <td className={`px-3 py-2 font-medium sticky left-0 align-top ${stickyBg}`}>
+                    {d}
+                    {isToday && <span className="ml-1 text-xs text-blue-600">(hoje)</span>}
+                    {isClosed && !isToday && <span className="ml-1 text-xs text-green-600">✓</span>}
+                  </td>
+                  <td className="px-2 py-1 text-right align-top">
+                    <div className="w-28 text-right px-2 py-1.5 font-bold text-slate-800">
+                      {dayTotal > 0 ? fmtEur(dayTotal) : <span className="text-slate-300">—</span>}
+                    </div>
+                  </td>
+                  {TEAMS.map(t => (
+                    <td key={t} className="px-2 py-1 text-right align-top">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={row[t] ?? ""}
+                        onChange={e => setField(d, t, e.target.value)}
+                        placeholder="0"
+                        className="w-24 text-right px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+                      />
+                    </td>
+                  ))}
+                  <td className="px-2 py-1 text-center align-top">
+                    <label className="inline-flex items-center justify-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSupersales}
+                        onChange={e => setField(d, "supersales", e.target.checked)}
+                        className="w-5 h-5 rounded border-slate-300 text-amber-600 focus:ring-2 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                      />
+                    </label>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Linha total */}
+            <tr className="border-t-2 border-slate-400 bg-slate-50 font-bold">
+              <td className="px-3 py-3 sticky left-0 bg-slate-50 text-slate-700 text-xs uppercase tracking-wide">Total</td>
+              <td className="px-2 py-3 text-right text-slate-900">{fmtEur(totals.total)}</td>
+              {TEAMS.map(t => (
+                <td key={t} className="px-2 py-3 text-right" style={{ color: TEAM_COLORS[t] }}>
+                  {totals[t] > 0 ? fmtEur(totals[t]) : <span className="text-slate-300">—</span>}
+                </td>
+              ))}
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, annualGoal, saveAnnualGoal, year }) {
+  const equipas = ANALISE_TEAMS.filter(t => t.id !== "total");
   const sumEquipas = equipas.reduce((s, t) => s + (Number(data.teamGoals[t.id]) || 0), 0);
   const totalGoal = Number(data.totalGoal) || 0;
   const diff = totalGoal - sumEquipas;
+  const [annualInput, setAnnualInput] = useState(annualGoal || "");
+
+  React.useEffect(() => { setAnnualInput(annualGoal || ""); }, [annualGoal]);
+
   return (
     <div className="space-y-4">
       {/* Objetivo anual */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+          <Target className="w-4 h-4" /> Objetivo anual — {year}
+        </h3>
+        <p className="text-xs text-slate-500 mt-1">Objetivo total de faturação para o ano {year}.</p>
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-slate-500">€</span>
+          <input
+            type="number"
+            value={annualInput}
+            onChange={(e) => setAnnualInput(e.target.value)}
+            onBlur={(e) => saveAnnualGoal(e.target.value)}
+            placeholder="ex: 15000000"
+            className="flex-1 max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-lg font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
       {/* Objetivo total do mês */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -2934,6 +2812,327 @@ function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, year }) {
 // ============================================================
 // History — visão anual por mês e equipa
 // ============================================================
+function History({ annualGoal: annualGoalProp, currentYear }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [annualGoal, setAnnualGoal] = useState(annualGoalProp || 0);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("billing_months")
+        .select("*")
+        .like("month_key", `${year}-%`)
+        .order("month_key", { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        console.error(error);
+        setRows([]);
+      } else {
+        setRows(data || []);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
+
+  const monthsData = useMemo(() => {
+    const byKey = {};
+    rows.forEach((r) => {
+      byKey[r.month_key] = r;
+    });
+    const result = [];
+    for (let m = 1; m <= 12; m++) {
+      const key = `${year}-${String(m).padStart(2, "0")}`;
+      const row = byKey[key];
+      const entries = row?.entries || {};
+      const teamGoals = row?.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0 };
+      const totalGoal = Number(row?.total_goal) || 0;
+
+      // Para cada âmbito, encontra o último valor acumulado preenchido
+      // (os valores são cumulativos → o último dia dá o total do mês)
+      const billed = { total: 0, PT: 0, IT: 0, ES: 0, FR: 0 };
+      Object.keys(entries)
+        .map((d) => Number(d))
+        .sort((a, b) => a - b)
+        .forEach((day) => {
+          const e = entries[day] || {};
+          ["total", "PT", "IT", "ES", "FR"].forEach((s) => {
+            const v = e[s];
+            if (
+              v !== undefined &&
+              v !== "" &&
+              v !== null &&
+              !Number.isNaN(Number(v))
+            ) {
+              billed[s] = Number(v);
+            }
+          });
+        });
+
+      result.push({
+        month: m,
+        monthName: MONTH_NAMES[m - 1],
+        shortName: MONTH_NAMES[m - 1].slice(0, 3),
+        totalGoal,
+        teamGoals,
+        billed,
+        pctTotal: totalGoal > 0 ? (billed.total / totalGoal) * 100 : 0,
+      });
+    }
+    return result;
+  }, [rows, year]);
+
+  const annualTotals = useMemo(() => {
+    const t = {
+      total: 0, PT: 0, IT: 0, ES: 0, FR: 0,
+      totalGoal: 0,
+      teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0 },
+    };
+    monthsData.forEach((m) => {
+      t.total += m.billed.total;
+      t.PT += m.billed.PT;
+      t.IT += m.billed.IT;
+      t.ES += m.billed.ES;
+      t.FR += m.billed.FR;
+      t.totalGoal += m.totalGoal;
+      TEAMS.forEach((team) => {
+        t.teamGoals[team] += Number(m.teamGoals[team]) || 0;
+      });
+    });
+    t.pctTotal = t.totalGoal > 0 ? (t.total / t.totalGoal) * 100 : 0;
+    return t;
+  }, [monthsData]);
+
+  const bestMonth = useMemo(() => {
+    const filled = monthsData.filter((m) => m.billed.total > 0);
+    if (filled.length === 0) return null;
+    return filled.reduce((a, b) => (b.billed.total > a.billed.total ? b : a));
+  }, [monthsData]);
+
+  // Load annual goal for selected year
+  useEffect(() => {
+    if (year === currentYear && annualGoalProp) {
+      setAnnualGoal(annualGoalProp);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: row } = await supabase
+        .from("billing_months")
+        .select("total_goal")
+        .eq("month_key", `${year}-annual`)
+        .maybeSingle();
+      if (!cancelled) setAnnualGoal(Number(row?.total_goal) || 0);
+    })();
+    return () => { cancelled = true; };
+  }, [year, annualGoalProp, currentYear]);
+
+  const yearOptions = useMemo(() => {
+    const current = today.getFullYear();
+    return [current - 2, current - 1, current, current + 1];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const maxBilled = Math.max(...monthsData.map((m) => m.billed.total), 1);
+  const monthsWithData = monthsData.filter((m) => m.billed.total > 0).length;
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Histórico anual</h2>
+
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-slate-500" />
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-16 text-slate-400">
+          <div className="text-4xl mb-3">⏳</div>
+          <div className="text-sm">A carregar histórico…</div>
+        </div>
+      ) : (
+        <>
+          {/* KPI summary cards */}
+          {(() => {
+            const pctAnual = annualGoal > 0 ? (annualTotals.total / annualGoal) * 100 : null;
+            const isAnualOver = pctAnual !== null && pctAnual >= 100;
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="text-xs uppercase tracking-wide text-blue-600 font-medium">Total faturado</div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">{fmtEur(annualTotals.total)}</div>
+                  <div className="text-xs text-blue-600 mt-1">{year}</div>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-500 font-medium">Objetivo anual</div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">{annualGoal > 0 ? fmtEur(annualGoal) : "—"}</div>
+                  <div className="text-xs text-slate-400 mt-1">{annualGoal > 0 ? `${year}` : "não definido"}</div>
+                </div>
+                <div className={`rounded-xl p-4 border ${pctAnual === null ? "bg-white border-slate-200" : isAnualOver ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+                  <div className={`text-xs uppercase tracking-wide font-medium ${pctAnual === null ? "text-slate-500" : isAnualOver ? "text-green-600" : "text-amber-600"}`}>% do objetivo anual feito</div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">{pctAnual !== null ? fmtPct(pctAnual) : "—"}</div>
+                  <div className="text-xs text-slate-400 mt-1">{pctAnual !== null ? `${fmtEur(annualTotals.total)} de ${fmtEur(annualGoal)}` : "sem objetivo definido"}</div>
+                </div>
+              </div>
+            );
+          })()}
+
+
+
+          {/* Monthly cards grid */}
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">Detalhe mensal</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {monthsData.map((m) => {
+                const hasData = m.billed.total > 0 || TEAMS.some((t) => m.billed[t] > 0);
+                const today2 = new Date();
+                const isCurrentMonth2 = m.month === today2.getMonth() + 1 && year === today2.getFullYear();
+                const isPastMonth2 = new Date(year, m.month, 0) < new Date(today2.getFullYear(), today2.getMonth(), 1);
+                const isOver = m.pctTotal >= 100;
+                const isOngoing = !isPastMonth2 && isCurrentMonth2 && !isOver;
+                // Border + bar color logic
+                const borderClass = !hasData
+                  ? "border-slate-100 opacity-50"
+                  : isOver
+                  ? "border-green-400"
+                  : isOngoing
+                  ? "border-amber-400"
+                  : isPastMonth2 && hasData
+                  ? "border-red-300"
+                  : "border-slate-200";
+                const barColor = isOver ? "bg-green-500" : isOngoing ? "bg-amber-400" : isPastMonth2 && hasData ? "bg-red-400" : "bg-blue-400";
+                const barWidth = isOver ? 100 : m.totalGoal > 0 ? Math.min((m.billed.total / m.totalGoal) * 100, 100) : 0;
+                return (
+                  <div key={m.month} className={`bg-white rounded-xl border-2 p-4 ${borderClass}`}>
+                    {/* Month header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold text-slate-800">{m.monthName}</span>
+                      {hasData && m.totalGoal > 0 && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isOver ? "bg-green-100 text-green-700" : isOngoing ? "bg-amber-100 text-amber-700" : isPastMonth2 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-600"}`}>
+                          {fmtPct(m.pctTotal)}
+                        </span>
+                      )}
+                    </div>
+                    {/* Total + bar */}
+                    <div className="text-xl font-bold text-slate-900">{hasData ? fmtEur(m.billed.total) : "—"}</div>
+                    {m.totalGoal > 0 && (
+                      <div className="text-xs text-slate-400 mt-0.5">obj. {fmtEur(m.totalGoal)}</div>
+                    )}
+                    {hasData && (
+                      <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${barColor}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    )}
+                    {/* Teams mini row */}
+                    {hasData && (
+                      <div className="mt-3 grid grid-cols-4 gap-1">
+                        {TEAMS.map((t) => {
+                          const billed = m.billed[t];
+                          const goal = Number(m.teamGoals[t]) || 0;
+                          const pctOfGoal = goal > 0 ? (billed / goal) * 100 : null;
+                          const pctOfTotal = m.billed.total > 0 && billed > 0 ? (billed / m.billed.total) * 100 : null;
+                          return (
+                            <div key={t} className="text-center">
+                              <div className="text-[10px] font-bold" style={{ color: TEAM_COLORS[t] }}>{t}</div>
+                              <div className="text-[11px] font-semibold text-slate-700 mt-0.5">
+                                {billed > 0 ? `${(billed / 1000).toFixed(0)}k` : "—"}
+                              </div>
+                              {pctOfTotal !== null && (
+                                <div className="text-[9px] font-medium text-slate-400">
+                                  {fmtPct(pctOfTotal)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Annual totals footer */}
+          <div className="bg-slate-800 text-white rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Total {year}</h3>
+
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
+                <div className="text-lg font-bold mt-1">{fmtEur(annualTotals.total)}</div>
+
+              </div>
+              {TEAMS.map((t) => (
+                <div key={t}>
+                  <div className="text-xs uppercase tracking-wide font-bold" style={{ color: TEAM_COLORS[t] }}>{t}</div>
+                  <div className="text-lg font-bold mt-1">{annualTotals[t] > 0 ? fmtEur(annualTotals[t]) : "—"}</div>
+
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Password gate — bloqueia toda a aplicação até a password ser introduzida
+// ============================================================
+const SITE_PASSWORD =
+  import.meta.env.VITE_SITE_PASSWORD || "Prozis12345";
+const GATE_STORAGE_KEY = "faturacao_gate_unlocked_v1";
+
+// ─── CONSTANTES PARTILHADAS ───────────────────────────────────────────────────
+
+const MC_MARKETS = [
+  { code: "PT",          name: "Portugal" },
+  { code: "IT",          name: "Itália" },
+  { code: "ES",          name: "Espanha" },
+  { code: "FR",          name: "França" },
+  { code: "CH-BNL-DEAT", name: "CH-BNL-DEAT" },
+  { code: "CZ-SK-GR-CY-PL", name: "CZ-SK-GR-CY-PL" },
+  { code: "USA",         name: "USA" },
+  { code: "OT",          name: "Outros" },
+];
+
+const MC_PROGRAMS = [
+  "Professionals","Elite","Progym","Proteams",
+  "Probox","Performance","Horeca","Corporate",
+];
+
+const MC_MONTHS_PT = [
+  "","Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+
 function mcKey(year, monthNum) {
   return `closing-${year}-${String(monthNum+1).padStart(2,"0")}`;
 }
@@ -3085,7 +3284,8 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Afiliação — Resultados globais">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => upField(p => ({...p, afil_prev: v}))} />
           <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
           <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => upField(p => ({...p, afil_result: v}))} />
         </div>
@@ -3093,8 +3293,9 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-orange-600">
-          <div className="grid grid-cols-1 gap-3">
-            <MCField label="Afiliação (€)" value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
+            <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
           </div>
         </MCCard>
       ))}
@@ -3219,10 +3420,22 @@ function Encomendas({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
-          <div className="grid grid-cols-3 gap-3">
-            <MCField label="Encomendas" value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
-            <MCField label="1ªs enc." value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
-            <MCField label="Fat. 1ªs enc. (€)" value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
+          <div className="grid grid-cols-3 gap-4">
+            {/* Col 1: Encomendas */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`Encomendas ${year-1}`} value={data.markets[m.code]?.orders_prev||""} onChange={v => upMkt(m.code,"orders_prev",v)} />
+              <MCField label={`Encomendas ${year}`} value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
+            </div>
+            {/* Col 2: 1ªs enc. */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`1ªs enc. ${year-1}`} value={data.markets[m.code]?.first_orders_prev||""} onChange={v => upMkt(m.code,"first_orders_prev",v)} />
+              <MCField label={`1ªs enc. ${year}`} value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
+            </div>
+            {/* Col 3: Fat. 1ªs enc. */}
+            <div className="flex flex-col gap-2">
+              <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={data.markets[m.code]?.first_orders_rev_prev||""} onChange={v => upMkt(m.code,"first_orders_rev_prev",v)} />
+              <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
+            </div>
           </div>
         </MCCard>
       ))}
@@ -3231,11 +3444,6 @@ function Encomendas({ monthNum, year, isAdmin }) {
 }
 
 // ─── LEADS / PARCERIAS ────────────────────────────────────────────────────────
-
-const PROG_FIELDS = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
-const PROG_LABELS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-const ORIGIN_FIELDS = ["leads_bap","leads_ang","leads_outras"];
-const ORIGIN_LABELS = ["Be A Partner","Vindas de angariadores","Outras fontes"];
 
 function LeadsParcerias({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
@@ -3253,15 +3461,8 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
           if (!curr.markets[m.code]) curr.markets[m.code] = {};
           const pm = prev.markets?.[m.code] || {};
           const cm = curr.markets[m.code];
-          if (!cm.leads_prev && pm.leads_curr)       cm.leads_prev = pm.leads_curr;
-          if (!cm.partners_prev && pm.partners_curr) cm.partners_prev = pm.partners_curr;
-          // Auto-fill origin and programme fields from prev year
-          ORIGIN_FIELDS.forEach(f => {
-            if (!cm[f+"_prev"] && pm[f+"_curr"]) cm[f+"_prev"] = pm[f+"_curr"];
-          });
-          PROG_FIELDS.forEach(f => {
-            if (!cm["prog_"+f+"_prev"] && pm["prog_"+f+"_curr"]) cm["prog_"+f+"_prev"] = pm["prog_"+f+"_curr"];
-          });
+          if (!cm.leads_prev && pm.leads_curr)         cm.leads_prev = pm.leads_curr;
+          if (!cm.partners_prev && pm.partners_curr)   cm.partners_prev = pm.partners_curr;
         });
       }
       setData(curr); dataRef.current = curr; setSaved(false);
@@ -3290,14 +3491,12 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
-  const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-purple-500"/>
-          <p className="text-sm text-slate-500">Parceiros · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
         </div>
         <div className="text-xs">
           {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
@@ -3305,55 +3504,56 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
         </div>
       </div>
 
-      {/* ── Card Total ── */}
-      <MCCard title="Total" accent="text-purple-800">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Origem das leads</p>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {ORIGIN_FIELDS.map((f,i) => (
-            <div key={f}>
-              <p className="text-xs text-slate-500 mb-1">{ORIGIN_LABELS[i]}</p>
-              <p className="text-sm font-bold text-slate-800">{sumF(f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF(f+"_curr")) : "—"}</p>
+      {/* Card Total — soma de todos os mercados */}
+      {(() => {
+        const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
+        const totals = {
+          leads_prev: sumF("leads_prev"), leads_curr: sumF("leads_curr"),
+          partners_prev: sumF("partners_prev"), partners_curr: sumF("partners_curr"),
+        };
+        const fmt = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) : "—";
+        const evo = (prev, curr) => prev > 0 && curr > 0 ? ((curr-prev)/prev*100).toFixed(1)+"%" : "—";
+        return (
+          <MCCard title="Total" accent="text-purple-800">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Leads {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.leads_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Leads {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.leads_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.leads_curr>=totals.leads_prev?"text-green-600":"text-red-600"}`}>{evo(totals.leads_prev,totals.leads_curr)}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year-1}</p>
+                  <p className="font-semibold text-slate-700">{fmt(totals.partners_prev)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year}</p>
+                  <p className="font-bold text-slate-900">{fmt(totals.partners_curr)}</p>
+                  <p className={`text-xs font-semibold mt-0.5 ${totals.partners_curr>=totals.partners_prev?"text-green-600":"text-red-600"}`}>{evo(totals.partners_prev,totals.partners_curr)}</p>
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Novos parceiros por programa</p>
-        <div className="grid grid-cols-4 gap-3">
-          {PROG_FIELDS.map((f,i) => (
-            <div key={f}>
-              <p className="text-xs text-slate-500 mb-1">{PROG_LABELS[i]}</p>
-              <p className="text-sm font-bold text-slate-800">{sumF("prog_"+f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF("prog_"+f+"_curr")) : "—"}</p>
-            </div>
-          ))}
-        </div>
-      </MCCard>
+          </MCCard>
+        );
+      })()}
 
-      {/* ── Cards por mercado ── */}
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
-          {/* Leads + Parceiros */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <MCField label="Leads" value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
-            <MCField label="Novos parceiros" value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
-          </div>
-
-          {/* Origem das leads */}
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Origem das leads</p>
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {ORIGIN_FIELDS.map((f,i) => (
-              <MCField key={f} label={ORIGIN_LABELS[i]}
-                value={data.markets[m.code]?.[f+"_curr"]||""}
-                onChange={v => upMkt(m.code, f+"_curr", v)} />
-            ))}
-          </div>
-
-          {/* Novos parceiros por programa */}
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Novos parceiros por programa</p>
-          <div className="grid grid-cols-4 gap-3">
-            {PROG_FIELDS.map((f,i) => (
-              <MCField key={f} label={PROG_LABELS[i]}
-                value={data.markets[m.code]?.["prog_"+f+"_curr"]||""}
-                onChange={v => upMkt(m.code, "prog_"+f+"_curr", v)} />
-            ))}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-3">
+              <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
+              <MCField label={`Novos parceiros ${year-1}`} value={data.markets[m.code]?.partners_prev||""} onChange={v => upMkt(m.code,"partners_prev",v)} />
+            </div>
+            <div className="flex flex-col gap-3">
+              <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
+              <MCField label={`Novos parceiros ${year}`} value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
+            </div>
           </div>
         </MCCard>
       ))}
@@ -3364,6 +3564,1022 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
 // ─── RELATÓRIO (auto-fill version) ───────────────────────────────────────────
 
+function Relatorio({ monthNum, year }) {
+  const [step, setStep] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [closingCurr, setClosingCurr] = useState(null);
+  const [closingPrev, setClosingPrev] = useState(null);
+
+  // All form state
+  const [rev, setRev] = useState({
+    result: 0, objective: 0, margin_pct: "",
+    margin_pct_prev: "",
+    q_result_prev_year: "", q_objective: "", q_result: "",
+    q_month1_revenue: "", q_month1_evolution: "", q_month1_margin: "",
+    q_month2_revenue: "", q_month2_evolution: "", q_month2_margin: "",
+    q_month3_revenue: "", q_month3_evolution: "", q_month3_margin: "",
+    prev_year: "",
+    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: 0, prev: "" }])),
+  });
+  const [afil, setAfil] = useState({
+    objective: "", result: "", prev_year: "",
+    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: "", prev: "" }])),
+  });
+  const [orders, setOrders] = useState({
+    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+      orders_curr:"", orders_prev:"",
+      first_curr:"", first_prev:"",
+      first_rev_curr:"", first_rev_prev:"",
+    }])),
+  });
+  const [leads, setLeads] = useState({
+    byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr:"", prev:"" }])),
+  });
+  const [programs, setPrograms] = useState(
+    Object.fromEntries(MC_PROGRAMS.map(p => [p, { curr:"", prev:"" }]))
+  );
+
+  // Auto-fill from Supabase
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const monthKey = `${year}-${String(monthNum+1).padStart(2,"0")}`;
+
+      // 1. Revenda from billing_months
+      const { data: bm } = await supabase
+        .from("billing_months")
+        .select("*")
+        .eq("month_key", monthKey)
+        .maybeSingle();
+
+      // 2. Closing data (afil, encomendas, leads, programs, margins)
+      const closing = await loadClosing(year, monthNum);
+
+      // Build revenda by market from last entry
+      const byMarket = Object.fromEntries(MC_MARKETS.map(m => [m.code, { curr: 0, prev: "" }]));
+      if (bm?.entries) {
+        const days = Object.keys(bm.entries).map(Number).sort((a,b)=>a-b);
+        const lastDay = days[days.length - 1];
+        if (lastDay) {
+          const lastEntry = bm.entries[String(lastDay)];
+          MC_MARKETS.forEach(m => {
+            if (lastEntry?.[m.code]) byMarket[m.code].curr = lastEntry[m.code];
+          });
+        }
+      }
+
+      // Fill closing market data into byMarket prev
+      if (closing?.markets) {
+        MC_MARKETS.forEach(m => {
+          const d = closing.markets[m.code] || {};
+          byMarket[m.code].prev = d.afil_prev || "";
+        });
+      }
+
+      // Restore manual fields from closing
+      const savedByMkt = closing?.revenda_by_market || {};
+      MC_MARKETS.forEach(m => {
+        if (savedByMkt[m.code]?.prev) byMarket[m.code].prev = savedByMkt[m.code].prev;
+      });
+
+      setRev(p => ({
+        ...p,
+        result: bm?.entries ? (() => {
+          const days = Object.keys(bm.entries).map(Number).sort((a,b)=>a-b);
+          const lastEntry = bm.entries[String(days[days.length-1])] || {};
+          return lastEntry.total || Object.values(lastEntry).reduce((s,v) => typeof v==="number"?s+v:s, 0);
+        })() : 0,
+        objective: bm?.total_goal || 0,
+        margin_pct:          closing?.revenda_margin || "",
+        margin_pct_prev:     closing?.revenda_margin_prev || "",
+        prev_year:           closing?.revenda_prev || "",
+        q_result_prev_year:  closing?.q_result_prev_year || "",
+        q_objective:         closing?.q_objective || "",
+        q_result:            closing?.q_result || "",
+        q_month1_revenue:    closing?.q_month1_revenue || "",
+        q_month1_evolution:  closing?.q_month1_evolution || "",
+        q_month1_margin:     closing?.q_month1_margin || "",
+        q_month2_revenue:    closing?.q_month2_revenue || "",
+        q_month2_evolution:  closing?.q_month2_evolution || "",
+        q_month2_margin:     closing?.q_month2_margin || "",
+        q_month3_revenue:    closing?.q_month3_revenue || "",
+        q_month3_evolution:  closing?.q_month3_evolution || "",
+        q_month3_margin:     closing?.q_month3_margin || "",
+        byMarket,
+      }));
+
+      setAfil({
+        objective: closing?.afil_objective || "",
+        result: closing?.afil_result || "",
+        prev_year: closing?.afil_prev || "",
+        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+          curr: closing?.markets?.[m.code]?.afil_result || "",
+          prev: closing?.markets?.[m.code]?.afil_prev || "",
+        }])),
+      });
+
+      setOrders({
+        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+          orders_curr: closing?.markets?.[m.code]?.orders_curr || "",
+          orders_prev: closing?.markets?.[m.code]?.orders_prev || "",
+          first_curr:  closing?.markets?.[m.code]?.first_orders_curr || "",
+          first_prev:  closing?.markets?.[m.code]?.first_orders_prev || "",
+          first_rev_curr: closing?.markets?.[m.code]?.first_orders_rev_curr || "",
+          first_rev_prev: closing?.markets?.[m.code]?.first_orders_rev_prev || "",
+        }])),
+      });
+
+      setLeads({
+        byMarket: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+          curr: closing?.markets?.[m.code]?.leads_curr || "",
+          prev: closing?.markets?.[m.code]?.leads_prev || "",
+        }])),
+      });
+
+      if (closing?.programs) {
+        setPrograms(Object.fromEntries(MC_PROGRAMS.map(p => [p, {
+          curr: closing.programs[p]?.curr || "",
+          prev: closing.programs[p]?.prev || "",
+        }])));
+      }
+
+      // Load closing data for margin/orders in PPTX
+      loadClosing(year, monthNum).then(setClosingCurr);
+      loadClosing(year - 1, monthNum).then(setClosingPrev);
+
+      setLoading(false);
+    })();
+  }, [monthNum, year]);
+
+  const N = s => parseFloat(s) || 0;
+  const fmtE = n => n == null ? "–" : new Intl.NumberFormat("fr-FR").format(n) + " €";
+  const fmtP = (n, sign=false) => {
+    if (n == null || isNaN(n)) return "–";
+    const s = Math.abs(n).toFixed(2) + "%";
+    if (sign) return (n>=0?"+":"-")+s;
+    return s;
+  };
+  const evo = (prev, curr) => {
+    if (!prev) return "–";
+    const e = ((curr-prev)/prev)*100;
+    return fmtP(e, true);
+  };
+
+  const MONTHS_UPPER = MC_MONTHS_PT.map(m => m.toUpperCase());
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [savedDraft, setSavedDraft] = useState(false);
+
+  async function saveDraft() {
+    setSavingDraft(true);
+    const existing = await loadClosing(year, monthNum);
+    const merged = {
+      ...existing,
+      revenda_margin:      rev.margin_pct,
+      revenda_margin_prev: rev.margin_pct_prev,
+      revenda_prev:        rev.prev_year,
+      revenda_by_market:   Object.fromEntries(MC_MARKETS.map(m => [m.code, { prev: rev.byMarket[m.code]?.prev || "" }])),
+      afil_objective:      afil.objective,
+      afil_result:         afil.result,
+      afil_prev:           afil.prev_year,
+      q_result_prev_year:  rev.q_result_prev_year,
+      q_objective:         rev.q_objective,
+      q_result:            rev.q_result,
+      q_month1_revenue:    rev.q_month1_revenue,
+      q_month1_evolution:  rev.q_month1_evolution,
+      q_month1_margin:     rev.q_month1_margin,
+      q_month2_revenue:    rev.q_month2_revenue,
+      q_month2_evolution:  rev.q_month2_evolution,
+      q_month2_margin:     rev.q_month2_margin,
+      q_month3_revenue:    rev.q_month3_revenue,
+      q_month3_evolution:  rev.q_month3_evolution,
+      q_month3_margin:     rev.q_month3_margin,
+      programs:            Object.fromEntries(MC_PROGRAMS.map(p => [p, { curr: programs[p]?.curr || "", prev: programs[p]?.prev || "" }])),
+      markets: Object.fromEntries(MC_MARKETS.map(m => [m.code, {
+        ...(existing?.markets?.[m.code] || {}),
+        afil_result:             afil.byMarket[m.code]?.curr || "",
+        afil_prev:               afil.byMarket[m.code]?.prev || "",
+        orders_curr:             orders.byMarket[m.code]?.orders_curr || "",
+        orders_prev:             orders.byMarket[m.code]?.orders_prev || "",
+        first_orders_curr:       orders.byMarket[m.code]?.first_curr || "",
+        first_orders_prev:       orders.byMarket[m.code]?.first_prev || "",
+        first_orders_rev_curr:   orders.byMarket[m.code]?.first_rev_curr || "",
+        first_orders_rev_prev:   orders.byMarket[m.code]?.first_rev_prev || "",
+        leads_curr:              leads.byMarket[m.code]?.curr || "",
+        leads_prev:              leads.byMarket[m.code]?.prev || "",
+      }])),
+    };
+    await saveClosing(year, monthNum, merged);
+    setSavingDraft(false);
+    setSavedDraft(true);
+    setTimeout(() => setSavedDraft(false), 3000);
+  }
+
+  async function generatePptx() {
+    setGenerating(true);
+    await saveDraft();
+    try {
+      const pptxgenjs = await import("pptxgenjs");
+      const PptxGenJS = pptxgenjs.default || pptxgenjs;
+      const prs = new PptxGenJS();
+      prs.layout = "LAYOUT_WIDE";
+      prs.title = `Apresentação de Resultados – ${MC_MONTHS_PT[monthNum+1]} ${year}`;
+
+      // ── Design system (Prozis Partners template) ──
+      const C = {
+        cream:   "F2F0EB",  // background
+        white:   "FFFFFF",
+        black:   "1A1A1A",
+        teal:    "3A9E8F",  // primary accent
+        tealDk:  "2E7D71",  // dark teal
+        tealLt:  "D6EDE9",  // light teal card bg
+        gray:    "E8E6E1",  // divider
+        grayDk:  "888888",  // muted text
+        grayLt:  "F7F5F1",  // subtle card bg
+        green:   "2E7D71",
+        red:     "C0392B",
+      };
+      const W = 13.33, H = 7.5;
+      const FF = "Calibri";
+      const mLabel = MONTHS_UPPER[monthNum+1];
+
+      // Format helpers
+      const fmtN = n => n == null ? "—" : new Intl.NumberFormat("fr-FR").format(Math.round(n));
+      const fmtE2 = n => n == null ? "—" : fmtN(n) + " €";
+      const fmtP2 = (n, sign=false) => {
+        if (n == null || isNaN(n)) return "—";
+        const s = Math.abs(n).toFixed(2) + "%";
+        return sign ? (n>=0?"+":"-")+s : s;
+      };
+      const evo2 = (prev, curr) => {
+        if (!prev || !curr) return "—";
+        const e = ((curr-prev)/prev*100);
+        return fmtP2(e, true);
+      };
+      const N2 = s => parseFloat(s)||0;
+
+      // ── Slide helpers ──
+
+      // Cream background on every slide
+      function bgCream(s) { s.background = {color: C.cream}; }
+
+      // Section separator slide (design: teal circle badge + bordered box label)
+      function addSep(num, title) {
+        const s = prs.addSlide(); bgCream(s);
+        // Diagonal stripe watermark
+        s.addShape(prs.ShapeType.rect, {x:4.5,y:-1,w:12,h:10, rotate:15,
+          fill:{color:"E8E6E1",transparency:70}, line:{color:"E8E6E1",transparency:70}});
+        s.addShape(prs.ShapeType.rect, {x:5.5,y:-1,w:12,h:10, rotate:15,
+          fill:{color:"E8E6E1",transparency:80}, line:{color:"E8E6E1",transparency:80}});
+        // Teal circle with number
+        s.addShape(prs.ShapeType.ellipse, {x:3.9, y:3.1, w:0.9, h:0.9,
+          fill:{color:C.teal}, line:{color:C.teal}});
+        s.addText(String(num), {x:3.9,y:3.05,w:0.9,h:0.9,
+          fontSize:28, bold:true, color:C.white, align:"center", fontFace:FF});
+        // Bordered label box
+        s.addShape(prs.ShapeType.rect, {x:4.95,y:2.85,w:7.2,h:0.85,
+          fill:{color:C.white,transparency:100}, line:{color:C.teal,pt:1.5}});
+        s.addText("DEPARTAMENTO", {x:5.1,y:2.88,w:7,h:0.25,
+          fontSize:10, bold:true, color:C.teal, fontFace:FF, charSpacing:3});
+        s.addText(title, {x:5.1,y:3.18,w:7,h:0.45,
+          fontSize:26, bold:false, color:C.black, fontFace:FF});
+      }
+
+      // Result slide (3 cards + detail row + progress bar)
+      function addResult(dept, subtitle, prevYear, objective, result) {
+        const s = prs.addSlide(); bgCream(s);
+        // Title
+        s.addText(dept, {x:0.5,y:0.25,w:12,h:0.5, fontSize:32,bold:true,color:C.black,fontFace:FF});
+        s.addText(subtitle, {x:0.5,y:0.75,w:12,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
+
+        // 3 KPI cards
+        const cards = [
+          {label:`RESULTADO ${mLabel} ${year-1}`, val: fmtE2(prevYear), big:false, bordered:false},
+          {label:`OBJETIVO ${mLabel} ${year}`,   val: fmtE2(objective),
+           sub: objective&&prevYear ? fmtP2((objective-prevYear)/prevYear*100,true)+" vs resultado "+mLabel.toLowerCase()+" "+(year-1) : "",
+           big:false, bordered:false, teal:true},
+          {label:`RESULTADO ${mLabel} ${year}`,  val: fmtE2(result),
+           sub: result&&prevYear ? fmtP2((result-prevYear)/prevYear*100,true)+" vs "+(year-1) : "",
+           big:true, bordered:true, teal:true},
+        ];
+        cards.forEach((c,i) => {
+          const x = 0.5 + i*4.15;
+          s.addShape(prs.ShapeType.roundRect, {x, y:1.15, w:3.95, h:1.55,
+            fill:{color:C.tealLt}, line:{color: c.bordered ? C.teal : C.tealLt, pt: c.bordered?2:1},
+            rectRadius:0.12});
+          s.addText(c.label, {x:x+0.18,y:1.22,w:3.6,h:0.28, fontSize:9,color:C.grayDk,fontFace:FF,bold:false});
+          s.addText(c.val, {x:x+0.18,y:1.52,w:3.6,h:0.55,
+            fontSize: c.big?28:22, bold:c.big, color: c.teal?C.teal:C.black, fontFace:FF});
+          if (c.sub) s.addText(c.sub, {x:x+0.18,y:2.12,w:3.6,h:0.22,
+            fontSize:10, bold:c.big, color:C.teal, fontFace:FF});
+        });
+
+        // Detail row
+        const evoPct = prevYear ? ((result-prevYear)/prevYear*100) : 0;
+        const evoAbs = result - (prevYear||0);
+        const aboveObj = result - (objective||0);
+        const pctObj = objective ? (result/objective*100) : 0;
+        const details = [
+          {label:"Evolução vs "+(year-1), val: fmtP2(evoPct,true)},
+          {label:"Ganho absoluto",          val: (evoAbs>=0?"+":"")+fmtE2(evoAbs)},
+          {label:"Acima do objetivo",       val: fmtE2(aboveObj)},
+          {label:"% do objetivo",           val: fmtP2(pctObj)},
+        ];
+        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:2.88,w:12.33,h:1.0,
+          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
+        s.addText("DETALHE DO RESULTADO", {x:0.72,y:2.93,w:4,h:0.22,
+          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
+        details.forEach((d,i) => {
+          const x = 0.72 + i*3.08;
+          if (i>0) s.addShape(prs.ShapeType.line, {x:x-0.05,y:3.05,w:0,h:0.65,
+            line:{color:C.gray,pt:1}});
+          s.addText(d.label, {x:x+0.05,y:3.06,w:2.9,h:0.22, fontSize:11,color:C.black,fontFace:FF});
+          const pos = !d.val.startsWith("-");
+          s.addText(d.val, {x:x+0.05,y:3.32,w:2.9,h:0.42,
+            fontSize:22, bold:true, color: i===0||i===3 ? C.teal : C.black, fontFace:FF});
+        });
+
+        // Progress bar
+        s.addShape(prs.ShapeType.roundRect, {x:0.5,y:4.08,w:12.33,h:1.75,
+          fill:{color:C.white}, line:{color:C.gray,pt:1}, rectRadius:0.1});
+        s.addText("CONCRETIZAÇÃO DO OBJETIVO", {x:0.72,y:4.13,w:6,h:0.24,
+          fontSize:8, bold:true, color:C.grayDk, fontFace:FF, charSpacing:2});
+        const barW = 11.5;
+        const barX = 0.72;
+        const barY = 4.52;
+        const barH = 0.28;
+        const clampPct = Math.min(pctObj/100, 1);
+        const excessPct = Math.max(0, pctObj/100 - 1);
+        // Bar track
+        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW,h:barH,
+          fill:{color:C.gray}, line:{color:C.gray,pt:0.5}, rectRadius:0.05});
+        // Main bar (up to objective)
+        s.addShape(prs.ShapeType.roundRect, {x:barX,y:barY,w:barW*clampPct,h:barH,
+          fill:{color:C.teal}, line:{color:C.teal}, rectRadius:0.05});
+        // Excess bar
+        if (excessPct>0) {
+          s.addShape(prs.ShapeType.roundRect, {x:barX+barW*clampPct,y:barY,w:barW*excessPct,h:barH,
+            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.05});
+        }
+        // Objective line
+        s.addShape(prs.ShapeType.line, {x:barX+barW*clampPct,y:barY-0.05,w:0,h:barH+0.1,
+          line:{color:C.black,pt:2}});
+        // Labels
+        s.addText("% do objetivo", {x:barX,y:barY+0.35,w:2,h:0.24, fontSize:9,color:C.grayDk,fontFace:FF});
+        s.addText(fmtP2(pctObj), {x:barX,y:barY+0.57,w:2,h:0.38, fontSize:22,bold:true,color:C.teal,fontFace:FF});
+        if (aboveObj>0) {
+          s.addShape(prs.ShapeType.roundRect, {x:barX+7.5,y:barY+0.42,w:4,h:0.32,
+            fill:{color:C.tealLt}, line:{color:C.teal,pt:0.5}, rectRadius:0.08});
+          s.addText(`✓  +${fmtE2(aboveObj)} acima do objetivo`, {x:barX+7.6,y:barY+0.46,w:3.8,h:0.24,
+            fontSize:9, color:C.teal, bold:true, fontFace:FF});
+        }
+        // Legend
+        const legends = [
+          {color:C.teal, label:`Realizado até objetivo (${fmtE2(objective)})`},
+          {color:C.tealLt, label:`Excedente (+${fmtE2(aboveObj)})`},
+        ];
+        legends.forEach((l,i) => {
+          const lx = barX + i*4.5;
+          s.addShape(prs.ShapeType.rect, {x:lx,y:6.08,w:0.18,h:0.12,fill:{color:l.color},line:{color:l.color}});
+          s.addText(l.label, {x:lx+0.25,y:6.05,w:4,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
+        });
+        s.addShape(prs.ShapeType.line, {x:barX+9,y:6.08,w:0,h:0.12,line:{color:C.black,pt:1.5}});
+        s.addText("Linha de objetivo", {x:barX+9.1,y:6.05,w:3,h:0.2, fontSize:9,color:C.grayDk,fontFace:FF});
+      }
+
+      // Market distribution table slide
+      function addMktTable(dept, subtitle, rows) {
+        const s = prs.addSlide(); bgCream(s);
+        s.addText(dept, {x:0.5,y:0.25,w:8,h:0.45, fontSize:28,bold:true,color:C.black,fontFace:FF});
+        s.addText(subtitle, {x:0.5,y:0.72,w:9,h:0.28, fontSize:13,color:C.grayDk,fontFace:FF});
+        // Table
+        const tRows = [
+          [{text:"MERCADO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10}},
+           {text:"FATURAÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:10,align:"right"}}],
+          ...rows.map((r,i)=>[
+            {text:r[0],options:{fontSize:10,fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
+            {text:r[1],options:{fontSize:10,bold:true,align:"right",fill:{color:i%2===0?C.white:C.grayLt},color:C.black}},
+          ])
+        ];
+        s.addTable(tRows, {x:0.5,y:1.15,w:5.5,colW:[4,1.5],border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
+      }
+
+      // ─────────────────────────────────────────────
+      // SLIDE 1: CAPA
+      // ─────────────────────────────────────────────
+      const s1 = prs.addSlide(); bgCream(s1);
+      // Diagonal stripe left
+      s1.addShape(prs.ShapeType.rect, {x:-1,y:-0.5,w:4,h:9,rotate:5,
+        fill:{color:"ECEAE4",transparency:30},line:{color:"ECEAE4",transparency:30}});
+      // Teal bar left edge
+      s1.addShape(prs.ShapeType.rect, {x:0,y:0,w:0.35,h:H,fill:{color:C.teal},line:{color:C.teal}});
+      // Logo area
+      s1.addText("PROZIS PARTNERS", {x:0.6,y:0.4,w:6,h:0.5,
+        fontSize:16,bold:true,color:C.teal,fontFace:FF,charSpacing:2});
+      // Title
+      s1.addText("Apresentação\nde resultados", {x:0.6,y:2.5,w:7,h:2.2,
+        fontSize:52,bold:true,color:C.black,fontFace:FF,breakLine:true});
+      s1.addText(`${mLabel} ${year}`, {x:0.6,y:4.7,w:7,h:0.8,
+        fontSize:36,bold:true,color:C.teal,fontFace:FF});
+
+      // ─────────────────────────────────────────────
+      // REVENDA
+      // ─────────────────────────────────────────────
+      addSep(1, "REVENDA");
+      addResult("REVENDA", `${mLabel} ${year} – em comparação ao ano anterior`,
+        N2(rev.prev_year), N2(rev.objective), N2(rev.result));
+
+      // Trimestre (only if quarter month)
+      if (isQuarterMonth) {
+        const qPrev=N2(rev.q_result_prev_year), qObj=N2(rev.q_objective), qRes=N2(rev.q_result);
+        const qEvo = qPrev?((qRes-qPrev)/qPrev*100):0;
+        const sq = prs.addSlide(); bgCream(sq);
+        sq.addText("REVENDA", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+        sq.addText("Mensal", {x:0.5,y:0.72,w:9,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+        const qCards = [
+          {label:`1º TRIMESTRE ${year-1}`, val:fmtE2(qPrev)},
+          {label:`OBJETIVO TRIMESTRE ${year}`, val:fmtE2(qObj),
+           sub:qPrev?fmtP2((qObj-qPrev)/qPrev*100,true)+" vs resultado 1º trimestre "+(year-1):""},
+          {label:`RESULTADO TRIMESTRE ${year}`, val:fmtE2(qRes),
+           sub:qPrev?fmtP2(qEvo,true)+" vs "+(year-1):"", big:true},
+        ];
+        qCards.forEach((c,i)=>{
+          const x=0.5+i*4.15;
+          sq.addShape(prs.ShapeType.roundRect,{x,y:1.15,w:3.95,h:c.big?1.8:1.55,
+            fill:{color:C.tealLt},line:{color:c.big?C.teal:C.tealLt,pt:c.big?2:1},rectRadius:0.12});
+          sq.addText(c.label,{x:x+0.18,y:1.22,w:3.6,h:0.28,fontSize:9,color:C.grayDk,fontFace:FF});
+          sq.addText(c.val,{x:x+0.18,y:1.52,w:3.6,h:0.55,
+            fontSize:c.big?26:20,bold:c.big,color:C.teal,fontFace:FF});
+          if(c.sub) sq.addText(c.sub,{x:x+0.18,y:2.1,w:3.6,h:0.22,fontSize:10,bold:c.big,color:C.teal,fontFace:FF});
+        });
+        const qMonthNums = monthNum<3?[1,2,3]:monthNum<6?[4,5,6]:monthNum<9?[7,8,9]:[10,11,12];
+        const qTblRows = [
+          [{text:"MÉTRICA",options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9}},
+           ...qMonthNums.map(mn=>({text:MONTHS_UPPER[mn],options:{bold:true,color:C.white,fill:{color:C.teal},fontSize:9,align:"right"}}))],
+          [{text:"FATURAÇÃO",options:{fontSize:9}},
+           {text:fmtN(N2(rev.q_month1_revenue)),options:{fontSize:9,bold:true,align:"right"}},
+           {text:fmtN(N2(rev.q_month2_revenue)),options:{fontSize:9,bold:true,align:"right"}},
+           {text:fmtN(N2(rev.q_month3_revenue)),options:{fontSize:9,bold:true,align:"right"}}],
+          [{text:"EVOLUÇÃO FACE AO ANO ANTERIOR",options:{fontSize:9}},
+           {text:fmtP2(N2(rev.q_month1_evolution),true),options:{fontSize:9,color:N2(rev.q_month1_evolution)>=0?C.teal:C.red,align:"right"}},
+           {text:fmtP2(N2(rev.q_month2_evolution),true),options:{fontSize:9,color:N2(rev.q_month2_evolution)>=0?C.teal:C.red,align:"right"}},
+           {text:fmtP2(N2(rev.q_month3_evolution),true),options:{fontSize:9,color:N2(rev.q_month3_evolution)>=0?C.teal:C.red,align:"right"}}],
+          [{text:"MARGEM",options:{fontSize:9}},
+           {text:fmtP2(N2(rev.q_month1_margin)),options:{fontSize:9,align:"right"}},
+           {text:fmtP2(N2(rev.q_month2_margin)),options:{fontSize:9,align:"right"}},
+           {text:fmtP2(N2(rev.q_month3_margin)),options:{fontSize:9,align:"right"}}],
+        ];
+        sq.addTable(qTblRows,{x:0.5,y:3.2,w:12.3,colW:[5,2.1,2.1,2.1],
+          border:{type:"solid",color:C.gray,pt:0.5},rowH:0.48});
+      }
+
+      // Market distribution — revenda
+      const revMktRows = MC_MARKETS
+        .filter(m=>N2(rev.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(rev.byMarket[b.code]?.curr)-N2(rev.byMarket[a.code]?.curr))
+        .map(m=>[m.name, fmtE2(N2(rev.byMarket[m.code]?.curr))]);
+      if (revMktRows.length) addMktTable("REVENDA","Distribuição da faturação por mercado", revMktRows);
+
+      // Programs
+      const progRows = MC_PROGRAMS.filter(p=>N2(programs[p]?.curr)>0)
+        .sort((a,b)=>N2(programs[b]?.curr)-N2(programs[a]?.curr))
+        .map(p=>[p, fmtE2(N2(programs[p]?.curr))]);
+      if (progRows.length) addMktTable("REVENDA","Distribuição da faturação por programa", progRows);
+
+      // ─────────────────────────────────────────────
+      // AFILIAÇÃO
+      // ─────────────────────────────────────────────
+      addSep(2, "AFILIAÇÃO");
+      addResult("AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
+        N2(afil.prev_year), N2(afil.objective), N2(afil.result));
+
+      const afilMktRows = MC_MARKETS
+        .filter(m=>N2(afil.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(afil.byMarket[b.code]?.curr)-N2(afil.byMarket[a.code]?.curr))
+        .map(m=>[m.name, fmtE2(N2(afil.byMarket[m.code]?.curr))]);
+      if (afilMktRows.length) addMktTable("AFILIAÇÃO","Distribuição da afiliação por mercado", afilMktRows);
+
+      // ─────────────────────────────────────────────
+      // TOTAL
+      // ─────────────────────────────────────────────
+      addSep(3, "TOTAL");
+      const totResult = N2(rev.result)+N2(afil.result);
+      const totPrev   = N2(rev.prev_year)+N2(afil.prev_year);
+      const totObj    = N2(rev.objective)+N2(afil.objective);
+      addResult("REVENDA + AFILIAÇÃO", `${mLabel} ${year} – em comparação ao ano anterior`,
+        totPrev, totObj, totResult);
+
+      // Total breakdown slide
+      const st = prs.addSlide(); bgCream(st);
+      st.addText("REVENDA + AFILIAÇÃO", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      st.addText(`${mLabel} ${year} – Histórico em gráficos`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      const revPct = totResult>0?Math.round(N2(rev.result)/totResult*100):0;
+      const afPct  = totResult>0?Math.round(N2(afil.result)/totResult*100):0;
+      st.addShape(prs.ShapeType.roundRect,{x:0.5,y:1.2,w:3.5,h:2.5,
+        fill:{color:C.tealLt},line:{color:C.teal,pt:1},rectRadius:0.12});
+      st.addText("TOTAL", {x:0.6,y:1.28,w:3.3,h:0.28,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
+      st.addText(fmtE2(totResult), {x:0.6,y:1.6,w:3.3,h:0.65,fontSize:24,bold:true,color:C.black,fontFace:FF});
+      // Revenda / Afil boxes
+      [{label:"REVENDA",val:N2(rev.result),pct:revPct,y:3.95},{label:"AFILIAÇÃO",val:N2(afil.result),pct:afPct,y:5.1}]
+      .forEach((item)=>{
+        st.addShape(prs.ShapeType.roundRect,{x:0.5,y:item.y,w:3.5,h:0.95,
+          fill:{color:C.tealLt},line:{color:C.teal,pt:0.5},rectRadius:0.1});
+        st.addText(item.label,{x:0.65,y:item.y+0.08,w:2,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF});
+        st.addText(fmtE2(item.val),{x:0.65,y:item.y+0.35,w:2.8,h:0.42,fontSize:18,bold:true,color:C.teal,fontFace:FF});
+        st.addText(`${item.pct}%`,{x:3.1,y:item.y+0.25,w:0.9,h:0.45,fontSize:22,bold:true,color:C.teal,fontFace:FF,align:"right"});
+      });
+
+      // ─────────────────────────────────────────────
+      // ENCOMENDAS
+      // ─────────────────────────────────────────────
+      addSep(4, "ENCOMENDAS");
+      const encTotCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_curr)),0);
+      const encTotPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.orders_prev)),0);
+      const enc1stCurr  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_curr)),0);
+      const enc1stPrev  = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_prev)),0);
+      const encRev1Curr = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_curr)),0);
+      const encRev1Prev = MC_MARKETS.reduce((s,m)=>s+(N2(orders.byMarket[m.code]?.first_rev_prev)),0);
+
+      const se = prs.addSlide(); bgCream(se);
+      se.addText("ENCOMENDAS", {x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      se.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      se.addText("DETALHE POR MÉTRICA", {x:0.5,y:1.12,w:12,h:0.25,fontSize:8,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
+      const encMetrics = [
+        [`ENCOMENDAS TOTAIS`, fmtN(encTotPrev), fmtN(encTotCurr), evo2(encTotPrev,encTotCurr)],
+        [`PRIMEIRAS ENCOMENDAS`, fmtN(enc1stPrev), fmtN(enc1stCurr), evo2(enc1stPrev,enc1stCurr)],
+        [`FATURAÇÃO 1ªs ENC.`, fmtE2(encRev1Prev), fmtE2(encRev1Curr), evo2(encRev1Prev,encRev1Curr)],
+      ];
+      const encHdr = [
+        [{text:"",options:{fill:{color:C.teal}}},{text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
+         {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}},
+         {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:10}}],
+        ...encMetrics.map((r,i)=>{
+          const bg=i%2===0?C.white:C.grayLt;
+          const pos=r[3].startsWith("+");
+          return [{text:r[0],options:{fontSize:10,fill:{color:bg},bold:true}},
+            {text:r[1],options:{fontSize:10,align:"right",fill:{color:bg}}},
+            {text:r[2],options:{fontSize:10,bold:true,align:"right",fill:{color:bg}}},
+            {text:r[3],options:{fontSize:10,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}}];
+        })
+      ];
+      se.addTable(encHdr,{x:0.5,y:1.4,w:12.3,colW:[4.5,2.5,2.5,2.8],
+        border:{type:"solid",color:C.gray,pt:0.5},rowH:0.52});
+
+      // ─────────────────────────────────────────────
+      // LEADS
+      // ─────────────────────────────────────────────
+      addSep(5, "LEADS E NOVAS PARCERIAS");
+      const leadsTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.curr),0);
+      const leadsPrevTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.prev),0);
+      const partnersTotal = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_curr),0);
+      const partnersPrevT = MC_MARKETS.reduce((s,m)=>s+N2(leads.byMarket[m.code]?.partners_prev),0);
+
+      // Leads by market table
+      const leadsRows = MC_MARKETS
+        .filter(m=>N2(leads.byMarket[m.code]?.curr)>0)
+        .sort((a,b)=>N2(leads.byMarket[b.code]?.curr)-N2(leads.byMarket[a.code]?.curr))
+        .map(m=>[m.name, String(Math.round(N2(leads.byMarket[m.code]?.curr)))]);
+      if (leadsRows.length) addMktTable("LEADS","BE A PARTNER – por mercado", leadsRows);
+
+      // Leads summary slide
+      const sl = prs.addSlide(); bgCream(sl);
+      sl.addText("LEADS", {x:0.5,y:0.25,w:8,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+      sl.addText(`${mLabel} ${year}`, {x:0.5,y:0.72,w:8,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+      const lSummary = [
+        ["TOTAL DE LEADS", leadsPrevTotal, leadsTotal],
+        ["NOVAS PARCERIAS", partnersPrevT, partnersTotal],
+      ];
+      lSummary.forEach((row,i)=>{
+        const y = 1.2+i*1.4;
+        sl.addShape(prs.ShapeType.roundRect,{x:0.5,y,w:12.3,h:1.2,
+          fill:{color:i===0?C.tealLt:C.white},line:{color:C.teal,pt:0.5},rectRadius:0.1});
+        sl.addText(row[0],{x:0.7,y:y+0.08,w:4,h:0.25,fontSize:9,bold:true,color:C.grayDk,fontFace:FF,charSpacing:1});
+        sl.addText(fmtN(row[2]),{x:0.7,y:y+0.42,w:3,h:0.55,fontSize:30,bold:true,color:C.teal,fontFace:FF});
+        if (row[1]>0) {
+          const e=(row[2]-row[1])/row[1]*100;
+          sl.addText(`${e>=0?"+":""}${e.toFixed(2)}% vs ${mLabel.toLowerCase()} ${year-1}`,
+            {x:4,y:y+0.52,w:4,h:0.3,fontSize:12,bold:true,color:e>=0?C.teal:C.red,fontFace:FF});
+        }
+      });
+
+      // ─────────────────────────────────────────────
+      // RESULTADOS POR MERCADO
+      // ─────────────────────────────────────────────
+      addSep(6, "RESULTADOS POR MERCADO");
+
+      MC_MARKETS.forEach(m=>{
+        const rd=rev.byMarket[m.code]||{}, ad=afil.byMarket[m.code]||{};
+        const od=orders.byMarket[m.code]||{};
+        const rCurr=N2(rd.curr),rPrev=N2(rd.prev),aCurr=N2(ad.curr),aPrev=N2(ad.prev);
+        if(!rCurr&&!aCurr) return;
+        const tCurr=rCurr+aCurr, tPrev=rPrev+aPrev;
+        const mDiff=N2(closingCurr?.markets?.[m.code]?.margin_curr)-N2(closingCurr?.markets?.[m.code]?.margin_prev||closingPrev?.markets?.[m.code]?.margin_curr);
+
+        const sm = prs.addSlide(); bgCream(sm);
+        sm.addText(m.name.toUpperCase(),{x:0.5,y:0.25,w:12,h:0.45,fontSize:28,bold:true,color:C.black,fontFace:FF});
+        sm.addText("DETALHE POR MÉTRICA",{x:0.5,y:0.72,w:12,h:0.28,fontSize:13,color:C.grayDk,fontFace:FF});
+
+        // KPI indicators (4 cards)
+        const rEvo=rPrev?((rCurr-rPrev)/rPrev*100):0;
+        const oEvo=N2(od.orders_prev)?((N2(od.orders_curr)-N2(od.orders_prev))/N2(od.orders_prev)*100):0;
+        const kpis=[
+          {label:"Revenda",val:fmtE2(rCurr),sub:fmtP2(rEvo,true),pos:rEvo>=0},
+          {label:"Margem",val:fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)),sub:fmtP2(mDiff,true)+"pp",pos:mDiff>=0},
+          {label:"Encomendas",val:fmtN(N2(od.orders_curr)),sub:fmtP2(oEvo,true),pos:oEvo>=0},
+          {label:`Total ${year}`,val:fmtE2(tCurr),sub:evo2(tPrev,tCurr),pos:tCurr>=tPrev},
+        ];
+        kpis.forEach((k,i)=>{
+          const x=0.5+i*3.2;
+          sm.addShape(prs.ShapeType.roundRect,{x,y:1.18,w:3.0,h:1.1,
+            fill:{color:C.white},line:{color:C.gray,pt:0.8},rectRadius:0.1});
+          sm.addText("INDICADORES PRINCIPAIS",{x:0.5,y:1.1,w:12,h:0.2,fontSize:7,bold:true,color:C.grayDk,fontFace:FF,charSpacing:2});
+          sm.addText(k.label,{x:x+0.12,y:1.22,w:2.8,h:0.22,fontSize:9,color:C.grayDk,fontFace:FF});
+          sm.addText(k.val,{x:x+0.12,y:1.46,w:2.8,h:0.45,fontSize:18,bold:true,color:C.black,fontFace:FF});
+          sm.addText(k.sub,{x:x+0.12,y:1.92,w:2.8,h:0.22,fontSize:9,bold:true,color:k.pos?C.teal:C.red,fontFace:FF});
+        });
+
+        // Detail table
+        const dtRows=[
+          [{text:"",options:{fill:{color:C.teal}}},
+           {text:mLabel+" "+(year-1),options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
+           {text:mLabel+" "+year,options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}},
+           {text:"EVOLUÇÃO",options:{bold:true,color:C.white,fill:{color:C.teal},align:"right",fontSize:9}}],
+          ...([
+            ["Revenda", fmtE2(rPrev), fmtE2(rCurr), evo2(rPrev,rCurr)],
+            ["Afiliação", fmtE2(aPrev), fmtE2(aCurr), evo2(aPrev,aCurr)],
+            ["Total (rev + afil)", fmtE2(tPrev), fmtE2(tCurr), evo2(tPrev,tCurr)],
+            ["Margem", fmtP2(N2(closingPrev?.markets?.[m.code]?.margin_curr)), fmtP2(N2(closingCurr?.markets?.[m.code]?.margin_curr)), fmtP2(mDiff,true)+"pp"],
+            ["Encomendas", fmtN(N2(od.orders_prev)), fmtN(N2(od.orders_curr)), evo2(N2(od.orders_prev),N2(od.orders_curr))],
+            ["1ªs enc.", fmtN(N2(od.first_prev)), fmtN(N2(od.first_curr)), evo2(N2(od.first_prev),N2(od.first_curr))],
+            ["Faturação 1ªs enc.", fmtE2(N2(od.first_rev_prev)), fmtE2(N2(od.first_rev_curr)), evo2(N2(od.first_rev_prev),N2(od.first_rev_curr))],
+          ].map((r,i)=>{
+            const bg=i%2===0?C.white:C.grayLt;
+            const pos=r[3].startsWith("+");
+            return [
+              {text:r[0],options:{fontSize:9,fill:{color:bg},bold:i===2}},
+              {text:r[1],options:{fontSize:9,align:"right",fill:{color:bg}}},
+              {text:r[2],options:{fontSize:9,bold:true,align:"right",fill:{color:bg}}},
+              {text:r[3],options:{fontSize:9,align:"right",fill:{color:bg},color:pos?C.teal:C.red,bold:true}},
+            ];
+          }))
+        ];
+        sm.addTable(dtRows,{x:0.5,y:2.45,w:12.3,colW:[4.2,2.5,2.5,2.6],
+          border:{type:"solid",color:C.gray,pt:0.5},rowH:0.45});
+      });
+
+      await prs.writeFile({fileName:`Relatorio-${MC_MONTHS_PT[monthNum+1]}-${year}.pptx`});
+    } catch(e) {
+      console.error(e);
+      alert("Erro ao gerar PowerPoint: "+e.message);
+    }
+    setGenerating(false);
+  }
+
+  const isQuarterMonth = [2,5,8,11].includes(monthNum); // Mar, Jun, Set, Dez
+  const steps = isQuarterMonth
+    ? ["Revenda","Afiliação","Total","Mercados","Programas","Trimestre"]
+    : ["Revenda","Afiliação","Total","Mercados","Programas"];
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-slate-400">
+      <div className="text-center">
+        <div className="text-3xl mb-3">⏳</div>
+        <p className="text-sm">A carregar dados de {MC_MONTHS_PT[monthNum+1]} {year}…</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-3xl mx-auto pb-10">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Relatório — {MC_MONTHS_PT[monthNum+1]} {year}</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Dados carregados automaticamente · edita antes de gerar</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {savedDraft && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+          <button onClick={saveDraft} disabled={savingDraft}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+            {savingDraft ? "A guardar…" : "💾 Guardar"}
+          </button>
+          <button onClick={generatePptx} disabled={generating}
+            className="px-5 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center gap-2">
+            {generating ? "⏳ A gerar…" : "⬇️ Gerar PowerPoint"}
+          </button>
+        </div>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex gap-1 mb-5 overflow-x-auto pb-1">
+        {steps.map((s,i) => (
+          <button key={i} onClick={() => setStep(i)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              step===i?"bg-orange-500 text-white":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            {i+1}. {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Step 0 – Revenda */}
+      {step===0 && (
+        <>
+          <MCCard title="Revenda — Resultados mensais">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <MCField label={`Resultado ${year-1} (€)`} value={rev.prev_year} onChange={v=>setRev(p=>({...p,prev_year:v}))} />
+              <MCField label={`Objetivo ${year} (€)`} value={String(rev.objective)} onChange={v=>setRev(p=>({...p,objective:v}))} />
+              <MCField label={`Resultado ${year} (€) ✦`} value={String(rev.result)} onChange={v=>setRev(p=>({...p,result:v}))} />
+              <MCField label={`Margem ${year} %`} value={rev.margin_pct} onChange={v=>setRev(p=>({...p,margin_pct:v}))} />
+              <MCField label={`Margem ${year-1} %`} value={rev.margin_pct_prev} onChange={v=>setRev(p=>({...p,margin_pct_prev:v}))} />
+            </div>
+          </MCCard>
+          <MCCard title="Revenda — Por mercado">
+            {MC_MARKETS.map(m => (
+              <div key={m.code} className="mb-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">{m.name}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <MCField label={`${year} (€) ✦`} value={String(rev.byMarket[m.code]?.curr||"")} onChange={v=>setRev(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
+                  <MCField label={`${year-1} (€)`} value={String(rev.byMarket[m.code]?.prev||"")} onChange={v=>setRev(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+                </div>
+              </div>
+            ))}
+          </MCCard>
+          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir do Registo Diário</p>
+        </>
+      )}
+
+      {/* Step 1 – Afiliação */}
+      {step===1 && (
+        <>
+          <MCCard title="Afiliação — Resultados mensais">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <MCField label={`Resultado ${year-1} (€)`} value={afil.prev_year} onChange={v=>setAfil(p=>({...p,prev_year:v}))} />
+              <MCField label={`Objetivo ${year} (€) ✦`} value={String(afil.objective)} onChange={v=>setAfil(p=>({...p,objective:v}))} />
+              <MCField label={`Resultado ${year} (€) ✦`} value={String(afil.result)} onChange={v=>setAfil(p=>({...p,result:v}))} />
+            </div>
+          </MCCard>
+          <MCCard title="Afiliação — Por mercado">
+            {MC_MARKETS.map(m => (
+              <div key={m.code} className="mb-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">{m.name}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <MCField label={`${year-1} (€)`} value={String(afil.byMarket[m.code]?.prev||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+                  <MCField label={`${year} (€) ✦`} value={String(afil.byMarket[m.code]?.curr||"")} onChange={v=>setAfil(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
+                </div>
+              </div>
+            ))}
+          </MCCard>
+          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir de Afiliação</p>
+        </>
+      )}
+
+      {/* Step 2 – Total */}
+      {step===2 && (
+        <MCCard title="Total (Revenda + Afiliação)">
+          <div className="grid grid-cols-2 gap-4">
+            {[["Resultado "+year+" (€)","auto",N(rev.result)+N(afil.result)],
+              ["Resultado "+(year-1)+" (€)","auto",N(rev.prev_year)+N(afil.prev_year)],
+              ["Objetivo "+year+" (€)","auto",N(rev.objective)+N(afil.objective)]]
+            .map(([label,,val],i) => (
+              <div key={i} className="bg-slate-50 rounded-xl p-4">
+                <p className="text-xs text-slate-500 mb-1">{label}</p>
+                <p className="text-xl font-bold text-slate-800">{new Intl.NumberFormat("fr-FR").format(val)} €</p>
+                <p className="text-xs text-slate-400 mt-1">calculado automaticamente</p>
+              </div>
+            ))}
+          </div>
+        </MCCard>
+      )}
+
+      {/* Step 3 – Mercados (encomendas + leads) */}
+      {step===3 && (
+        <>
+          {MC_MARKETS.map(m => (
+            <MCCard key={m.code} title={m.name}>
+              <div className="grid grid-cols-2 gap-6">
+                {/* Coluna 2025 */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{year-1}</p>
+                  <MCField label={`Enc. ${year-1}`} value={orders.byMarket[m.code]?.orders_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_prev:v}}}))} />
+                  <MCField label={`1ªs enc. ${year-1}`} value={orders.byMarket[m.code]?.first_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_prev:v}}}))} />
+                  <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={orders.byMarket[m.code]?.first_rev_prev||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_prev:v}}}))} />
+                  <MCField label={`Leads ${year-1}`} value={leads.byMarket[m.code]?.prev||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],prev:v}}}))} />
+                </div>
+                {/* Coluna 2026 */}
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs font-bold text-orange-400 uppercase tracking-wide">{year} ✦</p>
+                  <MCField label={`Enc. ${year}`} value={orders.byMarket[m.code]?.orders_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],orders_curr:v}}}))} />
+                  <MCField label={`1ªs enc. ${year}`} value={orders.byMarket[m.code]?.first_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_curr:v}}}))} />
+                  <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={orders.byMarket[m.code]?.first_rev_curr||""} onChange={v=>setOrders(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],first_rev_curr:v}}}))} />
+                  <MCField label={`Leads ${year}`} value={leads.byMarket[m.code]?.curr||""} onChange={v=>setLeads(p=>({...p,byMarket:{...p.byMarket,[m.code]:{...p.byMarket[m.code],curr:v}}}))} />
+                </div>
+              </div>
+            </MCCard>
+          ))}
+          <p className="text-xs text-slate-400 mt-1">✦ preenchido automaticamente a partir de Encomendas / Leads</p>
+        </>
+      )}
+
+      {/* Step 4 – Programas */}
+      {step===4 && (
+        <MCCard title="Revenda — Programas">
+          {MC_PROGRAMS.map(p => (
+            <div key={p} className="mb-3">
+              <p className="text-xs font-semibold text-slate-600 mb-2">{p}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <MCField label={`${year-1} (€)`} value={programs[p]?.prev||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],prev:v}}))} />
+                <MCField label={`${year} (€)`} value={programs[p]?.curr||""} onChange={v=>setPrograms(pr=>({...pr,[p]:{...pr[p],curr:v}}))} />
+              </div>
+            </div>
+          ))}
+        </MCCard>
+      )}
+
+      {/* Step 5 – Trimestre (só Mar/Jun/Set/Dez) */}
+      {step===5 && isQuarterMonth && (
+        <>
+          <MCCard title="Revenda — Trimestre">
+            <div className="grid grid-cols-3 gap-3">
+              <MCField label={`Trim. ${year-1} (€)`} value={rev.q_result_prev_year} onChange={v=>setRev(p=>({...p,q_result_prev_year:v}))} />
+              <MCField label={`Obj. trim. ${year} (€)`} value={rev.q_objective} onChange={v=>setRev(p=>({...p,q_objective:v}))} />
+              <MCField label={`Res. trim. ${year} (€)`} value={rev.q_result} onChange={v=>setRev(p=>({...p,q_result:v}))} />
+            </div>
+          </MCCard>
+          <MCCard title="Detalhe dos 3 meses">
+            {[{key:"q_month1",label:MC_MONTHS_PT[monthNum<3?1:monthNum<6?4:monthNum<9?7:10]},
+              {key:"q_month2",label:MC_MONTHS_PT[monthNum<3?2:monthNum<6?5:monthNum<9?8:11]},
+              {key:"q_month3",label:MC_MONTHS_PT[monthNum<3?3:monthNum<6?6:monthNum<9?9:12]}]
+            .map(({key,label}) => (
+              <div key={key} className="mb-4">
+                <p className="text-sm font-semibold text-slate-700 mb-2">{label}</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <MCField label="Faturação (€)" value={rev[`${key}_revenue`]} onChange={v=>setRev(p=>({...p,[`${key}_revenue`]:v}))} />
+                  <MCField label="Evolução % (ex: 74.9)" value={rev[`${key}_evolution`]} onChange={v=>setRev(p=>({...p,[`${key}_evolution`]:v}))} />
+                  <MCField label="Margem % (ex: 49.6)" value={rev[`${key}_margin`]} onChange={v=>setRev(p=>({...p,[`${key}_margin`]:v}))} />
+                </div>
+              </div>
+            ))}
+          </MCCard>
+        </>
+      )}
+
+      {/* Navegação */}
+      <div className="flex justify-between mt-4">
+        <button onClick={() => setStep(s => Math.max(0,s-1))} disabled={step===0}
+          className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-30">
+          ← Anterior
+        </button>
+        {step < steps.length-1 ? (
+          <button onClick={() => setStep(s => s+1)}
+            className="px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700">
+            Seguinte →
+          </button>
+        ) : (
+          <button onClick={generatePptx} disabled={generating}
+            className="px-5 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 disabled:opacity-60">
+            {generating?"⏳ A gerar…":"⬇️ Gerar PowerPoint"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+// ---- Afiliação ----
+const AFILIACAO_SCOPES = [
+  { id: "total", label: "Total" },
+  { id: "PT", label: "Portugal" },
+  { id: "IT", label: "Itália" },
+  { id: "ES", label: "Espanha" },
+  { id: "FR", label: "França" },
+  { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" },
+  { id: "CZ-SK-GR-CY-PL", label: "CZ-SK-GR-CY-PL" },
+  { id: "USA", label: "USA" },
+  { id: "OT", label: "Outros" },
+];
+
+function AfiliacaoDashboard({ totalDays, closedDay, month, monthNum, year, isCurrentMonth, isAdmin }) {
+  const [afilScope, setAfilScope] = useState("total");
+  const [afilData, setAfilData] = useState({
+    totalGoal: 0,
+    teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
+    entries: {},
+  });
+  const [loading, setLoading] = useState(true);
+  const today = new Date();
+  const selectedMonth = `${year}-${String(monthNum + 1).padStart(2, "0")}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const afilKey = `afil-${selectedMonth}`;
+      const { data: row } = await supabase
+        .from("billing_months")
+        .select("*")
+        .eq("month_key", afilKey)
+        .maybeSingle();
+      if (cancelled) return;
+      if (row) {
+        setAfilData({
+          totalGoal: Number(row.total_goal) || 0,
+          teamGoals: row.team_goals || { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 },
+          entries: row.entries || {},
+        });
+      } else {
+        setAfilData({ totalGoal: 0, teamGoals: { PT: 0, IT: 0, ES: 0, FR: 0, "CH-BNL-DEAT": 0, "CZ-SK-GR-CY-PL": 0, USA: 0, OT: 0 }, entries: {} });
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
+
+  const stats = useMemo(
+    () => computeScopeStats(afilData, afilScope, totalDays, closedDay, year, monthNum),
+    [afilData, afilScope, totalDays, closedDay, year, monthNum]
+  );
+  const teamStats = useMemo(
+    () => ["PT","IT","ES","FR","CH-BNL-DEAT","CZ-SK-GR-CY-PL","USA","OT"].map((t) => ({
+      team: t,
+      ...computeScopeStats(afilData, t, totalDays, closedDay, year, monthNum),
+    })),
+    [afilData, totalDays, closedDay, year, monthNum]
+  );
+
+  if (loading) return <div className="text-center py-12 text-slate-500">A carregar…</div>;
+
+  const scopeColor = TEAM_COLORS[afilScope] || "#0f172a";
+  const scopeLabel = AFILIACAO_SCOPES.find(s => s.id === afilScope)?.label || afilScope;
+
+  return (
+    <div className="space-y-5">
+      <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      <div className="space-y-5">
+      {/* Scope tabs */}
+      <div className="bg-white rounded-lg border border-slate-200 p-1 flex gap-1 overflow-x-auto">
+        {AFILIACAO_SCOPES.map((s) => {
+          const active = afilScope === s.id;
+          const color = TEAM_COLORS[s.id];
+          return (
+            <button
+              key={s.id}
+              onClick={() => setAfilScope(s.id)}
+              className={`flex-1 min-w-[70px] px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+                active ? "text-white" : "text-slate-600 hover:bg-slate-100"
+              }`}
+              style={active ? { backgroundColor: color } : undefined}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {stats.goal === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center mt-4">
+          <Target className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <h3 className="font-semibold text-slate-900">
+            {afilScope === "total"
+              ? "Sem objetivo total definido para este mês"
+              : `Sem objetivo definido para ${scopeLabel}`}
+          </h3>
+          <p className="text-sm text-slate-600 mt-1">
+            O administrador ainda não configurou este âmbito.
+          </p>
+        </div>
+      ) : (
+        <Dashboard
+          stats={stats}
+          scope={afilScope}
+          month={month}
+          year={year}
+          totalDays={totalDays}
+          closedDay={closedDay}
+          isCurrentMonth={isCurrentMonth}
+          teamStats={teamStats}
+        />
+      )}
+    </div>
+    </div>
+  );
+}
+
+// ---- Tab vazia ----
+function TabVazia({ titulo }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+        <TrendingUp className="w-8 h-8 text-slate-300" />
+      </div>
+      <h3 className="text-lg font-semibold text-slate-500">{titulo}</h3>
+      <p className="text-sm mt-1">Brevemente disponível</p>
+    </div>
+  );
+}
+
+
+// ── RegistoHub — separador "Registo" com sub-tabs ──
 function MargemRegisto({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -3439,14 +4655,16 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Margem global — Revenda">
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <MCField label={`Margem ${year-1} %`} value={data.revenda_margin_prev||""} onChange={v => upField("revenda_margin_prev", v)} />
           <MCField label={`Margem ${year} %`} value={data.revenda_margin||""} onChange={v => upField("revenda_margin", v)} />
         </div>
       </MCCard>
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-green-700">
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
             <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
           </div>
         </MCCard>
@@ -3455,14 +4673,72 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
   );
 }
 
-function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
-  const [subTab, setSubTab] = useState("registo");
+function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAdmin }) {
+  const [subTab, setSubTab] = useState("revenda");
+
   const subTabs = [
-    { id: "registo",    label: "Registo Diário", color: "bg-blue-600" },
-    { id: "afiliacao",  label: "Afiliação",      color: "bg-orange-500" },
-    { id: "encomendas", label: "Encomendas",     color: "bg-blue-700" },
-    { id: "parceiros",  label: "Parceiros",      color: "bg-purple-500" },
-    { id: "margem",     label: "Margem",         color: "bg-green-600" },
+    { id: "revenda",    label: "Revenda",          color: "bg-blue-500" },
+    { id: "afiliacao",  label: "Afiliação",         color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",        color: "bg-blue-600" },
+    { id: "leads",      label: "Leads / Parcerias", color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",            color: "bg-green-600" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tab bar */}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {subTabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+              subTab === t.id
+                ? `${t.color} text-white`
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {subTab === "revenda" && (
+        <EntryRevenda
+          monthNum={monthNum}
+          year={year}
+          totalDays={totalDays}
+          closedDay={closedDay}
+          isCurrentMonth={isCurrentMonth}
+        />
+      )}
+      {subTab === "afiliacao" && (
+        <AfiliacaoFecho monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "encomendas" && (
+        <Encomendas monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "leads" && (
+        <LeadsParcerias monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+      {subTab === "margem" && (
+        <MargemRegisto monthNum={monthNum} year={year} isAdmin={isAdmin} />
+      )}
+    </div>
+  );
+}
+
+
+// ── EntryHub — Registo Diário com sub-tabs ──────────────────────────────────
+function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
+  const [subTab, setSubTab] = useState("revenda");
+  const subTabs = [
+    { id: "revenda",    label: "Revenda",      color: "bg-blue-600" },
+    { id: "afiliacao",  label: "Afiliação",    color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",   color: "bg-blue-700" },
+    { id: "parceiros",  label: "Parceiros",    color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",       color: "bg-green-600" },
   ];
   return (
     <div className="space-y-4">
@@ -3475,7 +4751,7 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
           </button>
         ))}
       </div>
-      {subTab === "registo" && (
+      {subTab === "revenda" && (
         <Entry data={data} setEntry={setEntry} totalDays={totalDays}
           closedDay={closedDay} isCurrentMonth={isCurrentMonth} />
       )}
@@ -3488,295 +4764,14 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
 }
 
 
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PARTNER FOLLOWUP — Separador de acompanhamento de novos parceiros
-// ═══════════════════════════════════════════════════════════════════════════
-function PartnerFollowup() {
-  const FOLLOWUP_DAYS = 30;
-  const GESTORES = ["Antony", "Gestor 2", "Gestor 3"];
-
-  const [session, setSession] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginErr, setLoginErr] = useState("");
-  const [loggingIn, setLoggingIn] = useState(false);
-
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [clientId, setClientId] = useState("");
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState("all"); // all | pending | done
-
-  // Auth
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  // Load records for logged-in user
-  useEffect(() => {
-    if (!session) return;
-    loadRecords();
-  }, [session]);
-
-  const loadRecords = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("partner_followup")
-      .select("*")
-      .eq("gestor_email", session.user.email)
-      .order("created_at", { ascending: false });
-    if (!error) setRecords(data || []);
-    setLoading(false);
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginErr("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setLoginErr("Email ou password incorrectos.");
-    setLoggingIn(false);
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-  };
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    if (!clientId.trim()) return;
-    setSaving(true);
-    const { error } = await supabase.from("partner_followup").insert({
-      client_id: clientId.trim(),
-      note: note.trim() || null,
-      gestor_email: session.user.email,
-      status: "pending",
-    });
-    if (!error) {
-      setClientId("");
-      setNote("");
-      await loadRecords();
-    }
-    setSaving(false);
-  };
-
-  const updateStatus = async (id, status) => {
-    await supabase.from("partner_followup").update({ status }).eq("id", id);
-    await loadRecords();
-  };
-
-  const deleteRecord = async (id) => {
-    await supabase.from("partner_followup").delete().eq("id", id);
-    await loadRecords();
-  };
-
-  const getDaysInfo = (createdAt) => {
-    const created = new Date(createdAt);
-    const now = new Date();
-    const diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
-    const daysLeft = FOLLOWUP_DAYS - diffDays;
-    return { diffDays, daysLeft, overdue: daysLeft <= 0 };
-  };
-
-  const filteredRecords = records.filter(r => {
-    if (filter === "pending") return r.status === "pending";
-    if (filter === "done") return r.status !== "pending";
-    return true;
-  });
-
-  const overdueCount = records.filter(r => {
-    const { overdue } = getDaysInfo(r.created_at);
-    return overdue && r.status === "pending";
-  }).length;
-
-  // ── Login screen ──
-  if (!authReady) return <div className="text-center py-12 text-slate-400 text-sm">A carregar…</div>;
-
-  if (!session) return (
-    <div className="max-w-sm mx-auto mt-12">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 space-y-6">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-            <Lock className="w-6 h-6 text-emerald-600"/>
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">Acesso Gestores</h2>
-          <p className="text-sm text-slate-500 mt-1">Entra com o teu email e password</p>
-        </div>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Email</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              placeholder="gestor@prozis.com"/>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Password</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              placeholder="••••••••"/>
-          </div>
-          {loginErr && <p className="text-xs text-red-600">{loginErr}</p>}
-          <button type="submit" disabled={loggingIn}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50">
-            {loggingIn ? "A entrar…" : "Entrar"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-
-  // ── Main view ──
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Acompanhamento de Parceiros</h2>
-          <p className="text-sm text-slate-500">{session.user.email}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {overdueCount > 0 && (
-            <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-              ⚠ {overdueCount} {overdueCount === 1 ? "alerta" : "alertas"}
-            </span>
-          )}
-          <button onClick={handleLogout}
-            className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1">
-            <LogOut className="w-3 h-3"/> Sair
-          </button>
-        </div>
-      </div>
-
-      {/* Add form */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <p className="text-sm font-semibold text-slate-700 mb-3">Registar novo parceiro</p>
-        <form onSubmit={handleAdd} className="flex gap-3 flex-wrap">
-          <input
-            type="text" value={clientId} onChange={e=>setClientId(e.target.value)}
-            placeholder="ID do cliente (ex: 123456)" required
-            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
-          <input
-            type="text" value={note} onChange={e=>setNote(e.target.value)}
-            placeholder="Nota (opcional)"
-            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
-          <button type="submit" disabled={saving || !clientId.trim()}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
-            {saving ? "A guardar…" : "+ Adicionar"}
-          </button>
-        </form>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex gap-2">
-        {[
-          { id:"all", label:`Todos (${records.length})` },
-          { id:"pending", label:`Por verificar (${records.filter(r=>r.status==="pending").length})` },
-          { id:"done", label:`Verificados (${records.filter(r=>r.status!=="pending").length})` },
-        ].map(f => (
-          <button key={f.id} onClick={()=>setFilter(f.id)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter===f.id?"bg-emerald-600 text-white":"bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Records list */}
-      {loading ? (
-        <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>
-      ) : filteredRecords.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
-          {filter === "all" ? "Ainda não registaste nenhum parceiro." : "Nenhum registo nesta categoria."}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredRecords.map(r => {
-            const { diffDays, daysLeft, overdue } = getDaysInfo(r.created_at);
-            const isPending = r.status === "pending";
-            const isAlert = overdue && isPending;
-            return (
-              <div key={r.id} className={`bg-white rounded-xl border p-4 flex items-center gap-4 flex-wrap ${isAlert ? "border-red-300 bg-red-50" : "border-slate-200"}`}>
-                {/* Status indicator */}
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                  r.status === "bought" ? "bg-emerald-500" :
-                  r.status === "not_bought" ? "bg-slate-400" :
-                  isAlert ? "bg-red-500 animate-pulse" : "bg-amber-400"
-                }`}/>
-
-                {/* Client ID */}
-                <div className="flex-1 min-w-[120px]">
-                  <p className="font-bold text-slate-900 text-sm">ID: {r.client_id}</p>
-                  {r.note && <p className="text-xs text-slate-500 mt-0.5">{r.note}</p>}
-                </div>
-
-                {/* Days info */}
-                <div className="text-center min-w-[100px]">
-                  <p className="text-xs text-slate-400">Registado há</p>
-                  <p className="font-semibold text-slate-700 text-sm">{diffDays} {diffDays===1?"dia":"dias"}</p>
-                </div>
-
-                {/* Alert / days left */}
-                <div className="text-center min-w-[110px]">
-                  {isPending ? (
-                    isAlert ? (
-                      <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">
-                        ⚠ Verificar agora
-                      </span>
-                    ) : (
-                      <span className="bg-amber-50 text-amber-700 text-xs font-medium px-2 py-1 rounded-full">
-                        {daysLeft} {daysLeft===1?"dia":"dias"} restantes
-                      </span>
-                    )
-                  ) : (
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      r.status==="bought" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {r.status==="bought" ? "✓ Fez compra" : "✗ Sem compra"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Actions */}
-                {isPending && (
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={()=>updateStatus(r.id,"bought")}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                      ✓ Fez compra
-                    </button>
-                    <button onClick={()=>updateStatus(r.id,"not_bought")}
-                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                      ✗ Não fez
-                    </button>
-                  </div>
-                )}
-
-                {/* Delete */}
-                <button onClick={()=>deleteRecord(r.id)}
-                  className="text-slate-300 hover:text-red-400 text-xs transition-colors shrink-0">
-                  ✕
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function App() {
-  const [unlocked, setUnlocked] = React.useState(
+  const [unlocked, setUnlocked] = useState(
     () => typeof window !== "undefined" && window.localStorage.getItem(GATE_STORAGE_KEY) === "1"
   );
-  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+
+  if (!unlocked) {
+    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  }
   return <MainApp />;
 }
 
