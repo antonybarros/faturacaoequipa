@@ -52,6 +52,16 @@ async function loadMonthData(year, month) {
   return data || { entries:{}, team_goals:{} };
 }
 
+async function loadPartnersCount(year, month) {
+  const start = new Date(year, month, 1).toISOString();
+  const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  const { count } = await supabase.from("partner_followup")
+    .select("*", { count:"exact", head:true })
+    .gte("stage_started_at", start)
+    .lte("stage_started_at", end);
+  return count || 0;
+}
+
 function buildDaily(entries, totalDays) {
   const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
   for (let d=1; d<=totalDays; d++) {
@@ -67,10 +77,12 @@ function buildDaily(entries, totalDays) {
 
 function computeStats(daily, teamGoals, totalDays, closedDay) {
   const goal = Number(teamGoals?.equipa_fr)||0;
+  const partnerGoal = Number(teamGoals?.equipa_fr_partners)||0;
   const closed = daily.filter(d=>d.day<=closedDay);
   const actual = closed.length>0 ? closed[closed.length-1].cumul : 0;
   const expected = goal>0&&closedDay>0 ? Math.round(goal/totalDays*closedDay) : null;
   const vsExpected = expected!=null ? actual-expected : null;
+  const vsExpPct = expected>0 ? (actual/expected*100) : null;
   const normal = closed.filter(d=>!d.supersales&&d.dayValue>0);
   const ss = closed.filter(d=>d.supersales&&d.dayValue>0);
   const avgNormal = normal.length>0 ? Math.round(normal.reduce((s,d)=>s+d.dayValue,0)/normal.length) : 0;
@@ -80,7 +92,8 @@ function computeStats(daily, teamGoals, totalDays, closedDay) {
   const projWithSS = avgNormal>0&&avgSS>0 ? actual+avgNormal*(rem-1)+avgSS : projNoSS;
   const dailyAvg = closedDay>0 ? Math.round(actual/closedDay) : 0;
   const neededPerDay = goal>0&&rem>0 ? Math.round((goal-actual)/rem) : null;
-  return { goal, actual, expected, vsExpected, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay };
+  const remaining = goal>0 ? goal-actual : null;
+  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining };
 }
 
 function Modal({ title, subtitle, onClose, children }) {
@@ -101,62 +114,39 @@ function Modal({ title, subtitle, onClose, children }) {
   );
 }
 
-function TableRow({ cells, header, highlight }) {
-  return (
-    <tr style={{ borderBottom:`0.5px solid ${highlight?"#F1EFE8":C.card}`, background:highlight?"#FAEEDA":"transparent" }}>
-      {cells.map((cell, i) => (
-        <td key={i} style={{ padding:"11px 1.25rem", textAlign:i===0?"left":"right",
-          color: cell.color || (i===0 ? C.text : C.muted),
-          fontWeight: cell.bold ? 500 : (i===0 ? 500 : 400),
-          fontSize: header ? 11 : 14,
-          textTransform: header ? "uppercase" : "none",
-          letterSpacing: header ? ".06em" : "normal",
-          borderBottom: header ? `0.5px solid ${C.border}` : "none",
-        }}>{cell.v}</td>
-      ))}
-    </tr>
-  );
-}
-
 function DailyDetailModal({ daily, closedDay, goal, mode, onClose }) {
   const rows = daily.filter(d=>d.day<=closedDay&&d.cumul>0);
   const isObj = mode === "objetivo";
   return (
-    <Modal
-      title={isObj ? "% do objetivo mensal — evolução diária" : "% vs. esperado — evolução diária"}
-      subtitle={`Equipa FR · ${closedDay} dias fechados`}
-      onClose={onClose}>
+    <Modal title={isObj?"% do objetivo mensal — evolução diária":"% vs. esperado — evolução diária"}
+      subtitle={`Equipa FR · ${closedDay} dias fechados`} onClose={onClose}>
       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
         <thead style={{ position:"sticky", top:0, background:C.bg, zIndex:1 }}>
-          <TableRow header cells={[
-            {v:"DIA"},
-            {v:"ACUMULADO"},
-            ...(isObj ? [{v:"% DO OBJETIVO"}] : [{v:"ESPERADO"},{v:"% VS. ESPERADO"}])
-          ]} />
+          <tr>{[{v:"DIA"},{v:"ACUMULADO"},...(isObj?[{v:"% DO OBJETIVO"}]:[{v:"ESPERADO"},{v:"% VS. ESPERADO"}])].map((h,i)=>(
+            <th key={i} style={{ padding:"10px 1.25rem", textAlign:i===0?"left":"right", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".06em", borderBottom:`0.5px solid ${C.border}` }}>{h.v}</th>
+          ))}</tr>
         </thead>
         <tbody>
-          {rows.map(d => {
+          {rows.map(d=>{
             if (isObj) {
-              const pctObj = goal > 0 ? (d.cumul/goal*100) : null;
+              const pct = goal>0?(d.cumul/goal*100):null;
               return (
-                <TableRow key={d.day} highlight={d.supersales} cells={[
-                  {v:d.day+(d.supersales?" ⚡":""), bold:true},
-                  {v:fmtEur(d.cumul), bold:true, color:C.text},
-                  {v:pctObj!=null?`${pctObj.toFixed(1)}%`:"—", bold:true,
-                   color:pctObj>=100?C.green:pctObj>=80?C.amber:C.muted},
-                ]} />
+                <tr key={d.day} style={{ borderBottom:`0.5px solid ${C.card}`, background:d.supersales?"#FAEEDA":"transparent" }}>
+                  <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}{d.supersales?" ⚡":""}</td>
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:pct==null?C.muted:pct>=100?C.green:pct>=80?C.amber:C.muted }}>{pct!=null?`${pct.toFixed(1)}%`:"—"}</td>
+                </tr>
               );
             } else {
-              const exp = goal > 0 ? Math.round(goal/daily.length*d.day) : null;
-              const pct = exp > 0 ? (d.cumul/exp*100) : null;
+              const exp = goal>0?Math.round(goal/daily.length*d.day):null;
+              const pct = exp>0?(d.cumul/exp*100):null;
               return (
-                <TableRow key={d.day} highlight={d.supersales} cells={[
-                  {v:d.day+(d.supersales?" ⚡":""), bold:true},
-                  {v:fmtEur(d.cumul), bold:true, color:C.text},
-                  {v:exp?fmtEur(exp):"—", color:C.muted},
-                  {v:pct!=null?`${pct.toFixed(1)}%`:"—", bold:true,
-                   color:pct>=100?C.green:pct>=90?C.amber:C.red},
-                ]} />
+                <tr key={d.day} style={{ borderBottom:`0.5px solid ${C.card}`, background:d.supersales?"#FAEEDA":"transparent" }}>
+                  <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}{d.supersales?" ⚡":""}</td>
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", color:C.muted }}>{exp?fmtEur(exp):"—"}</td>
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:pct==null?C.muted:pct>=100?C.green:pct>=90?C.amber:C.red }}>{pct!=null?`${pct.toFixed(1)}%`:"—"}</td>
+                </tr>
               );
             }
           })}
@@ -181,18 +171,25 @@ function StatCard({ label, value, sub, subColor, onClick, highlight, small }) {
 
 function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   const [modal, setModal] = useState(null);
+  const [partnersCount, setPartnersCount] = useState(null);
+
+  useEffect(()=>{
+    loadPartnersCount(year, month).then(setPartnersCount);
+  }, [year, month]);
+
   const daily = useMemo(()=>buildDaily(entries,totalDays),[entries,totalDays]);
   const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay),[daily,teamGoals,totalDays,closedDay]);
 
-  const pctMonth = Math.round(closedDay/totalDays*100);
-  const pctObj = stats.goal>0 ? Math.round(stats.actual/stats.goal*100) : null;
+  const pctMonth = (closedDay/totalDays*100).toFixed(1);
+  const pctObj = stats.goal>0 ? (stats.actual/stats.goal*100).toFixed(1) : null;
+  const pctPartners = stats.partnerGoal>0&&partnersCount!=null ? (partnersCount/stats.partnerGoal*100).toFixed(1) : null;
+  const remainingPartners = stats.partnerGoal>0&&partnersCount!=null ? stats.partnerGoal-partnersCount : null;
 
   const chartData = daily.map(d=>({
     day:d.day,
     atual:d.day<=closedDay?d.cumul:null,
     objetivo:stats.goal>0?Math.round(stats.goal/totalDays*d.day):null,
   }));
-
   const barData = daily.filter(d=>d.day<=closedDay&&d.dayValue>0).map(d=>({day:d.day,value:d.dayValue,ss:d.supersales}));
   const mktData = MARKETS.map(m=>{ const l=daily[closedDay-1]; return {label:m.label,value:l?(m.id==="FR"?l.FR:l.CH):0,color:MARKET_COLORS[m.id]}; });
   const mktTotal = mktData.reduce((s,m)=>s+m.value,0);
@@ -201,26 +198,41 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
       {modal && <DailyDetailModal daily={daily} closedDay={closedDay} goal={stats.goal} mode={modal} onClose={()=>setModal(null)} />}
 
+      {/* Row 1 — faturação */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Faturado" value={fmtEur(stats.actual)}
-          sub={`${closedDay} de ${totalDays} dias · ${pctMonth}% do mês`}
+          sub={stats.remaining!=null?`faltam ${fmtEur(stats.remaining)} para o objetivo`:undefined}
+          subColor={C.muted}
           onClick={()=>setModal("faturado")} highlight />
         <StatCard label="Objetivo" value={stats.goal>0?fmtEur(stats.goal):"Sem objetivo"}
           sub={pctObj!=null?`${pctObj}% realizado em ${pctMonth}% do mês`:undefined}
-          subColor={pctObj!=null&&pctObj<pctMonth?C.red:C.green}
+          subColor={pctObj!=null&&Number(pctObj)<Number(pctMonth)?C.red:C.green}
           onClick={stats.goal>0?()=>setModal("objetivo"):undefined} />
         <StatCard label={`Esperado ao dia ${closedDay}`} value={stats.expected?fmtEur(stats.expected):"—"}
-          sub={`ao dia ${closedDay}`}
+          sub={stats.vsExpPct!=null?`${stats.vsExpPct.toFixed(1)}% vs o esperado ao dia ${closedDay}`:undefined}
+          subColor={stats.vsExpPct==null?undefined:stats.vsExpPct>=100?C.green:stats.vsExpPct>=90?C.amber:C.red}
           onClick={stats.goal>0?()=>setModal("esperado"):undefined} />
         <StatCard label={stats.vsExpected!=null&&stats.vsExpected>=0?"Acima do esperado":"Abaixo do esperado"}
-          value={stats.vsExpected!=null?fmtEur(Math.abs(stats.vsExpected)):"—"}
+          value={stats.vsExpected!=null?`${stats.vsExpected>=0?"+":"-"}${fmtEur(Math.abs(stats.vsExpected))}`:"-"}
           sub={`ao dia ${closedDay}`}
           subColor={stats.vsExpected==null?undefined:stats.vsExpected>=0?C.green:C.red} />
       </div>
 
+      {/* Row 2 — parceiros */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
+        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
+          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
+          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
+          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
+        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
+          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
+          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
+      </div>
+
+      {/* Row 3 — projeções */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Média / dia" value={stats.dailyAvg>0?fmtEur(stats.dailyAvg):"—"}
-          sub={stats.neededPerDay?`preciso ${fmtEur(stats.neededPerDay)}/dia para atingir 100% do objetivo`:undefined}
+          sub={stats.neededPerDay?`é preciso ${fmtEur(stats.neededPerDay)}/dia para atingir 100% do objetivo`:undefined}
           subColor={stats.neededPerDay&&stats.neededPerDay>stats.dailyAvg?C.red:C.green} small />
         <StatCard label="Projeção sem Supersales" value={stats.projNoSS?fmtEur(stats.projNoSS):"—"}
           sub={stats.projNoSS&&stats.goal>0?(stats.projNoSS>=stats.goal?"↑ acima do objetivo":"↓ abaixo do objetivo"):`média ${stats.avgNormal>0?fmtEur(stats.avgNormal):"—"}/dia`}
@@ -230,10 +242,11 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           subColor={stats.projWithSS>=stats.goal?C.green:C.red} small />
       </div>
 
+      {/* Chart */}
       <div style={T.card}>
         <p style={T.sectionTitle}>Evolução acumulada vs objetivo</p>
         <div style={{ display:"flex", gap:16, fontSize:12, color:C.muted, marginBottom:12 }}>
-          {[{c:C.green,l:String(year)},{c:"#9333ea",l:"Objetivo",dash:true}].map(({c,l,dash})=>(
+          {[{c:C.green,l:String(year)},{c:"#9333ea",l:"Objetivo"}].map(({c,l})=>(
             <span key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
               <span style={{ width:16, height:2, background:c, display:"inline-block", borderRadius:1 }}></span>{l}
             </span>
@@ -331,11 +344,11 @@ function MainApp() {
             </button>
           ))}
         </div>
-        {loading ? (
+        {loading?(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
-        ) : tab==="analise" ? (
+        ):tab==="analise"?(
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
-        ) : (
+        ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
             {tab==="registo"?"Separador Registo — em breve":"Separador Parceiros — em breve"}
           </div>
