@@ -56,7 +56,7 @@ function MainApp() {
   const [data, setData] = useState(emptyMonth());
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("analise");
-  const [analiseScope, setAnaliseScope] = useState("total");
+  const [analiseScope, setAnaliseScope] = useState("equipa_fr");
   const [scope, setScope] = useState("equipa_fr");
   const [saveMsg, setSaveMsg] = useState("");
   const [annualGoal, setAnnualGoalState] = useState(0);
@@ -350,7 +350,6 @@ function MainApp() {
                 setTotalGoal={setTotalGoal}
                 setTeamGoal={setTeamGoal}
                 distributeEqually={distributeEqually}
-                  saveAnnualGoal={saveAnnualGoal}
                 year={year}
               />
             )}
@@ -2849,35 +2848,13 @@ function Entry({ data, setEntry, totalDays, closedDay, isCurrentMonth }) {
 
 // ── EntryRevenda — registo por valor do DIA (não acumulado) ──
 function Setup({ data, setTotalGoal, setTeamGoal, distributeEqually, year }) {
-  const equipas = ANALISE_TEAMS.filter(t => t.id !== "total");
+  const equipas = ANALISE_TEAMS;
   const sumEquipas = equipas.reduce((s, t) => s + (Number(data.teamGoals[t.id]) || 0), 0);
   const totalGoal = Number(data.totalGoal) || 0;
   const diff = totalGoal - sumEquipas;
-  const [annualInput, setAnnualInput] = useState(annualGoal || "");
-
-  React.useEffect(() => { setAnnualInput(annualGoal || ""); }, [annualGoal]);
-
   return (
     <div className="space-y-4">
       {/* Objetivo anual */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-          <Target className="w-4 h-4" /> Objetivo anual — {year}
-        </h3>
-        <p className="text-xs text-slate-500 mt-1">Objetivo total de faturação para o ano {year}.</p>
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-slate-500">€</span>
-          <input
-            type="number"
-            value={annualInput}
-            onChange={(e) => setAnnualInput(e.target.value)}
-            onBlur={(e) => saveAnnualGoal(e.target.value)}
-            placeholder="ex: 15000000"
-            className="flex-1 max-w-xs px-3 py-2 border border-slate-300 rounded-lg text-lg font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
       {/* Objetivo total do mês */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
