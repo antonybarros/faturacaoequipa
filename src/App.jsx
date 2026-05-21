@@ -256,11 +256,13 @@ function MainApp() {
         { id: "history", label: "Histórico" },
         { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
+        { id: "followup", label: "Parceiros" },
       ]
     : [
         { id: "analise", label: "Análise comercial" },
         { id: "dashboard", label: "Resumo" },
         { id: "history", label: "Histórico" },
+        { id: "followup", label: "Parceiros" },
       ];
 
   return (
@@ -387,6 +389,7 @@ function MainApp() {
               />
             )}
 
+            {tab === "followup" && <PartnerFollowup />}
             {tab === "setup" && isAdmin && (
               <Setup
                 data={data}
@@ -4917,6 +4920,216 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
   );
 }
 
+
+
+// ══════════════════════════════════════════════════════════
+// SEPARADOR PARCEIROS — acompanhamento de primeiras compras
+// ══════════════════════════════════════════════════════════
+function PartnerFollowup() {
+  const PROGRAMMES = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+  const STAGES = [
+    { key:"s30", days:30, label:"30 dias", bg:"bg-white",       border:"border-slate-200",  badgeBg:"bg-red-100",    badgeText:"text-red-700"    },
+    { key:"s60", days:60, label:"60 dias", bg:"bg-orange-50",   border:"border-orange-200", badgeBg:"bg-orange-200", badgeText:"text-orange-800" },
+    { key:"s90", days:90, label:"90 dias", bg:"bg-red-50",      border:"border-red-200",    badgeBg:"bg-red-200",    badgeText:"text-red-800"    },
+  ];
+
+  const [records,   setRecords]   = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [clientId,  setClientId]  = useState("");
+  const [programme, setProgramme] = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [filter,    setFilter]    = useState("all");
+
+  useEffect(() => { loadRecords(); }, []);
+
+  const loadRecords = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("partner_followup")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setRecords(data || []);
+    setLoading(false);
+  };
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!clientId.trim() || !programme) return;
+    setSaving(true);
+    await supabase.from("partner_followup").insert({
+      client_id: clientId.trim(),
+      programme,
+      stage: "s30",
+      stage_started_at: new Date().toISOString(),
+      status: "pending",
+    });
+    setClientId(""); setProgramme("");
+    await loadRecords();
+    setSaving(false);
+  };
+
+  const handleBought = async (id) => {
+    await supabase.from("partner_followup").update({ status:"bought" }).eq("id", id);
+    await loadRecords();
+  };
+
+  const handleNotBought = async (record) => {
+    const next = record.stage === "s30" ? "s60" : record.stage === "s60" ? "s90" : null;
+    if (!next) {
+      await supabase.from("partner_followup").delete().eq("id", record.id);
+    } else {
+      await supabase.from("partner_followup").update({
+        stage: next,
+        stage_started_at: new Date().toISOString(),
+        status: "pending",
+      }).eq("id", record.id);
+    }
+    await loadRecords();
+  };
+
+  const getInfo = (r) => {
+    const stage = STAGES.find(s => s.key === r.stage) || STAGES[0];
+    const diff  = Math.floor((new Date() - new Date(r.stage_started_at)) / 86400000);
+    const left  = stage.days - diff;
+    return { stage, diff, left, overdue: left <= 0 && r.status === "pending" };
+  };
+
+  const pending  = records.filter(r => r.status === "pending");
+  const done     = records.filter(r => r.status === "bought");
+  const overdue  = pending.filter(r => getInfo(r).overdue).length;
+
+  const filtered =
+    filter === "s30"  ? pending.filter(r => r.stage === "s30") :
+    filter === "s60"  ? pending.filter(r => r.stage === "s60") :
+    filter === "s90"  ? pending.filter(r => r.stage === "s90") :
+    filter === "done" ? done :
+    pending;
+
+  return (
+    <div className="space-y-5">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Acompanhamento de Parceiros</h2>
+          <p className="text-sm text-slate-500">Seguimento de primeiras compras · prazo de 30 / 60 / 90 dias</p>
+        </div>
+        {overdue > 0 && (
+          <span className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full">
+            ⚠ {overdue} {overdue === 1 ? "alerta" : "alertas"}
+          </span>
+        )}
+      </div>
+
+      {/* Formulário */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <p className="text-sm font-semibold text-slate-700 mb-3">Registar novo parceiro</p>
+        <form onSubmit={handleAdd} className="flex gap-3 flex-wrap">
+          <input
+            type="text" value={clientId} onChange={e => setClientId(e.target.value)}
+            placeholder="ID do cliente (ex: 123456)" required
+            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+          <select
+            value={programme} onChange={e => setProgramme(e.target.value)} required
+            className="flex-1 min-w-[160px] border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+            <option value="">Tipo de parceria…</option>
+            {PROGRAMMES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button type="submit" disabled={saving || !clientId.trim() || !programme}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
+            {saving ? "A guardar…" : "+ Adicionar"}
+          </button>
+        </form>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { id:"all",  label:`Todos (${pending.length})` },
+          { id:"s30",  label:`30 dias (${pending.filter(r=>r.stage==="s30").length})` },
+          { id:"s60",  label:`60 dias (${pending.filter(r=>r.stage==="s60").length})`,  activeColor:"bg-orange-500" },
+          { id:"s90",  label:`90 dias (${pending.filter(r=>r.stage==="s90").length})`,  activeColor:"bg-red-500" },
+          { id:"done", label:`Compraram (${done.length})` },
+        ].map(f => (
+          <button key={f.id} onClick={() => setFilter(f.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              filter === f.id
+                ? (f.activeColor || "bg-emerald-600") + " text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-2xl border border-slate-200">
+          Nenhum registo nesta categoria.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(r => {
+            const { stage, diff, left, overdue } = getInfo(r);
+            const isDone = r.status === "bought";
+            return (
+              <div key={r.id}
+                className={`rounded-xl border p-4 flex items-center gap-4 flex-wrap ${stage.bg} ${stage.border}`}>
+                {/* Indicador */}
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  isDone ? "bg-emerald-500" :
+                  overdue ? "bg-red-500 animate-pulse" : "bg-amber-400"}`}/>
+
+                {/* ID + Programa */}
+                <div className="flex-1 min-w-[140px]">
+                  <p className="font-bold text-slate-900 text-sm">ID: {r.client_id}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{r.programme}</p>
+                </div>
+
+                {/* Fase */}
+                <div className="text-center min-w-[80px]">
+                  <p className="text-xs text-slate-400">Fase</p>
+                  <p className="font-semibold text-slate-700 text-sm">{stage.label}</p>
+                </div>
+
+                {/* Dias */}
+                <div className="text-center min-w-[90px]">
+                  <p className="text-xs text-slate-400">Registado há</p>
+                  <p className="font-semibold text-slate-700 text-sm">{diff} {diff===1?"dia":"dias"}</p>
+                </div>
+
+                {/* Estado */}
+                <div className="min-w-[120px] text-center">
+                  {isDone ? (
+                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">✓ Fez compra</span>
+                  ) : overdue ? (
+                    <span className={`${stage.badgeBg} ${stage.badgeText} text-xs font-bold px-2 py-1 rounded-full`}>⚠ Verificar agora</span>
+                  ) : (
+                    <span className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">{left} {left===1?"dia":"dias"} restantes</span>
+                  )}
+                </div>
+
+                {/* Acções */}
+                {!isDone && (
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleBought(r.id)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      ✓ Fez compra
+                    </button>
+                    <button onClick={() => handleNotBought(r)}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      ✗ Não fez
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(
