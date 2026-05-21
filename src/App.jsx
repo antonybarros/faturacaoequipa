@@ -254,7 +254,7 @@ function MainApp() {
         { id: "dashboard", label: "Resumo" },
         { id: "relatorio", label: "Relatório" },
         { id: "history", label: "Histórico" },
-        { id: "entry", label: "Registo Diário" },
+        { id: "entry", label: "Registo" },
         { id: "setup", label: "Objetivos" },
       ]
     : [
@@ -769,31 +769,10 @@ function AnaliseDashboardWrapper({
 function DashboardWrapper({
   data, totalDays, closedDay, month, monthNum, year, scope, setScope, isCurrentMonth,
 }) {
-  // From January 2025 onwards, use Registo Revenda (daily values) as data source
-  const useRevendaReg = year >= 2025;
-  const revendaKey = `revenda-daily-${year}-${String(monthNum + 1).padStart(2, "0")}`;
-
-  const [revendaEntries, setRevendaEntries] = useState(null);
-  useEffect(() => {
-    if (!useRevendaReg) { setRevendaEntries(null); return; }
-    supabase.from("billing_months").select("entries").eq("month_key", revendaKey).maybeSingle()
-      .then(({ data: row }) => {
-        setRevendaEntries(row?.entries || {});
-      });
-  }, [revendaKey, useRevendaReg]);
-
-  // Build effective data: if using Registo Revenda, convert daily→cumulative
-  const effectiveData = useMemo(() => {
-    if (!useRevendaReg || revendaEntries === null) return data;
-    return {
-      ...data,
-      entries: dailyToCumulative(revendaEntries, TEAMS),
-    };
-  }, [data, useRevendaReg, revendaEntries]);
-
+  // Resumo uses same data as Análise comercial (billing_months/YYYY-MM)
   const stats = useMemo(
-    () => computeScopeStats(effectiveData, scope, totalDays, closedDay, year, monthNum),
-    [effectiveData, scope, totalDays, closedDay, year, monthNum]
+    () => computeScopeStats(data, scope, totalDays, closedDay, year, monthNum),
+    [data, scope, totalDays, closedDay, year, monthNum]
   );
 
   // Load prev year data + closing data (margem, encomendas)
@@ -803,20 +782,11 @@ function DashboardWrapper({
 
   useEffect(() => {
     const prevKey = `${year - 1}-${String(monthNum + 1).padStart(2, "0")}`;
-    // Prev year billing — also try revenda-daily for prev year if applicable
-    const prevUseReg = (year - 1) >= 2025;
-    const prevDataKey = prevUseReg
-      ? `revenda-daily-${year - 1}-${String(monthNum + 1).padStart(2, "0")}`
-      : prevKey;
-
-    supabase.from("billing_months").select("entries").eq("month_key", prevDataKey).maybeSingle()
+    // Prev year billing — same source as current year (billing_months)
+    supabase.from("billing_months").select("entries").eq("month_key", prevKey).maybeSingle()
       .then(({ data: row }) => {
         if (!row?.entries) { setPrevYearActual(null); return; }
-        let entries = row.entries;
-        if (prevUseReg) {
-          // Convert daily to cumulative to extract final value
-          entries = dailyToCumulative(entries, TEAMS);
-        }
+        const entries = row.entries;
         const days = Object.keys(entries).map(Number).filter(n => !isNaN(n)).sort((a,b)=>a-b);
         if (!days.length) { setPrevYearActual(null); return; }
         const lastEntry = entries[String(days[days.length - 1])] || {};
@@ -835,7 +805,7 @@ function DashboardWrapper({
     loadClosing(year - 1, monthNum).then(setClosingPrev);
   }, [year, monthNum, scope]);
 
-  // YoY faturação — use displayActual (may differ from stats.actual when using Registo Revenda)
+  // YoY faturação
   const evoPct = prevYearActual > 0 ? ((stats.actual - prevYearActual) / prevYearActual) * 100 : null;
   const evoAbs = prevYearActual != null ? stats.actual - prevYearActual : null;
   const isAheadYoY = evoPct != null && evoPct >= 0;
@@ -854,20 +824,9 @@ function DashboardWrapper({
     const v = closing.markets?.[marketCode]?.margin_curr;
     return v ? parseFloat(v) : null;
   };
-  // margin_prev is stored in closingCurr (the current month's closing record),
-  // not in closingPrev (which is the previous year's closing record).
-  const getMarginPrev = (closing, marketCode) => {
-    if (!closing) return null;
-    if (marketCode === "total") {
-      if (closing.revenda_margin_prev) return parseFloat(closing.revenda_margin_prev);
-      const vals = MC_MARKETS.map(m => parseFloat(closing.markets?.[m.code]?.margin_prev)).filter(v => !isNaN(v) && v > 0);
-      return vals.length > 0 ? vals.reduce((s,v) => s+v, 0) / vals.length : null;
-    }
-    const v = closing.markets?.[marketCode]?.margin_prev;
-    return v ? parseFloat(v) : null;
-  };
+  // marginPrev comes from closingPrev (prev year's closing) using margin_curr field
   const marginCurr = getMargin(closingCurr, scope);
-  const marginPrev = getMarginPrev(closingCurr, scope); // reads margin_prev from current closing record
+  const marginPrev = getMargin(closingPrev, scope); // reads margin_curr from prev year closing
 
   // Encomendas — aggregate across all markets (total) or specific market
   const sumField = (closing, field) => {
@@ -884,7 +843,23 @@ function DashboardWrapper({
   const firstRevCurr  = sumField(closingCurr, "first_orders_rev_curr");
   const firstRevPrev  = sumField(closingPrev, "first_orders_rev_curr");
   const leadsCurr     = sumField(closingCurr, "leads_curr");
-  const leadsPrev     = sumField(closingPrev, "leads_curr");
+  const leadsPrev     = sumField(closingPrev, "leads_curr"); // read from prev year closing
+
+  // Origem das leads
+  const getOrigin = (closing, field) => {
+    if (!closing?.markets) return null;
+    const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+    const t = markets.reduce((s,m) => s + (Number(closing.markets[m]?.[field])||0), 0);
+    return t > 0 ? t : null;
+  };
+  const originFields = ["leads_bap","leads_ang","leads_outras"];
+  const originCurr = originFields.map(f => getOrigin(closingCurr, f+"_curr"));
+  const originPrev = originFields.map(f => getOrigin(closingPrev, f+"_curr"));
+
+  // Novos parceiros por programa
+  const progFields = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
+  const progCurr = progFields.map(f => getOrigin(closingCurr, "prog_"+f+"_curr"));
+  const progPrev = progFields.map(f => getOrigin(closingPrev, "prog_"+f+"_curr"));
   // Afiliação
   const afilCurr = (() => {
     if (!closingCurr) return null;
@@ -899,51 +874,31 @@ function DashboardWrapper({
     return global > 0 ? global : null;
   })();
   const afilPrev = (() => {
-    if (!closingCurr) return null; // prev year stored in current closing as afil_prev
-    // Try per-market afil_prev
-    if (closingCurr.markets) {
+    if (!closingPrev) return null;
+    // Read afil_result from prev year closing
+    if (closingPrev.markets) {
       const markets = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
-      const t = markets.reduce((s,m) => s + (parseFloat(closingCurr.markets[m]?.afil_prev)||0), 0);
+      const t = markets.reduce((s,m) => s + (parseFloat(closingPrev.markets[m]?.afil_result)||0), 0);
       if (t > 0) return t;
     }
-    // Fallback: global afil_prev field
-    const global = parseFloat(closingCurr.afil_prev);
+    const global = parseFloat(closingPrev.afil_result);
     return global > 0 ? global : null;
   })();
 
-  // Fallback: if billing data is empty, try to read total from Registo Revenda closing
-  // This covers months where data was entered via the simple 2025 form
-  const revendaActual = stats.actual > 0 ? stats.actual : (() => {
-    if (!closingCurr) return 0;
-    // Try _total from revenda closing (2025 format stored in closing)
-    const rev = closingCurr?.revenda_total;
-    if (rev) return Number(rev);
-    return 0;
-  })();
 
-  // Use revendaActual instead of stats.actual for YoY comparison display
-  const displayActual = revendaActual || stats.actual;
 
   return (
     <div className="space-y-5">
       <ScopeTabs scope={scope} setScope={setScope} />
 
-      {useRevendaReg && (
-        <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-          <span className="font-semibold">📋 Fonte:</span> Registo Revenda (valores diários)
-          {revendaEntries && Object.keys(revendaEntries).filter(k => !isNaN(Number(k))).length === 0 && (
-            <span className="ml-1 text-orange-600 font-medium">— ainda sem dados registados</span>
-          )}
-        </div>
-      )}
-
-      <RevDashboard
+<RevDashboard
         stats={stats}
         scope={scope}
         month={month}
         year={year}
         totalDays={totalDays}
         closedDay={closedDay}
+        data={data}
         isCurrentMonth={isCurrentMonth}
         prevYearActual={prevYearActual}
         marginCurr={marginCurr}
@@ -958,8 +913,24 @@ function DashboardWrapper({
         leadsPrev={leadsPrev}
         afilCurr={afilCurr}
         afilPrev={afilPrev}
-        effectiveData={effectiveData}
         closingCurr={closingCurr}
+        originCurr={originCurr}
+        originPrev={originPrev}
+        progCurr={progCurr}
+        progPrev={progPrev}
+        ordersCurrMkt={(() => {
+          const mkts = scope === "total" ? MC_MARKETS.map(m => m.code) : [scope];
+          const sumC = (field) => mkts.reduce((s,m) => s+(Number(closingCurr?.markets?.[m]?.[field])||0), 0);
+          const sumP = (field) => mkts.reduce((s,m) => s+(Number(closingPrev?.markets?.[m]?.[field])||0), 0);
+          return {
+            orders:       sumC("orders_curr"),
+            first:        sumC("first_orders_curr"),
+            firstRev:     sumC("first_orders_rev_curr"),
+            ordersPrev:   sumP("orders_curr"),
+            firstPrev:    sumP("first_orders_curr"),
+            firstRevPrev: sumP("first_orders_rev_curr"),
+          };
+        })()}
       />
     </div>
   );
@@ -1384,11 +1355,111 @@ function Dashboard({
 }
 
 
+
+// ── Chart.js helper components for RevDashboard ──────────────────────────────
+// Loaded once from CDN; subsequent renders reuse the global Chart object
+function useChartJs(cb, deps) {
+  useEffect(() => {
+    const el = document.createElement("script");
+    el.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+    el.async = true;
+    el.onload = cb;
+    if (window.Chart) { cb(); return; }
+    document.head.appendChild(el);
+    return () => {};
+  }, deps);
+}
+
+function ChartOrigin({ id, labels, d25, d26 }) {
+  useEffect(() => {
+    const init = () => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
+      const textColor = isDark ? "#e5e5e3" : "#444441";
+      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      canvas._chartInstance = new window.Chart(canvas, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
+            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString("fr-FR")}` } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 }, autoSkip: false }, border: { display: false } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
+          }
+        }
+      });
+    };
+    if (window.Chart) init();
+    else {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = init; document.head.appendChild(s);
+    }
+    return () => {
+      const canvas = document.getElementById(id);
+      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+    };
+  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
+  return null;
+}
+
+function ChartProg({ id, labels, d25, d26 }) {
+  useEffect(() => {
+    const init = () => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const isDark = matchMedia("(prefers-color-scheme:dark)").matches;
+      const textColor = isDark ? "#e5e5e3" : "#444441";
+      const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
+      canvas._chartInstance = new window.Chart(canvas, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: String(new Date().getFullYear()-1), data: d25, backgroundColor: "#B4B2A9", borderRadius: 4, borderWidth: 0 },
+            { label: String(new Date().getFullYear()),   data: d26, backgroundColor: "#1D9E75", borderRadius: 4, borderWidth: 0 },
+          ]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString("fr-FR")}` } } },
+          scales: {
+            y: { grid: { display: false }, ticks: { color: textColor, font: { size: 12 } }, border: { display: false } },
+            x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 } }, border: { display: false } }
+          }
+        }
+      });
+    };
+    if (window.Chart) init();
+    else {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = init; document.head.appendChild(s);
+    }
+    return () => {
+      const canvas = document.getElementById(id);
+      if (canvas?._chartInstance) { canvas._chartInstance.destroy(); canvas._chartInstance = null; }
+    };
+  }, [id, JSON.stringify(d25), JSON.stringify(d26)]);
+  return null;
+}
+
 // ── RevDashboard — separador Revenda (sem duplicados do Análise comercial) ──
 function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurrentMonth,
   prevYearActual, marginCurr, marginPrev, ordersCurr, ordersPrev, firstCurr, firstPrev,
   firstRevCurr, firstRevPrev, leadsCurr, leadsPrev, afilCurr, afilPrev,
-  effectiveData, closingCurr }) {
+  closingCurr, data, originCurr, originPrev, progCurr, progPrev, ordersCurrMkt }) {
   const {
     goal, dailyAvg, actual, daily,
     avgWithoutSuper, hasSuperDays,
@@ -1409,13 +1480,12 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getTotal = async (y) => {
-            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const converted = dailyToCumulative(row.entries, TEAMS);
-            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = converted[String(days[days.length-1])];
+            const last = row.entries[String(days[days.length-1])];
             return last?.total || TEAMS.reduce((s,t)=>s+(Number(last?.[t])||0),0) || null;
           };
           const [v25, v26] = await Promise.all([getTotal(year-1), getTotal(year)]);
@@ -1434,13 +1504,12 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       const rows = await Promise.all(
         MONTH_LABELS.map(async (_, mi) => {
           const getVal = async (y) => {
-            const key = `revenda-daily-${y}-${String(mi+1).padStart(2,"0")}`;
+            const key = `${y}-${String(mi+1).padStart(2,"0")}`;
             const {data:row} = await supabase.from("billing_months").select("entries").eq("month_key",key).maybeSingle();
             if (!row?.entries) return null;
-            const converted = dailyToCumulative(row.entries, TEAMS);
-            const days = Object.keys(converted).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+            const days = Object.keys(row.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
             if (!days.length) return null;
-            const last = converted[String(days[days.length-1])];
+            const last = row.entries[String(days[days.length-1])];
             return Number(last?.[scope]) || null;
           };
           const [v25, v26] = await Promise.all([getVal(year-1), getVal(year)]);
@@ -1608,10 +1677,13 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
 
   // ── Data for charts ─────────────────────────────────────────────────────────
   const getLastMktVal = (code) => {
-    if (!effectiveData?.entries) return 0;
-    const days = Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    if (!stats?.daily) return 0;
+    // Use the last cumulative value from stats.daily for this scope
+    // For per-market, read directly from data.entries last day
+    const entries = data?.entries || {};
+    const days = Object.keys(entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
     if (!days.length) return 0;
-    return Number(effectiveData.entries[String(days[days.length-1])][code]) || 0;
+    return Number(entries[String(days[days.length-1])][code]) || 0;
   };
   const COLORS_REV  = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
   const COLORS_AFIL = ["#3A9E8F","#2E7D71","#5BB8AC","#7DCCC3","#A8DDD8","#C5ECEA","#1A5C52","#0D3B33"];
@@ -1633,11 +1705,34 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
       </div>
 
       {/* ── CARD: REVENDA ── */}
-      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!effectiveData?.entries) return 0; const days=Object.keys(effectiveData.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=effectiveData.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
+      <BigCard name="REVENDA" result={actual} prev={prevYearActual||0} objective={goal} showObjective={scope === "total"} totalResult={scope !== "total" ? (() => { if (!data?.entries) return 0; const days=Object.keys(data.entries).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b); if(!days.length) return 0; const l=data.entries[String(days[days.length-1])]; return l?.total||TEAMS.reduce((s,t)=>s+(Number(l?.[t])||0),0); })() : 0}>
         {/* Distribuição por mercado — dentro do card Revenda */}
         {revendaByMkt.length > 0 && (
           <MktDonut data={revendaByMkt} colors={COLORS_REV} title="DISTRIBUIÇÃO POR MERCADO — REVENDA" />
         )}
+        {/* Margem */}
+        {(marginCurr || marginPrev) && (
+          <div className={DS.detailBox}>
+            <p className={DS.detailLabel}>MARGEM</p>
+            <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">{year-1}</p>
+                <p className="text-xl font-semibold text-slate-600">{marginPrev!=null?`${marginPrev.toFixed(2)}%`:"—"}</p>
+              </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">{year}</p>
+                <p className="text-xl font-bold text-slate-900">{marginCurr!=null?`${marginCurr.toFixed(2)}%`:"—"}</p>
+              </div>
+              <div className={DS.col}>
+                <p className="text-xs text-slate-400 mb-1">Evolução</p>
+                {marginCurr!=null&&marginPrev!=null?(()=>{const d=marginCurr-marginPrev;return(
+                  <p className={`text-xl font-bold ${d>=0?"text-emerald-600":"text-red-600"}`}>{d>=0?"+":""}{d.toFixed(2)}pp</p>
+                );})():<p className="text-xl font-bold text-slate-400">—</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Médias diárias */}
         {closedDay > 0 && (
           <div className={DS.detailBox}>
@@ -1701,26 +1796,38 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
         </div>
       )}
 
-      {/* ── CARD: ENCOMENDAS ── */}
-      {(ordersCurr || ordersPrev) && (
+      {/* ── CARD: AFILIAÇÃO ── */}
+      {afilCurr != null && (
+        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
+          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
+          showObjective={scope === "total"}>
+          {afilByMkt.length > 0 && (
+            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
+          )}
+        </BigCard>
+      )}
+
+      {/* ── CARD: ENCOMENDAS (from Registo closing) ── */}
+      {ordersCurrMkt && (ordersCurrMkt.orders > 0 || ordersCurrMkt.ordersPrev > 0) && (
         <div className={DS.card}>
           <div>
             <h2 className={DS.title}>ENCOMENDAS</h2>
             <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
           </div>
           {[
-            {label:"Total encomendas", prev:ordersPrev, curr:ordersCurr, fmt:v=>v!=null?Math.round(v).toString():"—"},
-            {label:"1ªs encomendas",   prev:firstPrev,  curr:firstCurr,  fmt:v=>v!=null?Math.round(v).toString():"—"},
-            {label:"Fat. 1ªs enc. (€)",prev:firstRevPrev, curr:firstRevCurr, fmt:v=>v!=null?fmtEur(v):"—"},
-          ].map((row,i)=>{
-            const evo=row.prev>0&&row.curr!=null?((row.curr-row.prev)/row.prev*100):null;
-            const pos=evo!=null&&evo>=0;
+            {label:"Total encomendas",   curr:ordersCurrMkt.orders,    prev:ordersCurrMkt.ordersPrev,    isEur:false},
+            {label:"1ªs encomendas",     curr:ordersCurrMkt.first,     prev:ordersCurrMkt.firstPrev,     isEur:false},
+            {label:"Fat. 1ªs enc. (€)",  curr:ordersCurrMkt.firstRev,  prev:ordersCurrMkt.firstRevPrev,  isEur:true},
+          ].map((row,i) => {
+            const evo = row.prev>0&&row.curr>0?((row.curr-row.prev)/row.prev*100):null;
+            const pos = evo!=null&&evo>=0;
+            const fmt = v => v>0?(row.isEur?fmtEur(v):new Intl.NumberFormat("fr-FR").format(Math.round(v))):"—";
             return (
               <div key={i} className={DS.detailBox}>
                 <p className={DS.detailLabel}>{row.label}</p>
                 <div className={`grid grid-cols-3 gap-0 ${DS.divider}`}>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{row.fmt(row.prev)}</p></div>
-                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{row.fmt(row.curr)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year-1}</p><p className="text-xl font-semibold text-slate-600">{fmt(row.prev)}</p></div>
+                  <div className={DS.col}><p className="text-xs text-slate-400 mb-1">{year}</p><p className="text-xl font-bold text-slate-900">{fmt(row.curr)}</p></div>
                   <div className={DS.col}><p className="text-xs text-slate-400 mb-1">Evolução</p>
                     <p className={`text-xl font-bold ${evo==null?"text-slate-400":pos?"text-emerald-600":"text-red-600"}`}>
                       {evo==null?"—":`${pos?"+":""}${evo.toFixed(1)}%`}
@@ -1731,17 +1838,6 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
             );
           })}
         </div>
-      )}
-
-      {/* ── CARD: AFILIAÇÃO ── */}
-      {afilCurr != null && (
-        <BigCard name="AFILIAÇÃO" result={afilCurr||0} prev={afilPrev||0}
-          objective={scope === "total" ? (parseFloat(closingCurr?.afil_objective)||0) : 0}
-          showObjective={scope === "total"}>
-          {afilByMkt.length > 0 && (
-            <MktDonut data={afilByMkt} colors={COLORS_AFIL} title="DISTRIBUIÇÃO POR MERCADO — AFILIAÇÃO" />
-          )}
-        </BigCard>
       )}
 
       {/* ── CARD: LEADS ── */}
@@ -1762,6 +1858,67 @@ function RevDashboard({ stats, scope, month, year, totalDays, closedDay, isCurre
           </div>
         </div>
       )}
+
+      {/* ── CARD: ORIGEM DAS LEADS — Chart.js grouped bar ── */}
+      {originCurr && originCurr.some(v => v != null) && (() => {
+        const labels = ["Be A Partner","Vindas de angariadores","Outras fontes"];
+        const d25 = originPrev.map(v => v || 0);
+        const d26 = originCurr.map(v => v || 0);
+        const chartId = `origin-${scope}`;
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>ORIGEM DAS LEADS</h2>
+              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+            </div>
+            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
+              </span>
+            </div>
+            <div style={{position:"relative",width:"100%",height:"220px"}}>
+              <canvas id={chartId} role="img" aria-label={`Origem das leads ${year-1} vs ${year}`}></canvas>
+            </div>
+            <ChartOrigin id={chartId} labels={labels} d25={d25} d26={d26} />
+          </div>
+        );
+      })()}
+
+      {/* ── CARD: NOVOS PARCEIROS POR PROGRAMA — Chart.js horizontal bar ── */}
+      {progCurr && progCurr.some(v => v != null) && (() => {
+        const progLabels = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+        // Sort by 2026 value descending
+        const combined = progLabels.map((l,i) => ({l, c: progCurr[i]||0, p: progPrev[i]||0}))
+          .sort((a,b) => b.c - a.c);
+        const sortedLabels = combined.map(x => x.l);
+        const d26 = combined.map(x => x.c);
+        const d25 = combined.map(x => x.p);
+        const chartId = `prog-${scope}`;
+        const h = Math.max(300, combined.length * 48 + 60);
+        return (
+          <div className={DS.card}>
+            <div>
+              <h2 className={DS.title}>NOVOS PARCEIROS POR PROGRAMA</h2>
+              <p className={DS.subtitle}>{month} {year} – comparação ao ano anterior</p>
+            </div>
+            <div style={{display:"flex",gap:"16px",marginBottom:"12px"}}>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#B4B2A9",display:"inline-block"}}></span>{year-1}
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"var(--color-text-secondary)"}}>
+                <span style={{width:"10px",height:"10px",borderRadius:"2px",background:"#1D9E75",display:"inline-block"}}></span>{year}
+              </span>
+            </div>
+            <div style={{position:"relative",width:"100%",height:`${h}px`}}>
+              <canvas id={chartId} role="img" aria-label={`Novos parceiros por programa ${year-1} vs ${year}`}></canvas>
+            </div>
+            <ChartProg id={chartId} labels={sortedLabels} d25={d25} d26={d26} />
+          </div>
+        );
+      })()}
 
       {/* ── CARD: TOTAL REVENDA + AFILIAÇÃO ── */}
       {afilCurr != null && scope === "total" && (() => {
@@ -3284,8 +3441,7 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Afiliação — Resultados globais">
-        <div className="grid grid-cols-3 gap-3">
-          <MCField label={`Resultado ${year-1} (€)`} value={data.afil_prev} onChange={v => upField(p => ({...p, afil_prev: v}))} />
+        <div className="grid grid-cols-2 gap-3">
           <MCField label="Objetivo (€)" value={data.afil_objective} onChange={v => upField(p => ({...p, afil_objective: v}))} />
           <MCField label={`Resultado ${year} (€)`} value={data.afil_result} onChange={v => upField(p => ({...p, afil_result: v}))} />
         </div>
@@ -3293,9 +3449,8 @@ function AfiliacaoFecho({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-orange-600">
-          <div className="grid grid-cols-2 gap-3">
-            <MCField label={`${year-1} (€)`} value={data.markets[m.code]?.afil_prev||""} onChange={v => upMkt(m.code,"afil_prev",v)} />
-            <MCField label={`${year} (€)`} value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
+          <div className="grid grid-cols-1 gap-3">
+            <MCField label="Afiliação (€)" value={data.markets[m.code]?.afil_result||""} onChange={v => upMkt(m.code,"afil_result",v)} />
           </div>
         </MCCard>
       ))}
@@ -3420,22 +3575,10 @@ function Encomendas({ monthNum, year, isAdmin }) {
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-blue-600">
-          <div className="grid grid-cols-3 gap-4">
-            {/* Col 1: Encomendas */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`Encomendas ${year-1}`} value={data.markets[m.code]?.orders_prev||""} onChange={v => upMkt(m.code,"orders_prev",v)} />
-              <MCField label={`Encomendas ${year}`} value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
-            </div>
-            {/* Col 2: 1ªs enc. */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`1ªs enc. ${year-1}`} value={data.markets[m.code]?.first_orders_prev||""} onChange={v => upMkt(m.code,"first_orders_prev",v)} />
-              <MCField label={`1ªs enc. ${year}`} value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
-            </div>
-            {/* Col 3: Fat. 1ªs enc. */}
-            <div className="flex flex-col gap-2">
-              <MCField label={`Fat. 1ªs enc. ${year-1} (€)`} value={data.markets[m.code]?.first_orders_rev_prev||""} onChange={v => upMkt(m.code,"first_orders_rev_prev",v)} />
-              <MCField label={`Fat. 1ªs enc. ${year} (€)`} value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
-            </div>
+          <div className="grid grid-cols-3 gap-3">
+            <MCField label="Encomendas" value={data.markets[m.code]?.orders_curr||""} onChange={v => upMkt(m.code,"orders_curr",v)} />
+            <MCField label="1ªs enc." value={data.markets[m.code]?.first_orders_curr||""} onChange={v => upMkt(m.code,"first_orders_curr",v)} />
+            <MCField label="Fat. 1ªs enc. (€)" value={data.markets[m.code]?.first_orders_rev_curr||""} onChange={v => upMkt(m.code,"first_orders_rev_curr",v)} />
           </div>
         </MCCard>
       ))}
@@ -3444,6 +3587,11 @@ function Encomendas({ monthNum, year, isAdmin }) {
 }
 
 // ─── LEADS / PARCERIAS ────────────────────────────────────────────────────────
+
+const PROG_FIELDS = ["professionals","elite","progym","probox","proteams","performance","horeca","corporate"];
+const PROG_LABELS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+const ORIGIN_FIELDS = ["leads_bap","leads_ang","leads_outras"];
+const ORIGIN_LABELS = ["Be A Partner","Vindas de angariadores","Outras fontes"];
 
 function LeadsParcerias({ monthNum, year, isAdmin }) {
   const [data, setData] = useState(null);
@@ -3461,8 +3609,15 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
           if (!curr.markets[m.code]) curr.markets[m.code] = {};
           const pm = prev.markets?.[m.code] || {};
           const cm = curr.markets[m.code];
-          if (!cm.leads_prev && pm.leads_curr)         cm.leads_prev = pm.leads_curr;
-          if (!cm.partners_prev && pm.partners_curr)   cm.partners_prev = pm.partners_curr;
+          if (!cm.leads_prev && pm.leads_curr)       cm.leads_prev = pm.leads_curr;
+          if (!cm.partners_prev && pm.partners_curr) cm.partners_prev = pm.partners_curr;
+          // Auto-fill origin and programme fields from prev year
+          ORIGIN_FIELDS.forEach(f => {
+            if (!cm[f+"_prev"] && pm[f+"_curr"]) cm[f+"_prev"] = pm[f+"_curr"];
+          });
+          PROG_FIELDS.forEach(f => {
+            if (!cm["prog_"+f+"_prev"] && pm["prog_"+f+"_curr"]) cm["prog_"+f+"_prev"] = pm["prog_"+f+"_curr"];
+          });
         });
       }
       setData(curr); dataRef.current = curr; setSaved(false);
@@ -3491,12 +3646,14 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
 
   if (!data) return <div className="text-center py-8 text-slate-400 text-sm">A carregar…</div>;
 
+  const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-purple-500"/>
-          <p className="text-sm text-slate-500">Fecho mensal · {MC_MONTHS_PT[monthNum+1]} {year}</p>
+          <p className="text-sm text-slate-500">Parceiros · {MC_MONTHS_PT[monthNum+1]} {year}</p>
         </div>
         <div className="text-xs">
           {saving && <span className="text-slate-400 animate-pulse">A guardar…</span>}
@@ -3504,56 +3661,55 @@ function LeadsParcerias({ monthNum, year, isAdmin }) {
         </div>
       </div>
 
-      {/* Card Total — soma de todos os mercados */}
-      {(() => {
-        const sumF = (field) => MC_MARKETS.reduce((s,m) => s + (Number(data.markets[m.code]?.[field])||0), 0);
-        const totals = {
-          leads_prev: sumF("leads_prev"), leads_curr: sumF("leads_curr"),
-          partners_prev: sumF("partners_prev"), partners_curr: sumF("partners_curr"),
-        };
-        const fmt = n => n > 0 ? new Intl.NumberFormat("fr-FR").format(n) : "—";
-        const evo = (prev, curr) => prev > 0 && curr > 0 ? ((curr-prev)/prev*100).toFixed(1)+"%" : "—";
-        return (
-          <MCCard title="Total" accent="text-purple-800">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Leads {year-1}</p>
-                  <p className="font-semibold text-slate-700">{fmt(totals.leads_prev)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Leads {year}</p>
-                  <p className="font-bold text-slate-900">{fmt(totals.leads_curr)}</p>
-                  <p className={`text-xs font-semibold mt-0.5 ${totals.leads_curr>=totals.leads_prev?"text-green-600":"text-red-600"}`}>{evo(totals.leads_prev,totals.leads_curr)}</p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year-1}</p>
-                  <p className="font-semibold text-slate-700">{fmt(totals.partners_prev)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 mb-1">Novos parceiros {year}</p>
-                  <p className="font-bold text-slate-900">{fmt(totals.partners_curr)}</p>
-                  <p className={`text-xs font-semibold mt-0.5 ${totals.partners_curr>=totals.partners_prev?"text-green-600":"text-red-600"}`}>{evo(totals.partners_prev,totals.partners_curr)}</p>
-                </div>
-              </div>
+      {/* ── Card Total ── */}
+      <MCCard title="Total" accent="text-purple-800">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Origem das leads</p>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {ORIGIN_FIELDS.map((f,i) => (
+            <div key={f}>
+              <p className="text-xs text-slate-500 mb-1">{ORIGIN_LABELS[i]}</p>
+              <p className="text-sm font-bold text-slate-800">{sumF(f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF(f+"_curr")) : "—"}</p>
             </div>
-          </MCCard>
-        );
-      })()}
+          ))}
+        </div>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Novos parceiros por programa</p>
+        <div className="grid grid-cols-4 gap-3">
+          {PROG_FIELDS.map((f,i) => (
+            <div key={f}>
+              <p className="text-xs text-slate-500 mb-1">{PROG_LABELS[i]}</p>
+              <p className="text-sm font-bold text-slate-800">{sumF("prog_"+f+"_curr") > 0 ? new Intl.NumberFormat("fr-FR").format(sumF("prog_"+f+"_curr")) : "—"}</p>
+            </div>
+          ))}
+        </div>
+      </MCCard>
 
+      {/* ── Cards por mercado ── */}
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-purple-600">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-3">
-              <MCField label={`Leads ${year-1}`} value={data.markets[m.code]?.leads_prev||""} onChange={v => upMkt(m.code,"leads_prev",v)} />
-              <MCField label={`Novos parceiros ${year-1}`} value={data.markets[m.code]?.partners_prev||""} onChange={v => upMkt(m.code,"partners_prev",v)} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <MCField label={`Leads ${year}`} value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
-              <MCField label={`Novos parceiros ${year}`} value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
-            </div>
+          {/* Leads + Parceiros */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <MCField label="Leads" value={data.markets[m.code]?.leads_curr||""} onChange={v => upMkt(m.code,"leads_curr",v)} />
+            <MCField label="Novos parceiros" value={data.markets[m.code]?.partners_curr||""} onChange={v => upMkt(m.code,"partners_curr",v)} />
+          </div>
+
+          {/* Origem das leads */}
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Origem das leads</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {ORIGIN_FIELDS.map((f,i) => (
+              <MCField key={f} label={ORIGIN_LABELS[i]}
+                value={data.markets[m.code]?.[f+"_curr"]||""}
+                onChange={v => upMkt(m.code, f+"_curr", v)} />
+            ))}
+          </div>
+
+          {/* Novos parceiros por programa */}
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Novos parceiros por programa</p>
+          <div className="grid grid-cols-4 gap-3">
+            {PROG_FIELDS.map((f,i) => (
+              <MCField key={f} label={PROG_LABELS[i]}
+                value={data.markets[m.code]?.["prog_"+f+"_curr"]||""}
+                onChange={v => upMkt(m.code, "prog_"+f+"_curr", v)} />
+            ))}
           </div>
         </MCCard>
       ))}
@@ -4655,16 +4811,14 @@ function MargemRegisto({ monthNum, year, isAdmin }) {
       </div>
 
       <MCCard title="Margem global — Revenda">
-        <div className="grid grid-cols-2 gap-3">
-          <MCField label={`Margem ${year-1} %`} value={data.revenda_margin_prev||""} onChange={v => upField("revenda_margin_prev", v)} />
+        <div className="grid grid-cols-1 gap-3">
           <MCField label={`Margem ${year} %`} value={data.revenda_margin||""} onChange={v => upField("revenda_margin", v)} />
         </div>
       </MCCard>
 
       {MC_MARKETS.map(m => (
         <MCCard key={m.code} title={m.name} accent="text-green-700">
-          <div className="grid grid-cols-2 gap-3">
-            <MCField label={`${year-1} %`} value={data.markets[m.code]?.margin_prev||""} onChange={v => upMkt(m.code,"margin_prev",v)} />
+          <div className="grid grid-cols-1 gap-3">
             <MCField label={`${year} %`} value={data.markets[m.code]?.margin_curr||""} onChange={v => upMkt(m.code,"margin_curr",v)} />
           </div>
         </MCCard>
@@ -4732,13 +4886,13 @@ function RegistoHub({ monthNum, year, totalDays, closedDay, isCurrentMonth, isAd
 
 // ── EntryHub — Registo Diário com sub-tabs ──────────────────────────────────
 function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthNum, year, isAdmin }) {
-  const [subTab, setSubTab] = useState("revenda");
+  const [subTab, setSubTab] = useState("registo");
   const subTabs = [
-    { id: "revenda",    label: "Revenda",      color: "bg-blue-600" },
-    { id: "afiliacao",  label: "Afiliação",    color: "bg-orange-500" },
-    { id: "encomendas", label: "Encomendas",   color: "bg-blue-700" },
-    { id: "parceiros",  label: "Parceiros",    color: "bg-purple-500" },
-    { id: "margem",     label: "Margem",       color: "bg-green-600" },
+    { id: "registo",    label: "Registo Diário", color: "bg-blue-600" },
+    { id: "afiliacao",  label: "Afiliação",      color: "bg-orange-500" },
+    { id: "encomendas", label: "Encomendas",     color: "bg-blue-700" },
+    { id: "parceiros",  label: "Parceiros",      color: "bg-purple-500" },
+    { id: "margem",     label: "Margem",         color: "bg-green-600" },
   ];
   return (
     <div className="space-y-4">
@@ -4751,7 +4905,7 @@ function EntryHub({ data, setEntry, totalDays, closedDay, isCurrentMonth, monthN
           </button>
         ))}
       </div>
-      {subTab === "revenda" && (
+      {subTab === "registo" && (
         <Entry data={data} setEntry={setEntry} totalDays={totalDays}
           closedDay={closedDay} isCurrentMonth={isCurrentMonth} />
       )}
