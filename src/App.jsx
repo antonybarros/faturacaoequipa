@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
+import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
 const MARKETS = [{ id: "FR", label: "França" }, { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" }];
@@ -294,7 +294,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:16, height:2, background:"#9333ea", display:"inline-block", borderRadius:1 }}></span>Média esperada</span>
         </div>
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={allDaysBar} margin={{ top:4, right:8, left:0, bottom:0 }}>
+          <ComposedChart data={allDaysBar} margin={{ top:4, right:8, left:0, bottom:0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={2} />
             <YAxis tickFormatter={v=>Math.round(v/1000)+"k"} tick={{ fontSize:9, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={28} />
@@ -315,7 +315,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
               {allDaysBar.map((d,i)=><Cell key={i} fill={d.value===0?"transparent":d.ss?"#d97706":d.value>=d.wdAvg?C.green:C.red} />)}
             </Bar>
             <Line type="stepAfter" dataKey="wdAvg" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="4 3" />
-          </BarChart>
+          </ComposedChart>
         </ResponsiveContainer>
         <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", fontSize:12, color:C.muted }}>
           <span>Dias fechados: {closedDay} / {totalDays}</span>
