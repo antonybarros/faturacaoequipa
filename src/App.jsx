@@ -618,7 +618,7 @@ function PartnerFollowup({ year, month }) {
     e.preventDefault();
     if (!clientId.trim() || !mkt || !prog) return;
     setSaving(true);
-    await supabase.from("partner_followup").insert({
+    const { error } = await supabase.from("partner_followup").insert({
       client_id: clientId.trim(),
       programme: prog,
       stage: "s30",
@@ -626,6 +626,7 @@ function PartnerFollowup({ year, month }) {
       status: "pending",
       market: mkt,
     });
+    if (error) { alert("Erro ao guardar: " + error.message); setSaving(false); return; }
     setClientId(""); setProg(""); setMkt("");
     setStartDate(new Date().toISOString().slice(0,10));
     await load();
