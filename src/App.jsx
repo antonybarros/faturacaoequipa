@@ -62,6 +62,16 @@ async function loadPartnersCount(year, month) {
   return count || 0;
 }
 
+async function loadPartnersCountPrev(year, month) {
+  const start = new Date(year - 1, month, 1).toISOString();
+  const end = new Date(year - 1, month + 1, 0, 23, 59, 59).toISOString();
+  const { count } = await supabase.from("partner_followup")
+    .select("*", { count:"exact", head:true })
+    .gte("stage_started_at", start)
+    .lte("stage_started_at", end);
+  return count || 0;
+}
+
 function buildDaily(entries, totalDays) {
   const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
   for (let d=1; d<=totalDays; d++) {
@@ -498,73 +508,24 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {/* ── Parceiros / Leads ── */}
       {subTab === "parceiros" && (() => {
-        const MKT_OLD = [{key:"FR",label:"França",color:"#9333ea"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT",color:"#d97706"}];
-        const MKT_NEW = [{key:"FR",label:"França",color:"#9333ea"},{key:"CH",label:"Suíça",color:"#d97706"},{key:"BNL",label:"Benelux",color:"#0891b2"},{key:"DEAT",label:"DE-AT",color:"#16a34a"}];
-        const mktList = newStruct ? MKT_NEW : MKT_OLD;
-        const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
-        const PROGS_S = ["Prof.","Elite","ProGym","ProBox","ProTeams","Perf.","Horeca","Corp."];
-
-        const getVal = (day, mkt, field) => {
-          const k = `${field}_d${day}_${mkt}`;
-          return goals[k] ?? "";
-        };
-        const setVal = (day, mkt, field, val) => {
-          const k = `${field}_d${day}_${mkt}`;
-          setMonthData(prev => ({ ...prev, team_goals: { ...prev.team_goals, [k]: val === "" ? undefined : Number(val) } }));
-        };
-        const getTotal = (day, mkt) => PROGS.reduce((s,p) => s + (Number(goals[`prog_${p.toLowerCase()}_d${day}_${mkt}`])||0), 0);
-
-        const thStyle = { padding:"7px 5px", fontSize:10, fontWeight:500, color:C.muted, textTransform:"uppercase", letterSpacing:".04em", borderBottom:`0.5px solid ${C.border}`, textAlign:"center", whiteSpace:"nowrap" };
-        const tdStyle = { padding:"5px 4px", textAlign:"center", borderBottom:`0.5px solid ${C.card}`, verticalAlign:"middle" };
-        const inpStyle = { padding:"4px 3px", border:`0.5px solid ${C.border}`, borderRadius:5, fontSize:12, background:C.bg, color:C.text, width:34, textAlign:"center" };
-
+        const LD_MKTS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+        const LD_MKTS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+        const mktList = newStruct ? LD_MKTS_NEW : LD_MKTS_OLD;
         return (
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...thStyle, textAlign:"left", width:36 }}>Dia</th>
-                  <th style={{ ...thStyle, textAlign:"left", width:90 }}>Mercado</th>
-                  {PROGS_S.map((p,i) => <th key={i} style={thStyle}>{p}</th>)}
-                  <th style={{ ...thStyle, width:48 }}>Leads</th>
-                  <th style={{ ...thStyle, color:C.green }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({length:totalDays},(_,i)=>i+1).map(day => (
-                  mktList.map((mkt, mi) => {
-                    const total = getTotal(day, mkt.key);
-                    const isFirst = mi === 0;
-                    return (
-                      <tr key={`${day}-${mkt.key}`}>
-                        {isFirst && (
-                          <td rowSpan={mktList.length} style={{ ...tdStyle, borderRight:`0.5px solid ${C.border}`, fontWeight:500, fontSize:14, textAlign:"center", verticalAlign:"middle", borderBottom:`0.5px solid ${C.border}` }}>{day}</td>
-                        )}
-                        <td style={{ ...tdStyle, textAlign:"left", fontWeight:500, fontSize:11, color:mkt.color, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>{mkt.label}</td>
-                        {PROGS.map(prog => {
-                          const fkey = `prog_${prog.toLowerCase()}_d${day}_${mkt.key}`;
-                          return (
-                            <td key={prog} style={{ ...tdStyle, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>
-                              <input type="number" min="0" value={goals[fkey]??""} placeholder="—"
-                                onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [fkey]: e.target.value===""?undefined:Number(e.target.value) } }))}
-                                onBlur={saveAll}
-                                style={inpStyle} />
-                            </td>
-                          );
-                        })}
-                        <td style={{ ...tdStyle, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>
-                          <input type="number" min="0" value={goals[`leads_d${day}_${mkt.key}`]??""} placeholder="—"
-                            onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [`leads_d${day}_${mkt.key}`]: e.target.value===""?undefined:Number(e.target.value) } }))}
-                            onBlur={saveAll}
-                            style={{ ...inpStyle, width:40 }} />
-                        </td>
-                        <td style={{ ...tdStyle, fontWeight:500, color:total>0?C.green:C.muted, fontSize:13, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>{total}</td>
-                      </tr>
-                    );
-                  })
-                ))}
-              </tbody>
-            </table>
+          <div style={T.card}>
+            <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
+            <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Os novos parceiros são registados automaticamente no separador Parceiros.</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
+              {mktList.map(mkt => (
+                <div key={mkt.key}>
+                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Leads — {mkt.label}</p>
+                  <input type="number" value={goals[`leads_d_${mkt.key}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`leads_d_${mkt.key}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              ))}
+            </div>
           </div>
         );
       })()}
@@ -621,6 +582,219 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   );
 }
 
+// ── PartnerFollowup ────────────────────────────────────────────────────────────
+function PartnerFollowup({ year, month }) {
+  const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+  const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+  const MKT_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+  const isNew = isNewStructure(year, month);
+  const mktList = isNew ? MKT_NEW : MKT_OLD;
+
+  const STAGES = [
+    { key:"s30", days:30, label:"30 dias" },
+    { key:"s60", days:60, label:"60 dias" },
+    { key:"s90", days:90, label:"90 dias" },
+  ];
+
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [clientId, setClientId] = useState("");
+  const [mkt, setMkt] = useState("");
+  const [prog, setProg] = useState("");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { load(); }, []);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false });
+    setRecords(data || []);
+    setLoading(false);
+  };
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!clientId.trim() || !mkt || !prog) return;
+    setSaving(true);
+    await supabase.from("partner_followup").insert({
+      client_id: clientId.trim(),
+      programme: prog,
+      stage: "s30",
+      stage_started_at: new Date(startDate).toISOString(),
+      status: "pending",
+      market: mkt,
+    });
+    setClientId(""); setProg(""); setMkt("");
+    setStartDate(new Date().toISOString().slice(0,10));
+    await load();
+    setSaving(false);
+  };
+
+  const handleBought = async (id) => {
+    await supabase.from("partner_followup").delete().eq("id", id);
+    await load();
+  };
+
+  const handleNotBought = async (record) => {
+    const next = record.stage==="s30"?"s60":record.stage==="s60"?"s90":null;
+    if (!next) {
+      await supabase.from("partner_followup").delete().eq("id", record.id);
+    } else {
+      await supabase.from("partner_followup").update({ stage:next, stage_started_at:new Date().toISOString(), status:"pending" }).eq("id", record.id);
+    }
+    await load();
+  };
+
+  const getInfo = (r) => {
+    const stage = STAGES.find(s=>s.key===r.stage)||STAGES[0];
+    const diff = Math.floor((new Date()-new Date(r.stage_started_at))/86400000);
+    const left = stage.days-diff;
+    return { stage, diff, left, overdue: left<=0 };
+  };
+
+  const pending = records.filter(r=>r.status==="pending");
+  const overdueCount = pending.filter(r=>getInfo(r).overdue).length;
+
+  const filtered = filter==="all" ? pending :
+    filter==="s30" ? pending.filter(r=>r.stage==="s30") :
+    filter==="s60" ? pending.filter(r=>r.stage==="s60") :
+    pending.filter(r=>r.stage==="s90");
+
+  const STAGE_COLORS = {
+    s30: { bg:C.card, border:C.border, badgeBg:"#FCEBEB", badgeText:C.red },
+    s60: { bg:"#FAEEDA", border:"#EF9F27", badgeBg:"#FAEEDA", badgeText:"#633806" },
+    s90: { bg:"#FCEBEB", border:C.red, badgeBg:"#F7C1C1", badgeText:"#791F1F" },
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <p style={{ fontSize:18, fontWeight:500, margin:0, color:C.text }}>Acompanhamento de Parceiros</p>
+          <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Seguimento de primeiras compras · 30 / 60 / 90 dias</p>
+        </div>
+        {overdueCount>0 && (
+          <span style={{ background:"#FCEBEB", color:C.red, fontSize:12, fontWeight:500, padding:"5px 12px", borderRadius:20 }}>
+            ⚠ {overdueCount} {overdueCount===1?"alerta":"alertas"}
+          </span>
+        )}
+      </div>
+
+      {/* Form */}
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Registar novo parceiro</p>
+        <form onSubmit={handleAdd}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
+            <div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>ID do cliente</p>
+              <input type="text" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="ex: 123456" required
+                style={{ width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+            </div>
+            <div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Mercado</p>
+              <select value={mkt} onChange={e=>setMkt(e.target.value)} required
+                style={{ width:"100%", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }}>
+                <option value="">Seleccionar…</option>
+                {mktList.map(m=><option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Programa</p>
+              <select value={prog} onChange={e=>setProg(e.target.value)} required
+                style={{ width:"100%", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }}>
+                <option value="">Seleccionar…</option>
+                {PROGS.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Data de entrada</p>
+              <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} required
+                style={{ width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+            </div>
+            <button type="submit" disabled={saving||!clientId.trim()||!mkt||!prog}
+              style={{ padding:"8px 18px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:500, cursor:"pointer", opacity:saving?0.6:1, whiteSpace:"nowrap" }}>
+              {saving?"…":"+ Adicionar"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display:"flex", gap:8 }}>
+        {[
+          {id:"all",  label:`Todos (${pending.length})`},
+          {id:"s30",  label:`30 dias (${pending.filter(r=>r.stage==="s30").length})`},
+          {id:"s60",  label:`60 dias (${pending.filter(r=>r.stage==="s60").length})`},
+          {id:"s90",  label:`90 dias (${pending.filter(r=>r.stage==="s90").length})`},
+        ].map(f=>(
+          <button key={f.id} onClick={()=>setFilter(f.id)}
+            style={{ padding:"6px 14px", borderRadius:20, fontSize:12, border:`0.5px solid ${C.border}`, cursor:"pointer",
+              background:filter===f.id?C.green:"transparent", color:filter===f.id?"#fff":C.muted, fontWeight:filter===f.id?500:400 }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"3rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
+      ) : filtered.length===0 ? (
+        <div style={{ textAlign:"center", padding:"3rem 0", color:C.muted, fontSize:14, background:C.card, borderRadius:12 }}>
+          Nenhum registo nesta categoria.
+        </div>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {filtered.map(r=>{
+            const {stage,diff,left,overdue}=getInfo(r);
+            const sc = STAGE_COLORS[stage.key];
+            const mktLabel = [...MKT_OLD,...MKT_NEW].find(m=>m.key===r.market)?.label || r.market || "—";
+            return (
+              <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
+                <div style={{ flex:1, minWidth:140 }}>
+                  <p style={{ fontWeight:500, fontSize:13, margin:0, color:C.text }}>ID: {r.client_id}</p>
+                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                    <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{r.programme}</span>
+                    <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{mktLabel}</span>
+                  </div>
+                </div>
+                <div style={{ textAlign:"center", minWidth:80 }}>
+                  <p style={{ fontSize:11, color:C.muted, margin:0 }}>Fase</p>
+                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{stage.label}</p>
+                </div>
+                <div style={{ textAlign:"center", minWidth:80 }}>
+                  <p style={{ fontSize:11, color:C.muted, margin:0 }}>Registado há</p>
+                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{diff} {diff===1?"dia":"dias"}</p>
+                </div>
+                <div style={{ minWidth:110, textAlign:"center" }}>
+                  {overdue ? (
+                    <span style={{ background:sc.badgeBg, color:sc.badgeText, fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:20 }}>⚠ Verificar agora</span>
+                  ) : (
+                    <span style={{ background:C.card, color:C.muted, fontSize:11, padding:"4px 10px", borderRadius:20 }}>{left} {left===1?"dia":"dias"} restantes</span>
+                  )}
+                </div>
+                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                  <button onClick={()=>handleBought(r.id)}
+                    style={{ padding:"6px 12px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
+                    ✓ Fez compra
+                  </button>
+                  <button onClick={()=>handleNotBought(r)}
+                    style={{ padding:"6px 12px", background:C.card, color:C.text, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
+                    ✗ Não fez
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MainApp() {
   const [tab, setTab] = useState("analise");
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
@@ -662,7 +836,7 @@ function MainApp() {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : "Separador Parceiros — em breve"}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : <PartnerFollowup year={year} month={month} />}
           </div>
         )}
       </div>
