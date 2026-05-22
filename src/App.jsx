@@ -128,24 +128,39 @@ function Modal({ title, subtitle, onClose, children }) {
 
 function DailyDetailModal({ daily, closedDay, goal, mode, onClose }) {
   const rows = daily.filter(d=>d.day<=closedDay&&d.cumul>0);
+  const isFat = mode === "faturado";
   const isObj = mode === "objetivo";
+  const title = isFat ? "Faturado diário — detalhe" : isObj ? "% do objetivo mensal — evolução diária" : "% vs. esperado — evolução diária";
+  const headers = isFat
+    ? [{v:"DIA"},{v:"ACUMULADO"},{v:"+NESSE DIA"}]
+    : isObj
+    ? [{v:"DIA"},{v:"ACUMULADO"},{v:"% DO OBJETIVO"}]
+    : [{v:"DIA"},{v:"ACUMULADO"},{v:"ESPERADO"},{v:"% VS. ESPERADO"}];
   return (
-    <Modal title={isObj?"% do objetivo mensal — evolução diária":"% vs. esperado — evolução diária"}
-      subtitle={`Equipa FR · ${closedDay} dias fechados`} onClose={onClose}>
+    <Modal title={title} subtitle={`Equipa FR · ${closedDay} dias fechados`} onClose={onClose}>
       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
         <thead style={{ position:"sticky", top:0, background:C.bg, zIndex:1 }}>
-          <tr>{[{v:"DIA"},{v:"ACUMULADO"},...(isObj?[{v:"% DO OBJETIVO"}]:[{v:"ESPERADO"},{v:"% VS. ESPERADO"}])].map((h,i)=>(
+          <tr>{headers.map((h,i)=>(
             <th key={i} style={{ padding:"10px 1.25rem", textAlign:i===0?"left":"right", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".06em", borderBottom:`0.5px solid ${C.border}` }}>{h.v}</th>
           ))}</tr>
         </thead>
         <tbody>
           {rows.map(d=>{
-            if (isObj) {
+            const rowStyle = { borderBottom:`0.5px solid ${C.card}`, background:d.supersales?"#FAEEDA":"transparent" };
+            const dayCell = <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}{d.supersales?" ⚡":""}</td>;
+            const cumulCell = <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>;
+            if (isFat) {
+              return (
+                <tr key={d.day} style={rowStyle}>
+                  {dayCell}{cumulCell}
+                  <td style={{ padding:"11px 1.25rem", textAlign:"right", color:C.muted }}>+{fmtEur(d.dayValue)}</td>
+                </tr>
+              );
+            } else if (isObj) {
               const pct = goal>0?(d.cumul/goal*100):null;
               return (
-                <tr key={d.day} style={{ borderBottom:`0.5px solid ${C.card}`, background:d.supersales?"#FAEEDA":"transparent" }}>
-                  <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}{d.supersales?" ⚡":""}</td>
-                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>
+                <tr key={d.day} style={rowStyle}>
+                  {dayCell}{cumulCell}
                   <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:pct==null?C.muted:pct>=100?C.green:pct>=80?C.amber:C.muted }}>{pct!=null?`${pct.toFixed(1)}%`:"—"}</td>
                 </tr>
               );
@@ -153,9 +168,8 @@ function DailyDetailModal({ daily, closedDay, goal, mode, onClose }) {
               const exp = goal>0?Math.round(goal/daily.length*d.day):null;
               const pct = exp>0?(d.cumul/exp*100):null;
               return (
-                <tr key={d.day} style={{ borderBottom:`0.5px solid ${C.card}`, background:d.supersales?"#FAEEDA":"transparent" }}>
-                  <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}{d.supersales?" ⚡":""}</td>
-                  <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{fmtEur(d.cumul)}</td>
+                <tr key={d.day} style={rowStyle}>
+                  {dayCell}{cumulCell}
                   <td style={{ padding:"11px 1.25rem", textAlign:"right", color:C.muted }}>{exp?fmtEur(exp):"—"}</td>
                   <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:pct==null?C.muted:pct>=100?C.green:pct>=90?C.amber:C.red }}>{pct!=null?`${pct.toFixed(1)}%`:"—"}</td>
                 </tr>
