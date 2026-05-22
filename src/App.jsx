@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
-import * as XLSX from "xlsx";
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -645,38 +644,62 @@ function PartnerFollowup({ year, month }) {
     setImporting(true);
     setImportMsg("");
     try {
+      // Read as text (works for CSV; for XLSX we use a script tag)
+      const parseDate = (v) => {
+        if (!v) return new Date().toISOString();
+        if (v instanceof Date) return v.toISOString();
+        // Excel serial date number
+        if (typeof v === "number") return new Date(Math.round((v - 25569) * 86400000)).toISOString();
+        // DD/MM/YYYY or YYYY-MM-DD
+        const s = String(v).trim();
+        const parts = s.split(/[\/\-\.]/);
+        if (parts.length === 3) {
+          const [a,b,c] = parts.map(Number);
+          if (a > 31) return new Date(a, b-1, c).toISOString(); // YYYY-MM-DD
+          return new Date(c, b-1, a).toISOString(); // DD/MM/YYYY
+        }
+        return new Date().toISOString();
+      };
+
+      // Use SheetJS via script injection if xlsx not available
+      if (!window._XLSX) {
+        await new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+        window._XLSX = window.XLSX;
+      }
+      const XL = window._XLSX;
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type:"array", cellDates:true });
+      const wb = XL.read(buf, { type:"array", cellDates:false });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
-      // Find header row
+      const rows = XL.utils.sheet_to_json(ws, { header:1, defval:"" });
+
       let headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === "ID"));
-      if (headerIdx < 0) { setImportMsg("❌ Não encontrei coluna ID"); setImporting(false); return; }
+      if (headerIdx < 0) { setImportMsg("❌ Coluna ID não encontrada"); setImporting(false); return; }
       const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
       const iID   = headers.findIndex(h => h==="ID");
       const iGest = headers.findIndex(h => h==="GESTOR");
       const iMkt  = headers.findIndex(h => h==="MERCADO");
       const iProg = headers.findIndex(h => h==="PROGRAMA");
       const iDate = headers.findIndex(h => h.includes("DATA"));
-      const dataRows = rows.slice(headerIdx + 1).filter(r => r[iID]);
+      const dataRows = rows.slice(headerIdx + 1).filter(r => String(r[iID]||"").trim());
       let ok = 0, skip = 0;
       for (const r of dataRows) {
-        const clientId = String(r[iID]).trim();
-        const gestorRaw = iGest >= 0 ? String(r[iGest]).trim() : "";
-        const mktRaw    = iMkt >= 0  ? String(r[iMkt]).trim()  : "";
-        const progRaw   = iProg >= 0 ? String(r[iProg]).trim() : "";
+        const clientId  = String(r[iID]).trim();
+        const gestorRaw = iGest >= 0 ? String(r[iGest]||"").trim() : "";
+        const mktRaw    = iMkt >= 0  ? String(r[iMkt]||"").trim()  : "";
+        const progRaw   = iProg >= 0 ? String(r[iProg]||"").trim() : "";
         const dateRaw   = iDate >= 0 ? r[iDate] : null;
         const gestorVal = mapVal(GESTOR_MAP, gestorRaw) || gestorRaw;
         const mktVal    = mapVal(MKT_MAP, mktRaw);
         const progVal   = mapVal(PROG_MAP, progRaw);
         if (!mktVal || !progVal) { skip++; continue; }
-        let dateVal;
-        if (dateRaw instanceof Date) dateVal = dateRaw.toISOString();
-        else if (typeof dateRaw === "number") dateVal = new Date(Math.round((dateRaw - 25569) * 86400 * 1000)).toISOString();
-        else dateVal = new Date().toISOString();
         const { error } = await supabase.from("partner_followup").insert({
           client_id: clientId, gestor: gestorVal, market: mktVal, programme: progVal,
-          stage:"s30", stage_started_at: dateVal, status:"pending",
+          stage:"s30", stage_started_at: parseDate(dateRaw), status:"pending",
         });
         if (!error) ok++; else skip++;
       }
@@ -686,7 +709,7 @@ function PartnerFollowup({ year, month }) {
       setImportMsg("❌ Erro: " + err.message);
     }
     setImporting(false);
-    fileRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const handleBought = async (id) => {
