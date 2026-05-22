@@ -326,6 +326,233 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   );
 }
 
+// ── Helper: is new structure (June 2026+) ─────────────────────────────────────
+const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5); // month is 0-indexed, 5 = June
+
+// ── Registo Tab ────────────────────────────────────────────────────────────────
+function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData }) {
+  const [subTab, setSubTab] = useState("faturacao");
+  const newStruct = isNewStructure(year, month);
+
+  const SUB_TABS = [
+    { id:"faturacao",  label:"Faturação diária" },
+    { id:"afiliacao",  label:"Afiliação" },
+    { id:"encomendas", label:"Encomendas" },
+    { id:"parceiros",  label:"Parceiros / Leads" },
+    { id:"margem",     label:"Margem" },
+    { id:"objetivos",  label:"Objetivos" },
+  ];
+
+  const save = async (newData) => {
+    const key = monthKey(year, month);
+    await supabase.from("billing_months").upsert({ month_key: key, ...newData }, { onConflict:"month_key" });
+    setMonthData(prev => ({ ...prev, ...newData }));
+  };
+
+  const updateEntry = (day, field, val) => {
+    const entries = { ...(monthData.entries || {}) };
+    entries[day] = { ...(entries[day] || {}), [field]: val === "" ? undefined : Number(val) };
+    setMonthData(prev => ({ ...prev, entries }));
+  };
+
+  const toggleSS = async (day) => {
+    const entries = { ...(monthData.entries || {}) };
+    entries[day] = { ...(entries[day] || {}), supersales: !entries[day]?.supersales };
+    const updated = { ...monthData, entries };
+    setMonthData(updated);
+    await save({ entries: updated.entries, team_goals: updated.team_goals });
+  };
+
+  const saveAll = () => save({ entries: monthData.entries, team_goals: monthData.team_goals });
+
+  const entries   = monthData.entries    || {};
+  const goals     = monthData.team_goals || {};
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+      {/* Sub-tabs */}
+      <div style={{ display:"flex", gap:0, borderBottom:`0.5px solid ${C.border}`, overflowX:"auto" }}>
+        {SUB_TABS.map(t => (
+          <button key={t.id} onClick={() => setSubTab(t.id)}
+            style={{ padding:"8px 16px", border:"none", borderBottom:subTab===t.id?`2px solid ${C.green}`:"2px solid transparent",
+              background:"transparent", color:subTab===t.id?C.green:C.muted, fontWeight:subTab===t.id?500:400, fontSize:13, cursor:"pointer", whiteSpace:"nowrap" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Faturação diária ── */}
+      {subTab === "faturacao" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Faturação diária — {MONTH_NAMES[month]} {year}</p>
+          {!newStruct && (
+            <div style={{ padding:"10px 14px", background:"#FEF3C7", borderRadius:8, marginBottom:12, fontSize:13, color:"#92400E" }}>
+              ⚠ Meses anteriores a Junho 2026 usam a estrutura antiga (FR + CH-BNL-DEAT)
+            </div>
+          )}
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ borderBottom:`0.5px solid ${C.border}` }}>
+                  {["Dia", "França", ...(newStruct?["Suíça","Benelux","DE-AT"]:["CH-BNL-DEAT"]), "Supersales"].map((h,i) => (
+                    <th key={h} style={{ padding:"8px 10px", textAlign:i===0?"left":"center", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({length:totalDays}, (_,i) => i+1).map(day => {
+                  const e = entries[day] || {};
+                  const isSS = !!e.supersales;
+                  return (
+                    <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}`, background:isSS?"#FAEEDA":"transparent" }}>
+                      <td style={{ padding:"6px 10px", fontWeight:500, color:C.text }}>{day}</td>
+                      {(newStruct ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"]).map(field => (
+                        <td key={field} style={{ padding:"4px 6px", textAlign:"center" }}>
+                          <input type="number" value={e[field] ?? ""} onChange={ev => updateEntry(day, field, ev.target.value)} onBlur={saveAll}
+                            placeholder="0"
+                            style={{ width:80, textAlign:"right", padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:6, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+                        </td>
+                      ))}
+                      <td style={{ padding:"4px 6px", textAlign:"center" }}>
+                        <button onClick={() => toggleSS(day)}
+                          style={{ padding:"4px 10px", border:`0.5px solid ${isSS?"#d97706":C.border}`, borderRadius:6, background:isSS?"#FEF3C7":"transparent", color:isSS?"#92400E":C.muted, fontSize:12, cursor:"pointer" }}>
+                          {isSS ? "⚡ SS" : "—"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Afiliação ── */}
+      {subTab === "afiliacao" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Afiliação — {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+            {[{field:"afil_result",label:"Valor de afiliação (€)"},{field:"afil_objective",label:"Objetivo de afiliação (€)"}].map(({field,label}) => (
+              <div key={field}>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                <input type="number" value={goals[field] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Encomendas ── */}
+      {subTab === "encomendas" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Encomendas — {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+            {[
+              {field:"orders_total",    label:"Total de encomendas"},
+              {field:"orders_first",    label:"Primeiras encomendas"},
+              {field:"orders_first_rev",label:"Faturação de primeiras encomendas (€)"},
+            ].map(({field,label}) => (
+              <div key={field}>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                <input type="number" value={goals[field] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Parceiros / Leads ── */}
+      {subTab === "parceiros" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+          <div style={T.card}>
+            <p style={T.sectionTitle}>Novos parceiros — {MONTH_NAMES[month]} {year}</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+              <div>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total de novos parceiros</p>
+                <input type="number" value={goals["partners_total"] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, partners_total:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            </div>
+            <p style={{ ...T.sectionTitle, marginTop:"1.25rem" }}>Por programa</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
+              {["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"].map(prog => (
+                <div key={prog}>
+                  <p style={{ fontSize:11, color:C.muted, margin:"0 0 5px" }}>{prog}</p>
+                  <input type="number" value={goals[`prog_${prog.toLowerCase()}`] ?? ""}
+                    onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [`prog_${prog.toLowerCase()}`]:e.target.value } }))} onBlur={saveAll}
+                    placeholder="0"
+                    style={{ width:"100%", boxSizing:"border-box", padding:"7px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={T.card}>
+            <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+              <div>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total de leads</p>
+                <input type="number" value={goals["leads_total"] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, leads_total:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Margem ── */}
+      {subTab === "margem" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Margem — {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+            {[{field:"margin_pct",label:"Margem do mês (%)"},{field:"margin_pct_prev",label:"Margem do mesmo mês do ano anterior (%)"}].map(({field,label}) => (
+              <div key={field}>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                <input type="number" step="0.01" value={goals[field] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0.00"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Objetivos ── */}
+      {subTab === "objetivos" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Objetivos — {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+            {[
+              {field:"equipa_fr",           label:"Objetivo de faturação (€)"},
+              {field:"equipa_fr_partners",   label:"Objetivo de novos parceiros"},
+              {field:"equipa_fr_first_rev",  label:"Objetivo de faturação primeiras compras (€)"},
+            ].map(({field,label}) => (
+              <div key={field}>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                <input type="number" value={goals[field] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MainApp() {
   const [tab, setTab] = useState("analise");
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
@@ -367,7 +594,7 @@ function MainApp() {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo"?"Separador Registo — em breve":"Separador Parceiros — em breve"}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : "Separador Parceiros — em breve"}
           </div>
         )}
       </div>
