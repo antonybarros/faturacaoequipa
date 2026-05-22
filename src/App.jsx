@@ -429,29 +429,48 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       )}
 
       {/* ── Afiliação ── */}
-      {subTab === "afiliacao" && (
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Afiliação — {MONTH_NAMES[month]} {year}</p>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-            {[{field:"afil_result",label:"Valor de afiliação (€)"}].map(({field,label}) => (
-              <div key={field}>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
-                <input type="number" value={goals[field] ?? ""}
-                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
-                  placeholder="0"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+      {subTab === "afiliacao" && (() => {
+        const AFL_MKTS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+        const AFL_MKTS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+        const mktList = newStruct ? AFL_MKTS_NEW : AFL_MKTS_OLD;
+        const inpAfil = (field, placeholder="0") => (
+          <input type="number" value={goals[field]??""} onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))} onBlur={saveAll}
+            placeholder={placeholder} style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+        );
+        return (
+          <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+            {mktList.map(mkt=>(
+              <div key={mkt.key} style={T.card}>
+                <p style={T.sectionTitle}>{mkt.label}</p>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:16}}>
+                  <div>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year} (€)</p>
+                    {inpAfil(`afil_${mkt.key}`)}
+                  </div>
+                  <div>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year-1} (€)</p>
+                    {inpAfil(`afil_prev_${mkt.key}`)}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Encomendas ── */}
       {subTab === "encomendas" && (() => {
         const ENC_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
         const ENC_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
         const mktList = newStruct ? ENC_MARKETS_NEW : ENC_MARKETS_OLD;
-        const ENC_FIELDS = [{field:"orders_total",label:"Total enc."},{field:"orders_first",label:"1ªs enc."},{field:"orders_first_rev",label:"Fat. 1ªs enc. (€)"}];
+        const ENC_FIELDS = [
+          {field:"orders_total",    label:`Total enc. ${year}`},
+          {field:"orders_first",    label:`1ªs enc. ${year}`},
+          {field:"orders_first_rev",label:`Fat. 1ªs enc. ${year} (€)`},
+          {field:"orders_total_prev",    label:`Total enc. ${year-1}`},
+          {field:"orders_first_prev",    label:`1ªs enc. ${year-1}`},
+          {field:"orders_first_rev_prev",label:`Fat. 1ªs enc. ${year-1} (€)`},
+        ];
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
             {mktList.map(mkt => (
@@ -581,11 +600,11 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       {subTab === "objetivos" && (
         <div style={T.card}>
           <p style={T.sectionTitle}>Objetivos — {MONTH_NAMES[month]} {year}</p>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:16 }}>
             {[
               {field:"equipa_fr",           label:"Objetivo de faturação (€)"},
               {field:"equipa_fr_partners",   label:"Objetivo de novos parceiros"},
-              {field:"equipa_fr_first_rev",  label:"Objetivo de faturação primeiras compras (€)"},
+              {field:"equipa_fr_first_rev",  label:"Objetivo fat. primeiras compras (€)"},
             ].map(({field,label}) => (
               <div key={field}>
                 <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
