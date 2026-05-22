@@ -602,8 +602,12 @@ function PartnerFollowup({ year, month }) {
   const [clientId, setClientId] = useState("");
   const [mkt, setMkt] = useState("");
   const [prog, setProg] = useState("");
+  const [gestor, setGestor] = useState("");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const fileRef = React.useRef();
 
   useEffect(() => { load(); }, []);
 
@@ -625,12 +629,64 @@ function PartnerFollowup({ year, month }) {
       stage_started_at: new Date(startDate).toISOString(),
       status: "pending",
       market: mkt,
+      gestor,
     });
     if (error) { alert("Erro ao guardar: " + error.message); setSaving(false); return; }
-    setClientId(""); setProg(""); setMkt("");
+    setClientId(""); setProg(""); setMkt(""); setGestor("");
     setStartDate(new Date().toISOString().slice(0,10));
     await load();
     setSaving(false);
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:"array", cellDates:true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+      // Find header row
+      let headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === "ID"));
+      if (headerIdx < 0) { setImportMsg("❌ Não encontrei coluna ID"); setImporting(false); return; }
+      const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
+      const iID   = headers.findIndex(h => h==="ID");
+      const iGest = headers.findIndex(h => h==="GESTOR");
+      const iMkt  = headers.findIndex(h => h==="MERCADO");
+      const iProg = headers.findIndex(h => h==="PROGRAMA");
+      const iDate = headers.findIndex(h => h.includes("DATA"));
+      const dataRows = rows.slice(headerIdx + 1).filter(r => r[iID]);
+      let ok = 0, skip = 0;
+      for (const r of dataRows) {
+        const clientId = String(r[iID]).trim();
+        const gestorRaw = iGest >= 0 ? String(r[iGest]).trim() : "";
+        const mktRaw    = iMkt >= 0  ? String(r[iMkt]).trim()  : "";
+        const progRaw   = iProg >= 0 ? String(r[iProg]).trim() : "";
+        const dateRaw   = iDate >= 0 ? r[iDate] : null;
+        const gestorVal = mapVal(GESTOR_MAP, gestorRaw) || gestorRaw;
+        const mktVal    = mapVal(MKT_MAP, mktRaw);
+        const progVal   = mapVal(PROG_MAP, progRaw);
+        if (!mktVal || !progVal) { skip++; continue; }
+        let dateVal;
+        if (dateRaw instanceof Date) dateVal = dateRaw.toISOString();
+        else if (typeof dateRaw === "number") dateVal = new Date(Math.round((dateRaw - 25569) * 86400 * 1000)).toISOString();
+        else dateVal = new Date().toISOString();
+        const { error } = await supabase.from("partner_followup").insert({
+          client_id: clientId, gestor: gestorVal, market: mktVal, programme: progVal,
+          stage:"s30", stage_started_at: dateVal, status:"pending",
+        });
+        if (!error) ok++; else skip++;
+      }
+      setImportMsg(`✓ ${ok} registos importados${skip>0?` · ${skip} ignorados`:""}`);
+      await load();
+    } catch(err) {
+      setImportMsg("❌ Erro: " + err.message);
+    }
+    setImporting(false);
+    fileRef.current.value = "";
   };
 
   const handleBought = async (id) => {
@@ -688,11 +744,19 @@ function PartnerFollowup({ year, month }) {
       <div style={T.card}>
         <p style={T.sectionTitle}>Registar novo parceiro</p>
         <form onSubmit={handleAdd}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
             <div>
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>ID do cliente</p>
               <input type="text" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="ex: 123456" required
                 style={{ width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+            </div>
+            <div>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Gestor</p>
+              <select value={gestor} onChange={e=>setGestor(e.target.value)} required
+                style={{ width:"100%", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }}>
+                <option value="">Seleccionar…</option>
+                {GESTORS.map(g=><option key={g} value={g}>{g}</option>)}
+              </select>
             </div>
             <div>
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Mercado</p>
@@ -721,6 +785,16 @@ function PartnerFollowup({ year, month }) {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Import */}
+      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+        <input type="file" accept=".xlsx,.xls,.csv" ref={fileRef} onChange={handleImport} style={{ display:"none" }} />
+        <button onClick={()=>fileRef.current.click()} disabled={importing}
+          style={{ padding:"8px 16px", background:"transparent", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, color:C.text, cursor:"pointer", opacity:importing?0.6:1 }}>
+          {importing?"A importar…":"📂 Importar Excel"}
+        </button>
+        {importMsg && <span style={{ fontSize:13, color:importMsg.startsWith("✓")?C.green:C.red }}>{importMsg}</span>}
       </div>
 
       {/* Filters */}
@@ -756,7 +830,7 @@ function PartnerFollowup({ year, month }) {
               <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
                 <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
                 <div style={{ flex:1, minWidth:140 }}>
-                  <p style={{ fontWeight:500, fontSize:13, margin:0, color:C.text }}>ID: {r.client_id}</p>
+                  <p style={{ fontWeight:500, fontSize:13, margin:0, color:C.text }}>ID: {r.client_id}{r.gestor?" · "+r.gestor:""}</p>
                   <div style={{ display:"flex", gap:8, marginTop:4 }}>
                     <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{r.programme}</span>
                     <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{mktLabel}</span>
