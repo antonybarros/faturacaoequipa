@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -644,7 +645,6 @@ function PartnerFollowup({ year, month }) {
     setImporting(true);
     setImportMsg("");
     try {
-      const XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type:"array", cellDates:true });
       const ws = wb.Sheets[wb.SheetNames[0]];
