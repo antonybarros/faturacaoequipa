@@ -582,6 +582,37 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   );
 }
 
+// ── Partner constants & mappings ──────────────────────────────────────────────
+const GESTORS = ["Antony", "Fabien", "Mónica"];
+const ALL_MKTS = [
+  {key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"},
+  {key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}
+];
+const GESTOR_MAP = {
+  "ANTONY BARROS":"Antony","FABIEN COLETTE":"Fabien","MONICA OLIVEIRA":"Mónica",
+  "ANTONY":"Antony","FABIEN":"Fabien","MONICA":"Mónica","MÓNICA":"Mónica",
+};
+const MKT_MAP = {
+  "França":"FR","FRANCA":"FR","FRANCE":"FR",
+  "Suiça":"CH","SUICA":"CH","SUIÇA":"CH","SWITZERLAND":"CH",
+  "AT":"DEAT","DE":"DEAT","DEAT":"DEAT",
+  "BE":"BNL","NL":"BNL","LU":"BNL","BNL":"BNL",
+  "FR":"FR","CH":"CH",
+};
+const PROG_MAP = {
+  "ELITE-PARTNER":"Elite","ELITE":"Elite",
+  "PROFESSIONALS":"Professionals","PROFESSIONAL":"Professionals",
+  "PRO GYM":"ProGym","PROGYM":"ProGym",
+  "PRO BOX":"ProBox","PROBOX":"ProBox",
+  "PRO TEAMS":"ProTeams","PROTEAMS":"ProTeams",
+  "PERFORMANCE":"Performance","HORECA":"Horeca","CORPORATE":"Corporate",
+};
+function mapVal(map, val) {
+  if (!val) return null;
+  const k = String(val).trim().toUpperCase();
+  return map[String(val).trim()] || map[k] || null;
+}
+
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
 function PartnerFollowup({ year, month }) {
   const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
@@ -848,7 +879,7 @@ function PartnerFollowup({ year, month }) {
           {filtered.map(r=>{
             const {stage,diff,left,overdue}=getInfo(r);
             const sc = STAGE_COLORS[stage.key];
-            const mktLabel = [...MKT_OLD,...MKT_NEW].find(m=>m.key===r.market)?.label || r.market || "—";
+            const mktLabel = ALL_MKTS.find(m=>m.key===r.market)?.label || r.market || "—";
             return (
               <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
                 <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
