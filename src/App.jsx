@@ -433,7 +433,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         <div style={T.card}>
           <p style={T.sectionTitle}>Afiliação — {MONTH_NAMES[month]} {year}</p>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-            {[{field:"afil_result",label:"Valor de afiliação (€)"},{field:"afil_objective",label:"Objetivo de afiliação (€)"}].map(({field,label}) => (
+            {[{field:"afil_result",label:"Valor de afiliação (€)"}].map(({field,label}) => (
               <div key={field}>
                 <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
                 <input type="number" value={goals[field] ?? ""}
@@ -447,86 +447,135 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       )}
 
       {/* ── Encomendas ── */}
-      {subTab === "encomendas" && (
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Encomendas — {MONTH_NAMES[month]} {year}</p>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-            {[
-              {field:"orders_total",    label:"Total de encomendas"},
-              {field:"orders_first",    label:"Primeiras encomendas"},
-              {field:"orders_first_rev",label:"Faturação de primeiras encomendas (€)"},
-            ].map(({field,label}) => (
-              <div key={field}>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
-                <input type="number" value={goals[field] ?? ""}
-                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
-                  placeholder="0"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+      {subTab === "encomendas" && (() => {
+        const ENC_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+        const ENC_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+        const mktList = newStruct ? ENC_MARKETS_NEW : ENC_MARKETS_OLD;
+        const ENC_FIELDS = [{field:"orders_total",label:"Total enc."},{field:"orders_first",label:"1ªs enc."},{field:"orders_first_rev",label:"Fat. 1ªs enc. (€)"}];
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+            {mktList.map(mkt => (
+              <div key={mkt.key} style={T.card}>
+                <p style={T.sectionTitle}>{mkt.label}</p>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:12 }}>
+                  {ENC_FIELDS.map(({field,label}) => {
+                    const fkey = `${field}_${mkt.key}`;
+                    return (
+                      <div key={fkey}>
+                        <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                        <input type="number" value={goals[fkey] ?? ""}
+                          onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [fkey]:e.target.value } }))} onBlur={saveAll}
+                          placeholder="0"
+                          style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Parceiros / Leads ── */}
-      {subTab === "parceiros" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-          <div style={T.card}>
-            <p style={T.sectionTitle}>Novos parceiros — {MONTH_NAMES[month]} {year}</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-              <div>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total de novos parceiros</p>
-                <input type="number" value={goals["partners_total"] ?? ""}
-                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, partners_total:e.target.value } }))} onBlur={saveAll}
-                  placeholder="0"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
-              </div>
-            </div>
-            <p style={{ ...T.sectionTitle, marginTop:"1.25rem" }}>Por programa</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
-              {["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"].map(prog => (
-                <div key={prog}>
-                  <p style={{ fontSize:11, color:C.muted, margin:"0 0 5px" }}>{prog}</p>
-                  <input type="number" value={goals[`prog_${prog.toLowerCase()}`] ?? ""}
-                    onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [`prog_${prog.toLowerCase()}`]:e.target.value } }))} onBlur={saveAll}
-                    placeholder="0"
-                    style={{ width:"100%", boxSizing:"border-box", padding:"7px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
-                </div>
-              ))}
-            </div>
+      {subTab === "parceiros" && (() => {
+        const MKT_OLD = [{key:"FR",label:"França",color:"#9333ea"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT",color:"#d97706"}];
+        const MKT_NEW = [{key:"FR",label:"França",color:"#9333ea"},{key:"CH",label:"Suíça",color:"#d97706"},{key:"BNL",label:"Benelux",color:"#0891b2"},{key:"DEAT",label:"DE-AT",color:"#16a34a"}];
+        const mktList = newStruct ? MKT_NEW : MKT_OLD;
+        const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+        const PROGS_S = ["Prof.","Elite","ProGym","ProBox","ProTeams","Perf.","Horeca","Corp."];
+
+        const getVal = (day, mkt, field) => {
+          const k = `${field}_d${day}_${mkt}`;
+          return goals[k] ?? "";
+        };
+        const setVal = (day, mkt, field, val) => {
+          const k = `${field}_d${day}_${mkt}`;
+          setMonthData(prev => ({ ...prev, team_goals: { ...prev.team_goals, [k]: val === "" ? undefined : Number(val) } }));
+        };
+        const getTotal = (day, mkt) => PROGS.reduce((s,p) => s + (Number(goals[`prog_${p.toLowerCase()}_d${day}_${mkt}`])||0), 0);
+
+        const thStyle = { padding:"7px 5px", fontSize:10, fontWeight:500, color:C.muted, textTransform:"uppercase", letterSpacing:".04em", borderBottom:`0.5px solid ${C.border}`, textAlign:"center", whiteSpace:"nowrap" };
+        const tdStyle = { padding:"5px 4px", textAlign:"center", borderBottom:`0.5px solid ${C.card}`, verticalAlign:"middle" };
+        const inpStyle = { padding:"4px 3px", border:`0.5px solid ${C.border}`, borderRadius:5, fontSize:12, background:C.bg, color:C.text, width:34, textAlign:"center" };
+
+        return (
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thStyle, textAlign:"left", width:36 }}>Dia</th>
+                  <th style={{ ...thStyle, textAlign:"left", width:90 }}>Mercado</th>
+                  {PROGS_S.map((p,i) => <th key={i} style={thStyle}>{p}</th>)}
+                  <th style={{ ...thStyle, width:48 }}>Leads</th>
+                  <th style={{ ...thStyle, color:C.green }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({length:totalDays},(_,i)=>i+1).map(day => (
+                  mktList.map((mkt, mi) => {
+                    const total = getTotal(day, mkt.key);
+                    const isFirst = mi === 0;
+                    return (
+                      <tr key={`${day}-${mkt.key}`}>
+                        {isFirst && (
+                          <td rowSpan={mktList.length} style={{ ...tdStyle, borderRight:`0.5px solid ${C.border}`, fontWeight:500, fontSize:14, textAlign:"center", verticalAlign:"middle", borderBottom:`0.5px solid ${C.border}` }}>{day}</td>
+                        )}
+                        <td style={{ ...tdStyle, textAlign:"left", fontWeight:500, fontSize:11, color:mkt.color, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>{mkt.label}</td>
+                        {PROGS.map(prog => {
+                          const fkey = `prog_${prog.toLowerCase()}_d${day}_${mkt.key}`;
+                          return (
+                            <td key={prog} style={{ ...tdStyle, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>
+                              <input type="number" min="0" value={goals[fkey]??""} placeholder="—"
+                                onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [fkey]: e.target.value===""?undefined:Number(e.target.value) } }))}
+                                onBlur={saveAll}
+                                style={inpStyle} />
+                            </td>
+                          );
+                        })}
+                        <td style={{ ...tdStyle, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>
+                          <input type="number" min="0" value={goals[`leads_d${day}_${mkt.key}`]??""} placeholder="—"
+                            onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [`leads_d${day}_${mkt.key}`]: e.target.value===""?undefined:Number(e.target.value) } }))}
+                            onBlur={saveAll}
+                            style={{ ...inpStyle, width:40 }} />
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight:500, color:total>0?C.green:C.muted, fontSize:13, borderBottom: mi===mktList.length-1?`0.5px solid ${C.border}`:tdStyle.borderBottom }}>{total}</td>
+                      </tr>
+                    );
+                  })
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div style={T.card}>
-            <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-              <div>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total de leads</p>
-                <input type="number" value={goals["leads_total"] ?? ""}
-                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, leads_total:e.target.value } }))} onBlur={saveAll}
-                  placeholder="0"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Margem ── */}
-      {subTab === "margem" && (
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Margem — {MONTH_NAMES[month]} {year}</p>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 320px))", gap:16 }}>
-            {[{field:"margin_pct",label:"Margem do mês (%)"},{field:"margin_pct_prev",label:"Margem do mesmo mês do ano anterior (%)"}].map(({field,label}) => (
-              <div key={field}>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
-                <input type="number" step="0.01" value={goals[field] ?? ""}
-                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
-                  placeholder="0.00"
-                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+      {subTab === "margem" && (() => {
+        const MRG_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+        const MRG_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+        const mktList = newStruct ? MRG_MARKETS_NEW : MRG_MARKETS_OLD;
+        return (
+          <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+            {mktList.map(mkt => (
+              <div key={mkt.key} style={T.card}>
+                <p style={T.sectionTitle}>{mkt.label}</p>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 280px))", gap:16 }}>
+                  {[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"},{f:`margin_pct_prev_${mkt.key}`,l:"Margem mesmo mês ano anterior (%)"}].map(({f,l}) => (
+                    <div key={f}>
+                      <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{l}</p>
+                      <input type="number" step="0.01" value={goals[f] ?? ""}
+                        onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [f]:e.target.value } }))} onBlur={saveAll}
+                        placeholder="0.00"
+                        style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Objetivos ── */}
       {subTab === "objetivos" && (
