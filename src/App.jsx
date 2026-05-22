@@ -870,6 +870,20 @@ function PartnerFollowup({ year, month }) {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e) { return { error: e }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding:"2rem", background:"#FCEBEB", borderRadius:12, color:"#791F1F", fontSize:13 }}>
+        <p style={{ fontWeight:500, margin:"0 0 8px" }}>Erro ao carregar o separador</p>
+        <p style={{ margin:0, fontFamily:"monospace" }}>{this.state.error.message}</p>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
 function MainApp() {
   const [tab, setTab] = useState("analise");
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
