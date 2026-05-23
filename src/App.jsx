@@ -85,6 +85,20 @@ function buildDaily(entries, totalDays) {
   return daily;
 }
 
+function buildDailyFirstRev(entries, totalDays, newStruct) {
+  const fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
+  const daily = []; let prevCumul = 0;
+  const lastVals = {};
+  for (let d = 1; d <= totalDays; d++) {
+    const e = entries[d] || {};
+    fields.forEach(f => { if (e[f] !== undefined) lastVals[f] = Number(e[f])||0; });
+    const cumul = fields.reduce((s,f) => s + (lastVals[f]||0), 0);
+    daily.push({ day:d, cumul, dayValue: cumul > prevCumul ? cumul - prevCumul : 0, supersales: false });
+    prevCumul = cumul;
+  }
+  return daily;
+}
+
 function computeStats(daily, teamGoals, totalDays, closedDay) {
   const goal = Number(teamGoals?.equipa_fr)||0;
   const partnerGoal = Number(teamGoals?.equipa_fr_partners)||0;
@@ -103,9 +117,8 @@ function computeStats(daily, teamGoals, totalDays, closedDay) {
   const dailyAvg = closedDay>0 ? Math.round(actual/closedDay) : 0;
   const neededPerDay = goal>0&&rem>0 ? Math.round((goal-actual)/rem) : null;
   const remaining = goal>0 ? goal-actual : null;
-  const firstRevActual = Number(teamGoals?.equipa_fr_first_rev)||0;
-  const firstRevGoal = Number(teamGoals?.equipa_fr_first_rev_goal)||0;
-  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining, firstRevActual, firstRevGoal };
+  const firstRevGoal = Number(teamGoals?.equipa_fr_first_rev)||0;
+  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining, firstRevGoal };
 }
 
 function Modal({ title, subtitle, onClose, children }) {
@@ -203,8 +216,12 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
     loadPartnersCount(year, month).then(setPartnersCount);
   }, [year, month]);
 
+  const newStruct = isNewStructure(year, month);
   const daily = useMemo(()=>buildDaily(entries,totalDays),[entries,totalDays]);
   const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay),[daily,teamGoals,totalDays,closedDay]);
+  const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
+  const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
+  const firstRevGoal = stats.firstRevGoal;
 
   const pctMonth = (closedDay/totalDays*100).toFixed(1);
   const pctObj = stats.goal>0 ? (stats.actual/stats.goal*100).toFixed(1) : null;
@@ -236,7 +253,10 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {modal && <DailyDetailModal daily={daily} closedDay={closedDay} goal={stats.goal} mode={modal} onClose={()=>setModal(null)} />}
+      {modal && (modal==="firstrev_faturado"||modal==="firstrev_objetivo"
+        ? <DailyDetailModal daily={dailyFirstRev} closedDay={closedDay} goal={firstRevGoal} mode={modal==="firstrev_faturado"?"faturado":"objetivo"} onClose={()=>setModal(null)} />
+        : <DailyDetailModal daily={daily} closedDay={closedDay} goal={stats.goal} mode={modal} onClose={()=>setModal(null)} />
+      )}
 
       {/* Row 1 — faturação */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
@@ -332,8 +352,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
         </div>
       </div>
 
-      {/* Row 5 — parceiros + primeiras compras */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:10 }}>
+      {/* Row 5 — parceiros */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
           sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
           subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
@@ -341,11 +361,27 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
         <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
           sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
           subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
-        <StatCard label="Objetivo faturação primeiras compras"
-          value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
-          sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
-          subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
       </div>
+
+      {/* Row 6 — primeiras compras */}
+      {(() => {
+        const pctFirstRev = firstRevGoal>0&&firstRevActual>0 ? (firstRevActual/firstRevGoal*100).toFixed(1) : null;
+        return (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
+            <StatCard label="Faturação 1ªs compras"
+              value={firstRevActual>0?fmtEur(firstRevActual):"—"}
+              sub={firstRevGoal>0?`faltam ${fmtEur(Math.max(0,firstRevGoal-firstRevActual))} para o objetivo`:undefined}
+              subColor={C.muted}
+              onClick={firstRevActual>0?()=>setModal("firstrev_faturado"):undefined}
+              highlight={firstRevActual>0&&firstRevGoal>0&&firstRevActual>=firstRevGoal} />
+            <StatCard label="Objetivo faturação primeiras compras"
+              value={firstRevGoal>0?fmtEur(firstRevGoal):"Sem objetivo"}
+              sub={pctFirstRev!=null?`${pctFirstRev}% realizado em ${pctMonth}% do mês`:undefined}
+              subColor={pctFirstRev!=null&&Number(pctFirstRev)<Number(pctMonth)?C.red:C.green}
+              onClick={firstRevGoal>0?()=>setModal("firstrev_objetivo"):undefined} />
+          </div>
+        );
+      })()}
     </div>
   );
 }
