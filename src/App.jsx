@@ -341,7 +341,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
         <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
           sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
           subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
-        <StatCard label="Faturação primeiras compras"
+        <StatCard label="Objetivo faturação primeiras compras"
           value={stats.firstRevActual>0?fmtEur(stats.firstRevActual):"—"}
           sub={stats.firstRevGoal>0?`objetivo: ${fmtEur(stats.firstRevGoal)}`:undefined}
           subColor={stats.firstRevActual>0&&stats.firstRevGoal>0?(stats.firstRevActual>=stats.firstRevGoal?C.green:C.red):C.muted} />
@@ -359,12 +359,13 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   const newStruct = isNewStructure(year, month);
 
   const SUB_TABS = [
-    { id:"faturacao",  label:"Faturação diária" },
-    { id:"afiliacao",  label:"Afiliação" },
-    { id:"encomendas", label:"Encomendas" },
-    { id:"parceiros",  label:"Parceiros / Leads" },
-    { id:"margem",     label:"Margem" },
-    { id:"objetivos",  label:"Objetivos" },
+    { id:"faturacao",   label:"Faturação diária" },
+    { id:"primeiras",   label:"1ªs Compras" },
+    { id:"afiliacao",   label:"Afiliação" },
+    { id:"encomendas",  label:"Encomendas" },
+    { id:"parceiros",   label:"Parceiros / Leads" },
+    { id:"margem",      label:"Margem" },
+    { id:"objetivos",   label:"Objetivos" },
   ];
 
   const save = async (newData) => {
@@ -443,6 +444,46 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                           {isSS ? "⚡ SS" : "—"}
                         </button>
                       </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── 1ªs Compras ── */}
+      {subTab === "primeiras" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Faturação 1ªs compras — {MONTH_NAMES[month]} {year}</p>
+          {!newStruct && (
+            <div style={{ padding:"10px 14px", background:"#FEF3C7", borderRadius:8, marginBottom:12, fontSize:13, color:"#92400E" }}>
+              ⚠ Meses anteriores a Junho 2026 usam a estrutura antiga (FR + CH-BNL-DEAT)
+            </div>
+          )}
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ borderBottom:`0.5px solid ${C.border}` }}>
+                  {["Dia", "França", ...(newStruct ? ["Suíça","Benelux","DE-AT"] : ["CH-BNL-DEAT"])].map((h,i) => (
+                    <th key={h} style={{ padding:"8px 10px", textAlign:i===0?"left":"center", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({length:totalDays}, (_,i) => i+1).map(day => {
+                  const e = entries[day] || {};
+                  return (
+                    <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}` }}>
+                      <td style={{ padding:"6px 10px", fontWeight:500, color:C.text }}>{day}</td>
+                      {(newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"]).map(field => (
+                        <td key={field} style={{ padding:"4px 6px", textAlign:"center" }}>
+                          <input type="number" value={e[field] ?? ""} onChange={ev => updateEntry(day, field, ev.target.value)} onBlur={saveAll}
+                            placeholder="0"
+                            style={{ width:80, textAlign:"right", padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:6, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
+                        </td>
+                      ))}
                     </tr>
                   );
                 })}
