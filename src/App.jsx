@@ -53,28 +53,39 @@ async function loadMonthData(year, month) {
 }
 
 async function loadHistoricalSSAvg(year, month) {
-  // Load up to 3 previous months that have SS days, compute average SS day value
+  // Load previous months, find months that had a SS day, sum their SS day values, divide by count
   const keys = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 12; i++) {
     const d = new Date(year, month - i, 1);
     keys.push(monthKey(d.getFullYear(), d.getMonth()));
   }
   const { data } = await supabase.from("billing_months").select("entries").in("month_key", keys);
   if (!data || data.length === 0) return 0;
-  const ssDayValues = [];
+  let totalSSValue = 0, monthsWithSS = 0;
   for (const row of data) {
     const entries = row.entries || {};
-    let prev = 0;
     const days = Object.keys(entries).map(Number).sort((a,b)=>a-b);
+    // Build cumul per day first
+    const cumuls = {};
+    let prev = 0;
     for (const d of days) {
       const e = entries[d];
-      if (!e.supersales) { prev = 0; continue; }
-      const cumul = (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
-      if (cumul > prev) ssDayValues.push(cumul - prev);
-      prev = cumul;
+      const val = (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+      cumuls[d] = val > prev ? val : prev;
+      prev = cumuls[d];
+    }
+    // Find SS day and compute its day value = cumul[ssDay] - cumul[ssDay-1]
+    for (const d of days) {
+      const e = entries[d];
+      if (!e.supersales) continue;
+      const prevDay = days.filter(x => x < d).slice(-1)[0];
+      const prevCumul = prevDay != null ? cumuls[prevDay] : 0;
+      const ssValue = cumuls[d] - prevCumul;
+      if (ssValue > 0) { totalSSValue += ssValue; monthsWithSS++; }
+      break; // only 1 SS day per month
     }
   }
-  return ssDayValues.length > 0 ? Math.round(ssDayValues.reduce((s,v)=>s+v,0)/ssDayValues.length) : 0;
+  return monthsWithSS > 0 ? Math.round(totalSSValue / monthsWithSS) : 0;
 }
 
 async function loadPartnersCount(year, month) {
