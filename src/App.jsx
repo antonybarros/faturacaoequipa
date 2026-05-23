@@ -352,22 +352,18 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
         </div>
       </div>
 
-      {/* Row 5 — parceiros */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
-        <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
-          sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
-          subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
-          highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
-        <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
-          sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
-          subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
-      </div>
-
-      {/* Row 6 — primeiras compras */}
+      {/* Row 5 — parceiros + primeiras compras */}
       {(() => {
         const pctFirstRev = firstRevGoal>0&&firstRevActual>0 ? (firstRevActual/firstRevGoal*100).toFixed(1) : null;
         return (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
+            <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
+              sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
+              subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
+              highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
+            <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
+              sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
+              subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
             <StatCard label="Faturação 1ªs compras"
               value={firstRevActual>0?fmtEur(firstRevActual):"—"}
               sub={firstRevGoal>0?`faltam ${fmtEur(Math.max(0,firstRevGoal-firstRevActual))} para o objetivo`:undefined}
@@ -716,8 +712,11 @@ function CopyBtn({ text }) {
   };
   return (
     <button onClick={handleCopy} title="Copiar ID"
-      style={{ background:"transparent", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:4, color: copied ? C.green : C.muted, fontSize:12, lineHeight:1, flexShrink:0 }}>
-      {copied ? "✓" : "⎘"}
+      style={{ display:"inline-flex", alignItems:"center", gap:4, background:copied?"#DCFCE7":"transparent",
+               border:`1px solid ${copied?"#86EFAC":"#D1D5DB"}`, cursor:"pointer", padding:"3px 8px",
+               borderRadius:6, color:copied?"#16A34A":C.muted, fontSize:12, fontWeight:500, lineHeight:1, flexShrink:0, transition:"all .15s" }}>
+      <span style={{ fontSize:13 }}>{copied ? "✓" : "⎘"}</span>
+      <span>{copied ? "Copiado" : "Copiar"}</span>
     </button>
   );
 }
@@ -907,9 +906,12 @@ function PartnerFollowup({ year, month }) {
   );
 
   const STAGE_COLORS = {
-    s30: { bg:C.card, border:C.border, badgeBg:"#FCEBEB", badgeText:C.red },
-    s60: { bg:"#FAEEDA", border:"#EF9F27", badgeBg:"#FAEEDA", badgeText:"#633806" },
-    s90: { bg:"#FCEBEB", border:C.red, badgeBg:"#F7C1C1", badgeText:"#791F1F" },
+    s30: { bg:C.card, border:C.border, badgeBg:"#FCEBEB", badgeText:C.red,
+           overdueBg:"#F7C1C1", overdueBorder:"#E05555" },
+    s60: { bg:"#FAEEDA", border:"#EF9F27", badgeBg:"#FAEEDA", badgeText:"#633806",
+           overdueBg:"#F5D79E", overdueBorder:"#C47D10" },
+    s90: { bg:"#FCEBEB", border:C.red, badgeBg:"#F7C1C1", badgeText:"#791F1F",
+           overdueBg:"#F0A0A0", overdueBorder:"#B91C1C" },
   };
 
   return (
@@ -1046,7 +1048,7 @@ function PartnerFollowup({ year, month }) {
             const sc = STAGE_COLORS[stage.key];
             const mktLabel = ALL_MKTS.find(m=>m.key===r.market)?.label || r.market || "—";
             return (
-              <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+              <div key={r.id} style={{ background:overdue?sc.overdueBg:sc.bg, border:`1.5px solid ${overdue?sc.overdueBorder:sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
                 {/* Dot */}
                 <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
                 {/* ID + Programa */}
@@ -1141,7 +1143,7 @@ function MainApp() {
           </select>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Análise"},{id:"registo",l:"Registo"},{id:"parceiros",l:"Parceiros"}].map(t=>(
+          {[{id:"analise",l:"Dashboard"},{id:"registo",l:"Registo"},{id:"parceiros",l:"Follow-up"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
                 background:"transparent", color:tab===t.id?C.green:C.muted, fontWeight:tab===t.id?500:400, fontSize:14, cursor:"pointer" }}>
