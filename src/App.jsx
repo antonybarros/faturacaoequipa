@@ -704,6 +704,24 @@ function mapVal(map, val) {
   return map[String(val).trim()] || map[k] || null;
 }
 
+// ── CopyBtn ───────────────────────────────────────────────────────────────────
+function CopyBtn({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(String(text)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button onClick={handleCopy} title="Copiar ID"
+      style={{ background:"transparent", border:"none", cursor:"pointer", padding:"2px 4px", borderRadius:4, color: copied ? C.green : C.muted, fontSize:12, lineHeight:1, flexShrink:0 }}>
+      {copied ? "✓" : "⎘"}
+    </button>
+  );
+}
+
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
 function PartnerFollowup({ year, month }) {
   const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
@@ -729,6 +747,8 @@ function PartnerFollowup({ year, month }) {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [importDetails, setImportDetails] = useState(null);
+  const [showImportDetails, setShowImportDetails] = useState(false);
   const fileRef = React.useRef();
 
   useEffect(() => { load(); }, []);
@@ -765,6 +785,8 @@ function PartnerFollowup({ year, month }) {
     if (!file) return;
     setImporting(true);
     setImportMsg("");
+    setImportDetails(null);
+    setShowImportDetails(false);
     try {
       // Read as text (works for CSV; for XLSX we use a script tag)
       const parseDate = (v) => {
@@ -808,7 +830,8 @@ function PartnerFollowup({ year, month }) {
       const iProg = headers.findIndex(h => h==="PROGRAMA");
       const iDate = headers.findIndex(h => h.includes("DATA"));
       const dataRows = rows.slice(headerIdx + 1).filter(r => String(r[iID]||"").trim());
-      let ok = 0, skip = 0;
+      let ok = 0, skipInvalid = 0, skipDup = 0;
+      const invalidDetails = [], dupDetails = [];
       for (const r of dataRows) {
         const clientId  = String(r[iID]).trim();
         const gestorRaw = iGest >= 0 ? String(r[iGest]||"").trim() : "";
@@ -818,14 +841,24 @@ function PartnerFollowup({ year, month }) {
         const gestorVal = mapVal(GESTOR_MAP, gestorRaw) || gestorRaw;
         const mktVal    = mapVal(MKT_MAP, mktRaw);
         const progVal   = mapVal(PROG_MAP, progRaw);
-        if (!mktVal || !progVal) { skip++; continue; }
+        if (!mktVal || !progVal) {
+          skipInvalid++;
+          invalidDetails.push({ id: clientId, motivo: !mktVal ? `Mercado não reconhecido: "${mktRaw}"` : `Programa não reconhecido: "${progRaw}"` });
+          continue;
+        }
+        const { data: existing } = await supabase.from("partner_followup").select("id").eq("client_id", clientId).maybeSingle();
+        if (existing) { skipDup++; dupDetails.push({ id: clientId }); continue; }
         const { error } = await supabase.from("partner_followup").insert({
           client_id: clientId, gestor: gestorVal, market: mktVal, programme: progVal,
           stage:"s30", stage_started_at: parseDate(dateRaw), status:"pending",
         });
-        if (!error) ok++; else skip++;
+        if (!error) ok++; else { skipInvalid++; invalidDetails.push({ id: clientId, motivo: "Erro ao inserir" }); }
       }
-      setImportMsg(`✓ ${ok} registos importados${skip>0?` · ${skip} ignorados`:""}`);
+      const parts = [`✓ ${ok} registos importados`];
+      if (skipDup > 0) parts.push(`${skipDup} duplicados ignorados`);
+      if (invalidDetails.length > 0) parts.push(`${invalidDetails.length} inválidos ignorados`);
+      setImportMsg(parts.join(" · "));
+      setImportDetails({ dups: dupDetails, invalids: invalidDetails });
       await load();
     } catch(err) {
       setImportMsg("❌ Erro: " + err.message);
@@ -859,10 +892,19 @@ function PartnerFollowup({ year, month }) {
   const pending = records.filter(r=>r.status==="pending");
   const overdueCount = pending.filter(r=>getInfo(r).overdue).length;
 
-  const filtered = filter==="all" ? pending :
+  const sortByUrgency = (arr) => [...arr].sort((a,b) => {
+    const ia = getInfo(a), ib = getInfo(b);
+    if (ia.overdue && !ib.overdue) return -1;
+    if (!ia.overdue && ib.overdue) return 1;
+    return ia.left - ib.left;
+  });
+
+  const filtered = sortByUrgency(
+    filter==="all" ? pending :
     filter==="s30" ? pending.filter(r=>r.stage==="s30") :
     filter==="s60" ? pending.filter(r=>r.stage==="s60") :
-    pending.filter(r=>r.stage==="s90");
+    pending.filter(r=>r.stage==="s90")
+  );
 
   const STAGE_COLORS = {
     s30: { bg:C.card, border:C.border, badgeBg:"#FCEBEB", badgeText:C.red },
@@ -939,7 +981,39 @@ function PartnerFollowup({ year, month }) {
           style={{ padding:"8px 16px", background:"transparent", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, color:C.text, cursor:"pointer", opacity:importing?0.6:1 }}>
           {importing?"A importar…":"📂 Importar Excel"}
         </button>
-        {importMsg && <span style={{ fontSize:13, color:importMsg.startsWith("✓")?C.green:C.red }}>{importMsg}</span>}
+        {importMsg && (
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:13, color:importMsg.startsWith("✓")?C.green:C.red }}>{importMsg}</span>
+              {importDetails && (importDetails.invalids.length>0||importDetails.dups.length>0) && (
+                <button onClick={()=>setShowImportDetails(v=>!v)}
+                  style={{ fontSize:12, color:C.muted, background:"transparent", border:`0.5px solid ${C.border}`, borderRadius:6, padding:"2px 8px", cursor:"pointer" }}>
+                  {showImportDetails?"▲ Ocultar":"▼ Ver detalhes"}
+                </button>
+              )}
+            </div>
+            {showImportDetails && importDetails && (
+              <div style={{ background:C.card, border:`0.5px solid ${C.border}`, borderRadius:8, padding:"10px 14px", fontSize:12, display:"flex", flexDirection:"column", gap:6, maxHeight:200, overflowY:"auto" }}>
+                {importDetails.dups.length>0 && (
+                  <div>
+                    <p style={{ margin:"0 0 4px", fontWeight:500, color:C.muted }}>Duplicados ignorados</p>
+                    {importDetails.dups.map((d,i)=>(
+                      <p key={i} style={{ margin:"2px 0", color:C.text }}>· ID {d.id} — já existe na base de dados</p>
+                    ))}
+                  </div>
+                )}
+                {importDetails.invalids.length>0 && (
+                  <div>
+                    <p style={{ margin:"0 0 4px", fontWeight:500, color:C.red }}>Inválidos ignorados</p>
+                    {importDetails.invalids.map((d,i)=>(
+                      <p key={i} style={{ margin:"2px 0", color:C.text }}>· ID {d.id} — {d.motivo}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -972,33 +1046,44 @@ function PartnerFollowup({ year, month }) {
             const sc = STAGE_COLORS[stage.key];
             const mktLabel = ALL_MKTS.find(m=>m.key===r.market)?.label || r.market || "—";
             return (
-              <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              <div key={r.id} style={{ background:sc.bg, border:`0.5px solid ${sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+                {/* Dot */}
                 <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
-                <div style={{ flex:1, minWidth:140 }}>
-                  <p style={{ fontWeight:500, fontSize:13, margin:0, color:C.text }}>ID: {r.client_id}{r.gestor?" · "+r.gestor:""}</p>
-                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
-                    <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{r.programme}</span>
-                    <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 7px", borderRadius:20 }}>{mktLabel}</span>
+                {/* ID + Programa */}
+                <div style={{ minWidth:130 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <p style={{ fontWeight:600, fontSize:14, margin:0, color:C.text }}>ID: {r.client_id}</p>
+                    <CopyBtn text={r.client_id} />
                   </div>
+                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20, marginTop:4, display:"inline-block" }}>{r.programme}</span>
                 </div>
-                <div style={{ textAlign:"center", minWidth:80 }}>
+                {/* Gestor + Mercado */}
+                <div style={{ minWidth:110 }}>
+                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{r.gestor||"—"}</p>
+                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20, marginTop:4, display:"inline-block" }}>{mktLabel}</span>
+                </div>
+                {/* Fase */}
+                <div style={{ textAlign:"center", minWidth:70 }}>
                   <p style={{ fontSize:11, color:C.muted, margin:0 }}>Fase</p>
                   <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{stage.label}</p>
                 </div>
+                {/* Registado há */}
                 <div style={{ textAlign:"center", minWidth:80 }}>
                   <p style={{ fontSize:11, color:C.muted, margin:0 }}>Registado há</p>
                   <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{diff} {diff===1?"dia":"dias"}</p>
                 </div>
-                <div style={{ minWidth:110, textAlign:"center" }}>
+                {/* Badge prazo */}
+                <div style={{ minWidth:120, textAlign:"center" }}>
                   {overdue ? (
                     <span style={{ background:sc.badgeBg, color:sc.badgeText, fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:20 }}>⚠ Verificar agora</span>
                   ) : (
                     <span style={{ background:C.card, color:C.muted, fontSize:11, padding:"4px 10px", borderRadius:20 }}>{left} {left===1?"dia":"dias"} restantes</span>
                   )}
                 </div>
-                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                {/* Ações */}
+                <div style={{ display:"flex", gap:8, flexShrink:0, marginLeft:"auto" }}>
                   <button onClick={()=>handleBought(r.id)}
-                    style={{ padding:"6px 12px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
+                    style={{ padding:"6px 14px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
                     ✓ Fez compra
                   </button>
                   <button onClick={()=>handleNotBought(r)}
