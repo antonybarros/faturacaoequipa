@@ -52,6 +52,31 @@ async function loadMonthData(year, month) {
   return data || { entries:{}, team_goals:{} };
 }
 
+async function loadHistoricalSSAvg(year, month) {
+  // Load up to 3 previous months that have SS days, compute average SS day value
+  const keys = [];
+  for (let i = 1; i <= 4; i++) {
+    const d = new Date(year, month - i, 1);
+    keys.push(monthKey(d.getFullYear(), d.getMonth()));
+  }
+  const { data } = await supabase.from("billing_months").select("entries").in("month_key", keys);
+  if (!data || data.length === 0) return 0;
+  const ssDayValues = [];
+  for (const row of data) {
+    const entries = row.entries || {};
+    let prev = 0;
+    const days = Object.keys(entries).map(Number).sort((a,b)=>a-b);
+    for (const d of days) {
+      const e = entries[d];
+      if (!e.supersales) { prev = 0; continue; }
+      const cumul = (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+      if (cumul > prev) ssDayValues.push(cumul - prev);
+      prev = cumul;
+    }
+  }
+  return ssDayValues.length > 0 ? Math.round(ssDayValues.reduce((s,v)=>s+v,0)/ssDayValues.length) : 0;
+}
+
 async function loadPartnersCount(year, month) {
   const start = new Date(year, month, 1).toISOString();
   const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
@@ -99,7 +124,7 @@ function buildDailyFirstRev(entries, totalDays, newStruct) {
   return daily;
 }
 
-function computeStats(daily, teamGoals, totalDays, closedDay) {
+function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0) {
   const goal = Number(teamGoals?.equipa_fr)||0;
   const partnerGoal = Number(teamGoals?.equipa_fr_partners)||0;
   const closed = daily.filter(d=>d.day<=closedDay);
@@ -113,12 +138,25 @@ function computeStats(daily, teamGoals, totalDays, closedDay) {
   const avgSS = ss.length>0 ? Math.round(ss.reduce((s,d)=>s+d.dayValue,0)/ss.length) : 0;
   const rem = totalDays-closedDay;
   const projNoSS = avgNormal>0 ? actual+avgNormal*rem : null;
-  const projWithSS = avgNormal>0&&avgSS>0 ? actual+avgNormal*(rem-1)+avgSS : projNoSS;
+  // SS projection logic:
+  // - If SS already happened this month → same as projNoSS (already in actual)
+  // - If SS not yet happened and rem >= 1 → use historical avg for 1 SS day + normal for rest
+  // - If rem = 0 and no SS → null (no days left)
+  const ssHappened = ss.length > 0;
+  const effectiveSSAvg = ssHappened ? avgSS : historicalSSAvg;
+  let projWithSS;
+  if (ssHappened) {
+    projWithSS = projNoSS;
+  } else if (effectiveSSAvg > 0 && avgNormal > 0 && rem >= 1) {
+    projWithSS = actual + avgNormal * (rem - 1) + effectiveSSAvg;
+  } else {
+    projWithSS = null;
+  }
   const dailyAvg = closedDay>0 ? Math.round(actual/closedDay) : 0;
   const neededPerDay = goal>0&&rem>0 ? Math.round((goal-actual)/rem) : null;
   const remaining = goal>0 ? goal-actual : null;
   const firstRevGoal = Number(teamGoals?.equipa_fr_first_rev)||0;
-  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, remainingDays:rem, closedDay, remaining, firstRevGoal };
+  return { goal, partnerGoal, actual, expected, vsExpected, vsExpPct, dailyAvg, neededPerDay, projNoSS, projWithSS, avgNormal, avgSS, historicalSSAvg: effectiveSSAvg, ssHappened, remainingDays:rem, closedDay, remaining, firstRevGoal };
 }
 
 function Modal({ title, subtitle, onClose, children }) {
@@ -217,8 +255,10 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   }, [year, month]);
 
   const newStruct = isNewStructure(year, month);
+  const [historicalSSAvg, setHistoricalSSAvg] = useState(0);
+  useEffect(()=>{ loadHistoricalSSAvg(year, month).then(setHistoricalSSAvg); }, [year, month]);
   const daily = useMemo(()=>buildDaily(entries,totalDays),[entries,totalDays]);
-  const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay),[daily,teamGoals,totalDays,closedDay]);
+  const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg]);
   const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
   const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
   const firstRevGoal = stats.firstRevGoal;
@@ -287,8 +327,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
           sub={stats.projNoSS&&stats.goal>0?(stats.projNoSS>=stats.goal?"↑ acima do objetivo":"↓ abaixo do objetivo"):`média ${stats.avgNormal>0?fmtEur(stats.avgNormal):"—"}/dia`}
           subColor={stats.projNoSS>=stats.goal?C.green:C.red} small />
         <StatCard label="Projeção com Supersales" value={stats.projWithSS?fmtEur(stats.projWithSS):"—"}
-          sub={stats.projWithSS&&stats.goal>0?(stats.projWithSS>=stats.goal?"↑ acima do objetivo":"↓ abaixo do objetivo"):`SS médio ${stats.avgSS>0?fmtEur(stats.avgSS):"sem dados"}`}
-          subColor={stats.projWithSS>=stats.goal?C.green:C.red} small />
+          sub={stats.projWithSS==null?"sem dados SS históricos":stats.ssHappened?`SS já realizada (${fmtEur(stats.avgSS)})`:`estimativa SS: ${fmtEur(stats.historicalSSAvg)} (média histórica)`}
+          subColor={stats.projWithSS==null?C.muted:stats.projWithSS>=stats.goal?C.green:C.red} small />
       </div>
 
       {/* Chart */}
