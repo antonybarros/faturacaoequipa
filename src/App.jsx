@@ -1077,7 +1077,7 @@ function PartnerFollowup({ year, month }) {
       </div>
 
       {/* Filters */}
-      <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
+      <div style={{ display:"flex", flexWrap:"nowrap", gap:8, alignItems:"center", overflowX:"auto" }}>
         {/* Stage buttons */}
         <div style={{ display:"flex", gap:8 }}>
           {[
@@ -1097,14 +1097,14 @@ function PartnerFollowup({ year, month }) {
         <div style={{ width:1, height:24, background:C.border, margin:"0 4px" }} />
         {/* Gestor */}
         <select value={filterGestor} onChange={e=>setFilterGestor(e.target.value)}
-          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterGestor!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
-          <option value="all">Todos os gestores</option>
+          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterGestor!=="all"?C.text:C.muted, outline:"none", cursor:"pointer", flexShrink:0 }}>
+          <option value="all">Gestor</option>
           {GESTORS.map(g=><option key={g} value={g}>{g}</option>)}
         </select>
         {/* Mercado */}
         <select value={filterMkt} onChange={e=>setFilterMkt(e.target.value)}
-          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterMkt!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
-          <option value="all">Todos os mercados</option>
+          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterMkt!=="all"?C.text:C.muted, outline:"none", cursor:"pointer", flexShrink:0 }}>
+          <option value="all">Mercado</option>
           <option value="FR">França</option>
           <option value="CH">Suíça</option>
           <option value="BNL">Benelux</option>
@@ -1112,8 +1112,8 @@ function PartnerFollowup({ year, month }) {
         </select>
         {/* Programa */}
         <select value={filterProg} onChange={e=>setFilterProg(e.target.value)}
-          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterProg!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
-          <option value="all">Todos os programas</option>
+          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterProg!=="all"?C.text:C.muted, outline:"none", cursor:"pointer", flexShrink:0 }}>
+          <option value="all">Programa</option>
           <option value="Elite">Elite</option>
           <option value="Professionals">Professionals</option>
           <option value="ProGym">Pro Gym</option>
