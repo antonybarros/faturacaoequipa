@@ -789,6 +789,9 @@ function PartnerFollowup({ year, month }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [filterGestor, setFilterGestor] = useState("all");
+  const [filterMkt, setFilterMkt] = useState("all");
+  const [filterProg, setFilterProg] = useState("all");
   const [clientId, setClientId] = useState("");
   const [mkt, setMkt] = useState("");
   const [prog, setProg] = useState("");
@@ -949,11 +952,15 @@ function PartnerFollowup({ year, month }) {
     return ia.left - ib.left;
   });
 
-  const filtered = sortByUrgency(
-    filter==="all" ? pending :
+  const stageFiltered = filter==="all" ? pending :
     filter==="s30" ? pending.filter(r=>r.stage==="s30") :
     filter==="s60" ? pending.filter(r=>r.stage==="s60") :
-    pending.filter(r=>r.stage==="s90")
+    pending.filter(r=>r.stage==="s90");
+
+  const filtered = sortByUrgency(stageFiltered
+    .filter(r => filterGestor==="all" || r.gestor===filterGestor)
+    .filter(r => filterMkt==="all" || r.market===filterMkt)
+    .filter(r => filterProg==="all" || r.programme===filterProg)
   );
 
   const STAGE_COLORS = {
@@ -1070,19 +1077,59 @@ function PartnerFollowup({ year, month }) {
       </div>
 
       {/* Filters */}
-      <div style={{ display:"flex", gap:8 }}>
-        {[
-          {id:"all",  label:`Todos (${pending.length})`},
-          {id:"s30",  label:`30 dias (${pending.filter(r=>r.stage==="s30").length})`},
-          {id:"s60",  label:`60 dias (${pending.filter(r=>r.stage==="s60").length})`},
-          {id:"s90",  label:`90 dias (${pending.filter(r=>r.stage==="s90").length})`},
-        ].map(f=>(
-          <button key={f.id} onClick={()=>setFilter(f.id)}
-            style={{ padding:"6px 14px", borderRadius:20, fontSize:12, border:`0.5px solid ${C.border}`, cursor:"pointer",
-              background:filter===f.id?C.green:"transparent", color:filter===f.id?"#fff":C.muted, fontWeight:filter===f.id?500:400 }}>
-            {f.label}
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
+        {/* Stage buttons */}
+        <div style={{ display:"flex", gap:8 }}>
+          {[
+            {id:"all",  label:`Todos (${pending.length})`},
+            {id:"s30",  label:`30 dias (${pending.filter(r=>r.stage==="s30").length})`},
+            {id:"s60",  label:`60 dias (${pending.filter(r=>r.stage==="s60").length})`},
+            {id:"s90",  label:`90 dias (${pending.filter(r=>r.stage==="s90").length})`},
+          ].map(f=>(
+            <button key={f.id} onClick={()=>setFilter(f.id)}
+              style={{ padding:"6px 14px", borderRadius:20, fontSize:12, border:`0.5px solid ${C.border}`, cursor:"pointer",
+                background:filter===f.id?C.green:"transparent", color:filter===f.id?"#fff":C.muted, fontWeight:filter===f.id?500:400 }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {/* Separator */}
+        <div style={{ width:1, height:24, background:C.border, margin:"0 4px" }} />
+        {/* Gestor */}
+        <select value={filterGestor} onChange={e=>setFilterGestor(e.target.value)}
+          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterGestor!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
+          <option value="all">Todos os gestores</option>
+          {GESTORS.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+        {/* Mercado */}
+        <select value={filterMkt} onChange={e=>setFilterMkt(e.target.value)}
+          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterMkt!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
+          <option value="all">Todos os mercados</option>
+          <option value="FR">França</option>
+          <option value="CH">Suíça</option>
+          <option value="BNL">Benelux</option>
+          <option value="DEAT">Alemanha e Áustria</option>
+        </select>
+        {/* Programa */}
+        <select value={filterProg} onChange={e=>setFilterProg(e.target.value)}
+          style={{ padding:"5px 10px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:filterProg!=="all"?C.text:C.muted, outline:"none", cursor:"pointer" }}>
+          <option value="all">Todos os programas</option>
+          <option value="Elite">Elite</option>
+          <option value="Professionals">Professionals</option>
+          <option value="ProGym">Pro Gym</option>
+          <option value="ProBox">Pro Box</option>
+          <option value="ProTeams">Pro Teams</option>
+          <option value="Performance">Performance</option>
+          <option value="Horeca">Horeca</option>
+          <option value="Corporate">Corporate</option>
+        </select>
+        {/* Reset */}
+        {(filterGestor!=="all"||filterMkt!=="all"||filterProg!=="all") && (
+          <button onClick={()=>{ setFilterGestor("all"); setFilterMkt("all"); setFilterProg("all"); }}
+            style={{ padding:"5px 10px", borderRadius:8, fontSize:12, border:`0.5px solid ${C.border}`, background:"transparent", color:C.muted, cursor:"pointer" }}>
+            ✕ Limpar filtros
           </button>
-        ))}
+        )}
       </div>
 
       {/* List */}
