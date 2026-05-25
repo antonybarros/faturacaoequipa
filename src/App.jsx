@@ -406,10 +406,10 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top:4, right:8, left:8, bottom:0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1EFE8" vertical={false} />
-            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={4} />
+            <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={0} />
             <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":v} tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={40} />
             <Tooltip formatter={(v,n)=>[fmtEur(v),n==="atual"?"Resultado":"Objetivo"]} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:12, background:C.bg }} />
-            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" />}
+            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" label={{ value: stats.vsExpPct!=null?`${stats.vsExpPct.toFixed(1)}%`:"", position:"top", fill:"#888", fontSize:11, fontWeight:600 }} />}
             <Line type="monotone" dataKey="atual" stroke={C.green} strokeWidth={2} dot={false} connectNulls />
             {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
           </LineChart>
