@@ -94,7 +94,8 @@ async function loadPartnersCount(year, month) {
   const { count } = await supabase.from("partner_followup")
     .select("*", { count:"exact", head:true })
     .gte("stage_started_at", start)
-    .lte("stage_started_at", end);
+    .lte("stage_started_at", end)
+    .neq("status", "deleted");
   return count || 0;
 }
 
@@ -792,6 +793,7 @@ function PartnerFollowup({ year, month }) {
   const [filterGestor, setFilterGestor] = useState("all");
   const [filterMkt, setFilterMkt] = useState("all");
   const [filterProg, setFilterProg] = useState("all");
+  const [sortOrder, setSortOrder] = useState("urgency");
   const [clientId, setClientId] = useState("");
   const [mkt, setMkt] = useState("");
   const [prog, setProg] = useState("");
@@ -817,6 +819,8 @@ function PartnerFollowup({ year, month }) {
     e.preventDefault();
     if (!clientId.trim() || !mkt || !prog) return;
     setSaving(true);
+    const { data: existing } = await supabase.from("partner_followup").select("id").eq("client_id", clientId.trim()).maybeSingle();
+    if (existing) { alert(`ID ${clientId.trim()} já existe na lista.`); setSaving(false); return; }
     const { error } = await supabase.from("partner_followup").insert({
       client_id: clientId.trim(),
       programme: prog,
@@ -921,17 +925,23 @@ function PartnerFollowup({ year, month }) {
   };
 
   const handleBought = async (id) => {
-    await supabase.from("partner_followup").delete().eq("id", id);
+    await supabase.from("partner_followup").update({ status:"bought" }).eq("id", id);
     await load();
   };
 
   const handleNotBought = async (record) => {
     const next = record.stage==="s30"?"s60":record.stage==="s60"?"s90":null;
     if (!next) {
-      await supabase.from("partner_followup").delete().eq("id", record.id);
+      await supabase.from("partner_followup").update({ status:"closed" }).eq("id", record.id);
     } else {
       await supabase.from("partner_followup").update({ stage:next, stage_started_at:new Date().toISOString(), status:"pending" }).eq("id", record.id);
     }
+    await load();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Apagar este registo? Será removido da contagem de novos parceiros.")) return;
+    await supabase.from("partner_followup").delete().eq("id", id);
     await load();
   };
 
@@ -957,7 +967,14 @@ function PartnerFollowup({ year, month }) {
     filter==="s60" ? pending.filter(r=>r.stage==="s60") :
     pending.filter(r=>r.stage==="s90");
 
-  const filtered = sortByUrgency(stageFiltered
+  const applySort = (arr) => {
+    if (sortOrder==="urgency") return sortByUrgency(arr);
+    if (sortOrder==="newest") return [...arr].sort((a,b)=>new Date(b.stage_started_at)-new Date(a.stage_started_at));
+    if (sortOrder==="oldest") return [...arr].sort((a,b)=>new Date(a.stage_started_at)-new Date(b.stage_started_at));
+    return arr;
+  };
+
+  const filtered = applySort(stageFiltered
     .filter(r => filterGestor==="all" || r.gestor===filterGestor)
     .filter(r => filterMkt==="all" || r.market===filterMkt)
     .filter(r => filterProg==="all" || r.programme===filterProg)
@@ -1093,6 +1110,13 @@ function PartnerFollowup({ year, month }) {
             </button>
           ))}
         </div>
+        {/* Sort toggle */}
+        <select value={sortOrder} onChange={e=>setSortOrder(e.target.value)}
+          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:C.text, outline:"none", cursor:"pointer", flexShrink:0 }}>
+          <option value="urgency">↑ Mais urgente</option>
+          <option value="oldest">↑ Mais antigo</option>
+          <option value="newest">↓ Mais recente</option>
+        </select>
         {/* Separator */}
         <div style={{ width:1, height:24, background:C.border, margin:"0 4px" }} />
         {/* Gestor */}
@@ -1189,6 +1213,10 @@ function PartnerFollowup({ year, month }) {
                   <button onClick={()=>handleNotBought(r)}
                     style={{ padding:"6px 12px", background:C.card, color:C.text, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
                     ✗ Não fez
+                  </button>
+                  <button onClick={()=>handleDelete(r.id)} title="Apagar erro de registo"
+                    style={{ padding:"6px 10px", background:"transparent", color:C.muted, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
+                    🗑
                   </button>
                 </div>
               </div>
