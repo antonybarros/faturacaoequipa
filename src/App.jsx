@@ -409,7 +409,16 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
             <XAxis dataKey="day" tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} interval={0} />
             <YAxis tickFormatter={v=>v>=1000?Math.round(v/1000)+"k":v} tick={{ fontSize:10, fill:"#B4B2A9" }} axisLine={false} tickLine={false} width={40} />
             <Tooltip formatter={(v,n)=>[fmtEur(v),n==="atual"?"Resultado":"Objetivo"]} labelFormatter={l=>`Dia ${l}`} contentStyle={{ borderRadius:8, border:`0.5px solid ${C.border}`, fontSize:12, background:C.bg }} />
-            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3" label={{ value: stats.vsExpPct!=null?`${stats.vsExpPct.toFixed(1)}%`:"", position:"top", fill:"#888", fontSize:11, fontWeight:600 }} />}
+            {closedDay>0&&closedDay<totalDays&&<ReferenceLine x={closedDay} stroke="#D3D1C7" strokeDasharray="3 3"
+              label={(props)=>{
+                const {viewBox} = props;
+                if (!viewBox || stats.vsExpPct==null) return null;
+                return (
+                  <text x={viewBox.x+4} y={viewBox.y+12} fill="#888" fontSize={11} fontWeight={600}>
+                    {`${stats.vsExpPct.toFixed(1)}%`}
+                  </text>
+                );
+              }} />}
             <Line type="monotone" dataKey="atual" stroke={C.green} strokeWidth={2} dot={false} connectNulls />
             {stats.goal>0&&<Line type="monotone" dataKey="objetivo" stroke="#9333ea" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />}
           </LineChart>
