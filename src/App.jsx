@@ -1112,7 +1112,7 @@ function PartnerFollowup({ year, month }) {
         </div>
         {/* Sort toggle */}
         <select value={sortOrder} onChange={e=>setSortOrder(e.target.value)}
-          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:C.text, outline:"none", cursor:"pointer", flexShrink:0 }}>
+          style={{ padding:"5px 8px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, background:C.bg, color:C.muted, outline:"none", cursor:"pointer", flexShrink:0 }}>
           <option value="urgency">↑ Mais urgente</option>
           <option value="oldest">↑ Mais antigo</option>
           <option value="newest">↓ Mais recente</option>
@@ -1170,54 +1170,49 @@ function PartnerFollowup({ year, month }) {
             const sc = STAGE_COLORS[stage.key];
             const mktLabel = ALL_MKTS.find(m=>m.key===r.market)?.label || r.market || "—";
             return (
-              <div key={r.id} style={{ background:overdue?sc.overdueBg:sc.bg, border:`1.5px solid ${overdue?sc.overdueBorder:sc.border}`, borderRadius:12, padding:"14px 16px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
-                {/* Dot */}
-                <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
-                {/* ID + Programa */}
-                <div style={{ minWidth:130 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div key={r.id} style={{ background:overdue?sc.overdueBg:sc.bg, border:`1.5px solid ${overdue?sc.overdueBorder:sc.border}`, borderRadius:12, padding:"12px 16px" }}>
+                {/* Linha 1 */}
+                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:overdue?C.red:"#d97706", flexShrink:0 }} />
+                  <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:150 }}>
                     <p style={{ fontWeight:600, fontSize:14, margin:0, color:C.text }}>ID: {r.client_id}</p>
                     <CopyBtn text={r.client_id} />
                   </div>
-                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20, marginTop:4, display:"inline-block" }}>{r.programme}</span>
+                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text, minWidth:80 }}>{r.gestor||"—"}</p>
+                  <div style={{ textAlign:"center", minWidth:70 }}>
+                    <p style={{ fontSize:11, color:C.muted, margin:0 }}>Fase</p>
+                    <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{stage.label}</p>
+                  </div>
+                  <div style={{ textAlign:"center", minWidth:80 }}>
+                    <p style={{ fontSize:11, color:C.muted, margin:0 }}>Registado há</p>
+                    <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{diff} {diff===1?"dia":"dias"}</p>
+                  </div>
+                  <div style={{ minWidth:120, textAlign:"center" }}>
+                    {overdue ? (
+                      <span style={{ background:sc.badgeBg, color:sc.badgeText, fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:20 }}>⚠ Verificar agora</span>
+                    ) : (
+                      <span style={{ background:C.card, color:C.muted, fontSize:11, padding:"4px 10px", borderRadius:20 }}>{left} {left===1?"dia":"dias"} restantes</span>
+                    )}
+                  </div>
+                  <div style={{ display:"flex", gap:8, marginLeft:"auto", flexShrink:0 }}>
+                    <button onClick={()=>handleBought(r.id)}
+                      style={{ padding:"6px 14px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
+                      ✓ Fez compra
+                    </button>
+                    <button onClick={()=>handleNotBought(r)}
+                      style={{ padding:"6px 12px", background:C.card, color:C.text, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
+                      ✗ Não fez
+                    </button>
+                    <button onClick={()=>handleDelete(r.id)} title="Apagar erro de registo"
+                      style={{ padding:"6px 10px", background:"transparent", color:C.muted, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
+                      🗑
+                    </button>
+                  </div>
                 </div>
-                {/* Gestor + Mercado */}
-                <div style={{ minWidth:110 }}>
-                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{r.gestor||"—"}</p>
-                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20, marginTop:4, display:"inline-block" }}>{mktLabel}</span>
-                </div>
-                {/* Fase */}
-                <div style={{ textAlign:"center", minWidth:70 }}>
-                  <p style={{ fontSize:11, color:C.muted, margin:0 }}>Fase</p>
-                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{stage.label}</p>
-                </div>
-                {/* Registado há */}
-                <div style={{ textAlign:"center", minWidth:80 }}>
-                  <p style={{ fontSize:11, color:C.muted, margin:0 }}>Registado há</p>
-                  <p style={{ fontSize:13, fontWeight:500, margin:0, color:C.text }}>{diff} {diff===1?"dia":"dias"}</p>
-                </div>
-                {/* Badge prazo */}
-                <div style={{ minWidth:120, textAlign:"center" }}>
-                  {overdue ? (
-                    <span style={{ background:sc.badgeBg, color:sc.badgeText, fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:20 }}>⚠ Verificar agora</span>
-                  ) : (
-                    <span style={{ background:C.card, color:C.muted, fontSize:11, padding:"4px 10px", borderRadius:20 }}>{left} {left===1?"dia":"dias"} restantes</span>
-                  )}
-                </div>
-                {/* Ações */}
-                <div style={{ display:"flex", gap:8, flexShrink:0, marginLeft:"auto" }}>
-                  <button onClick={()=>handleBought(r.id)}
-                    style={{ padding:"6px 14px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
-                    ✓ Fez compra
-                  </button>
-                  <button onClick={()=>handleNotBought(r)}
-                    style={{ padding:"6px 12px", background:C.card, color:C.text, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
-                    ✗ Não fez
-                  </button>
-                  <button onClick={()=>handleDelete(r.id)} title="Apagar erro de registo"
-                    style={{ padding:"6px 10px", background:"transparent", color:C.muted, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
-                    🗑
-                  </button>
+                {/* Linha 2 */}
+                <div style={{ display:"flex", gap:8, marginTop:8, paddingLeft:22 }}>
+                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20 }}>{r.programme}</span>
+                  <span style={{ fontSize:11, background:C.card, color:C.muted, padding:"2px 8px", borderRadius:20 }}>{mktLabel}</span>
                 </div>
               </div>
             );
