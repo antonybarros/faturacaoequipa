@@ -258,6 +258,55 @@ function StatCard({ label, value, sub, subColor, onClick, highlight, small }) {
   );
 }
 
+function PartnersDetailModal({ year, month, closedDay, onClose }) {
+  const [rows, setRows] = useState([]);
+  useEffect(()=>{
+    const start = new Date(year, month, 1).toISOString();
+    const end = new Date(year, month+1, 0, 23, 59, 59).toISOString();
+    supabase.from("partner_followup").select("stage_started_at").gte("stage_started_at", start).lte("stage_started_at", end).neq("status","deleted")
+      .then(({data})=>{
+        if (!data) return;
+        const byDay = {};
+        data.forEach(r=>{
+          const d = new Date(r.stage_started_at).getDate();
+          byDay[d] = (byDay[d]||0)+1;
+        });
+        const totalDays = new Date(year, month+1, 0).getDate();
+        let cumul = 0;
+        const result = [];
+        for (let d=1; d<=totalDays; d++) {
+          const dayVal = byDay[d]||0;
+          cumul += dayVal;
+          result.push({ day:d, cumul, dayVal });
+        }
+        setRows(result);
+      });
+  }, [year, month]);
+
+  return (
+    <Modal title="Novos parceiros — detalhe" subtitle={`Equipa FR · ${closedDay} dias fechados`} onClose={onClose}>
+      <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
+        <thead style={{ position:"sticky", top:0, background:C.bg, zIndex:1 }}>
+          <tr>
+            {["DIA","ACUMULADO","+NESSE DIA"].map((h,i)=>(
+              <th key={i} style={{ padding:"10px 1.25rem", textAlign:i===0?"left":"right", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".06em", borderBottom:`0.5px solid ${C.border}` }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(d=>(
+            <tr key={d.day} style={{ borderBottom:`0.5px solid ${C.card}` }}>
+              <td style={{ padding:"11px 1.25rem", fontWeight:500, color:C.text }}>{d.day}</td>
+              <td style={{ padding:"11px 1.25rem", textAlign:"right", fontWeight:500, color:C.text }}>{d.cumul}</td>
+              <td style={{ padding:"11px 1.25rem", textAlign:"right", color:C.muted }}>+{d.dayVal}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Modal>
+  );
+}
+
 function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   const [modal, setModal] = useState(null);
   const [partnersCount, setPartnersCount] = useState(null);
@@ -305,7 +354,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {modal && (modal==="firstrev_faturado"||modal==="firstrev_objetivo"
+      {modal==="parceiros" && <PartnersDetailModal year={year} month={month} closedDay={closedDay} onClose={()=>setModal(null)} />}
+      {modal && modal!=="parceiros" && (modal==="firstrev_faturado"||modal==="firstrev_objetivo"
         ? <DailyDetailModal daily={dailyFirstRev} closedDay={closedDay} goal={firstRevGoal} mode={modal==="firstrev_faturado"?"faturado":"objetivo"} onClose={()=>setModal(null)} />
         : <DailyDetailModal daily={daily} closedDay={closedDay} goal={stats.goal} mode={modal} onClose={()=>setModal(null)} />
       )}
@@ -412,7 +462,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
             <StatCard label="Novos parceiros" value={partnersCount!=null?fmt(partnersCount):"—"}
               sub={remainingPartners!=null?(remainingPartners>0?`faltam ${fmt(remainingPartners)} para o objetivo`:"objetivo atingido!"):undefined}
               subColor={remainingPartners!=null&&remainingPartners<=0?C.green:C.muted}
-              highlight={partnersCount!=null&&stats.partnerGoal>0&&partnersCount>=stats.partnerGoal} />
+              onClick={partnersCount!=null?()=>setModal("parceiros"):undefined}
+              highlight />
             <StatCard label="Objetivo de novos parceiros" value={stats.partnerGoal>0?fmt(stats.partnerGoal):"Sem objetivo"}
               sub={pctPartners!=null?`${pctPartners}% realizado em ${pctMonth}% do mês`:undefined}
               subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
@@ -421,7 +472,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
               sub={firstRevGoal>0?`faltam ${fmtEur(Math.max(0,firstRevGoal-firstRevActual))} para o objetivo`:undefined}
               subColor={C.muted}
               onClick={firstRevActual>0?()=>setModal("firstrev_faturado"):undefined}
-              highlight={firstRevActual>0&&firstRevGoal>0&&firstRevActual>=firstRevGoal} />
+              highlight />
             <StatCard label="Objetivo faturação primeiras compras"
               value={firstRevGoal>0?fmtEur(firstRevGoal):"Sem objetivo"}
               sub={pctFirstRev!=null?`${pctFirstRev}% realizado em ${pctMonth}% do mês`:undefined}
