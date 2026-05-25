@@ -109,14 +109,15 @@ async function loadPartnersCountPrev(year, month) {
   return count || 0;
 }
 
-function buildDaily(entries, totalDays) {
+function buildDaily(entries, totalDays, year, month) {
   const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
   for (let d=1; d<=totalDays; d++) {
     const e = entries[d] || {};
     if (e.FR !== undefined) lastFR = Number(e.FR)||0;
     if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
     const cumul = lastFR + lastCH;
-    daily.push({ day:d, FR:lastFR, CH:lastCH, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true });
+    const dow = (year!=null&&month!=null) ? new Date(year, month, d).getDay() : null;
+    daily.push({ day:d, FR:lastFR, CH:lastCH, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, dow });
     prevCumul = cumul;
   }
   return daily;
@@ -149,18 +150,43 @@ function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0)
   const avgNormal = normal.length>0 ? Math.round(normal.reduce((s,d)=>s+d.dayValue,0)/normal.length) : 0;
   const avgSS = ss.length>0 ? Math.round(ss.reduce((s,d)=>s+d.dayValue,0)/ss.length) : 0;
   const rem = totalDays-closedDay;
-  const projNoSS = avgNormal>0 ? actual+avgNormal*rem : null;
-  // SS projection logic:
-  // - If SS already happened this month → same as projNoSS (already in actual)
-  // - If SS not yet happened and rem >= 1 → use historical avg for 1 SS day + normal for rest
-  // - If rem = 0 and no SS → null (no days left)
+
+  // Day-of-week averages (0=Sun, 1=Mon, ... 6=Sat)
+  // We need to know the year/month to get the day of week for each day
+  // We pass year/month via the daily array's context — compute from totalDays anchor
+  // Use a reference: day 1 of the month. We derive weekday from totalDays count (passed externally).
+  // Instead, compute dow-based avg using closed days
+  const dowAvg = {};
+  const dowCount = {};
+  closed.filter(d=>!d.supersales&&d.dayValue>0).forEach(d=>{
+    // d.dow is set by buildDaily if available, otherwise skip
+    if (d.dow==null) return;
+    dowAvg[d.dow] = (dowAvg[d.dow]||0) + d.dayValue;
+    dowCount[d.dow] = (dowCount[d.dow]||0) + 1;
+  });
+  const avgByDow = {};
+  Object.keys(dowAvg).forEach(k=>{ avgByDow[k] = Math.round(dowAvg[k]/dowCount[k]); });
+  const hasDowData = Object.keys(avgByDow).length >= 3;
+
+  // Project remaining days using dow avg (fallback to avgNormal if dow not available)
+  const remDayValues = hasDowData ? daily.filter(d=>d.day>closedDay&&!d.supersales).map(d=>avgByDow[d.dow]||avgNormal) : [];
+  const projNoSS = hasDowData && remDayValues.length>0
+    ? actual + remDayValues.reduce((s,v)=>s+v, 0)
+    : avgNormal>0 ? actual+avgNormal*rem : null;
+
+  // SS projection
   const ssHappened = ss.length > 0;
   const effectiveSSAvg = ssHappened ? avgSS : historicalSSAvg;
   let projWithSS;
   if (ssHappened) {
     projWithSS = projNoSS;
-  } else if (effectiveSSAvg > 0 && avgNormal > 0 && rem >= 1) {
-    projWithSS = actual + avgNormal * (rem - 1) + effectiveSSAvg;
+  } else if (effectiveSSAvg > 0 && projNoSS!=null && rem >= 1) {
+    // Replace the weakest remaining day with SS day
+    const weakestIdx = remDayValues.length>0 ? remDayValues.indexOf(Math.min(...remDayValues)) : -1;
+    const adjRemTotal = weakestIdx>=0
+      ? remDayValues.reduce((s,v,i)=>s+(i===weakestIdx?effectiveSSAvg:v),0)
+      : remDayValues.reduce((s,v)=>s+v,0) - (avgNormal*(rem-1)) + effectiveSSAvg;
+    projWithSS = actual + adjRemTotal;
   } else {
     projWithSS = null;
   }
@@ -271,10 +297,12 @@ function PartnersDetailModal({ year, month, closedDay, onClose }) {
           const d = new Date(r.stage_started_at).getDate();
           byDay[d] = (byDay[d]||0)+1;
         });
-        const totalDays = new Date(year, month+1, 0).getDate();
+        const today = new Date();
+        const isCurrentMonth = today.getFullYear()===year && today.getMonth()===month;
+        const lastDay = isCurrentMonth ? today.getDate() : new Date(year, month+1, 0).getDate();
         let cumul = 0;
         const result = [];
-        for (let d=1; d<=totalDays; d++) {
+        for (let d=1; d<=lastDay; d++) {
           const dayVal = byDay[d]||0;
           cumul += dayVal;
           result.push({ day:d, cumul, dayVal });
@@ -318,7 +346,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
   const newStruct = isNewStructure(year, month);
   const [historicalSSAvg, setHistoricalSSAvg] = useState(0);
   useEffect(()=>{ loadHistoricalSSAvg(year, month).then(setHistoricalSSAvg); }, [year, month]);
-  const daily = useMemo(()=>buildDaily(entries,totalDays),[entries,totalDays]);
+  const daily = useMemo(()=>buildDaily(entries,totalDays,year,month),[entries,totalDays,year,month]);
   const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg]);
   const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
   const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
