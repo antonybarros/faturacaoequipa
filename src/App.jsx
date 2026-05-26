@@ -72,6 +72,71 @@ function TopParceirosTab() {
         ))}
       </div>
 
+      {/* Top 10 */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        {[
+          {title:"Top 10 — faturação", data:[...TOP_CLIENTS].sort((a,b)=>b.valor_total-a.valor_total).slice(0,10), key:"valor_total", fmt:fmtEur},
+          {title:"Top 10 — nº encomendas", data:[...TOP_CLIENTS].sort((a,b)=>b.n_encomendas-a.n_encomendas).slice(0,10), key:"n_encomendas", fmt:n=>n+" enc."},
+        ].map(({title,data,key,fmt:f})=>(
+          <div key={title} style={T.card}>
+            <p style={T.sectionTitle}>{title}</p>
+            {data.map((c,i)=>(
+              <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:i<9?`0.5px solid ${C.border}`:"none"}}>
+                <span style={{fontSize:11,fontWeight:500,color:i<3?C.green:C.muted,minWidth:18,textAlign:"right"}}>{i+1}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
+                <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
+                <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text,textAlign:"right",minWidth:80}}>{f(c[key])}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Contactar hoje + SS */}
+      {(()=>{
+        const hoje = new Date(2026,4,26);
+        const amanha = new Date(2026,4,27);
+        const fmt_date = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        const amanhaStr = fmt_date(amanha);
+        const contactarHoje = TOP_CLIENTS.filter(c=>c.proxima_compra===amanhaStr);
+        const ssClients = [...TOP_CLIENTS].filter(c=>c.ss_pct>0).sort((a,b)=>b.ss_pct-a.ss_pct);
+        return (
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+            <div style={{...T.card,borderLeft:contactarHoje.length>0?`3px solid ${C.amber}`:undefined,borderRadius:contactarHoje.length>0?"0 12px 12px 0":12}}>
+              <p style={T.sectionTitle}>Parceiros a contactar hoje</p>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Próxima compra prevista para amanhã ({amanhaStr})</p>
+              {contactarHoje.length===0
+                ? <p style={{fontSize:13,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum para hoje.</p>
+                : contactarHoje.map(c=>(
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                    <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
+                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
+                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span>
+                    <span style={{fontSize:11,color:C.muted}}>{c.top_produto}</span>
+                  </div>
+                ))
+              }
+            </div>
+            <div style={T.card}>
+              <p style={T.sectionTitle}>Prioritários em Supersales</p>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Clientes com maior % de compras em dias SS</p>
+              {ssClients.length===0
+                ? <p style={{fontSize:13,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum SS detectado nos dados actuais.</p>
+                : ssClients.map((c,i)=>(
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<ssClients.length-1?`0.5px solid ${C.border}`:"none"}}>
+                    <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
+                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
+                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#FAEEDA",color:"#633806"}}>{c.ss_class}</span>
+                    <span style={{fontSize:13,fontWeight:500,color:C.amber,minWidth:40,textAlign:"right"}}>{c.ss_pct}%</span>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Benchmarks */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
