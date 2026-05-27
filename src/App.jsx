@@ -6,8 +6,18 @@ const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env
 const MARKETS = [{ id: "FR", label: "França" }, { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" }];
 const MARKET_COLORS = { FR: "#9333ea", "CH-BNL-DEAT": "#d97706" };
 const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "partnersfranca";
-const GATE_KEY = "faturacao_gate_v2";
+const PASSWORDS = {
+  admin: import.meta.env.VITE_PASSWORD_ADMIN || "partnersfranca",
+  fabien: import.meta.env.VITE_PASSWORD_FABIEN || "partnersfabien",
+  monica: import.meta.env.VITE_PASSWORD_MONICA || "partnersmonica",
+};
+const ROLES = {
+  admin: { name:"Antony", gestor:"Antony", isAdmin:true },
+  fabien: { name:"Fabien", gestor:"Fabien", isAdmin:false },
+  monica: { name:"Mónica", gestor:"Mónica", isAdmin:false },
+};
+const GATE_KEY = "faturacao_gate_v3";
+const ROLE_KEY = "faturacao_role_v3";
 const today = new Date();
 const monthKey = (y, m) => `${y}-${String(m + 1).padStart(2, "0")}`;
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
@@ -275,8 +285,11 @@ function PasswordGate({ onUnlock }) {
   const [pw, setPw] = useState(""), [err, setErr] = useState("");
   const submit = (e) => {
     e.preventDefault();
-    if (pw === SITE_PASSWORD) { try { localStorage.setItem(GATE_KEY, "1"); } catch {} onUnlock(); }
-    else { setErr("Password incorrecta"); setPw(""); }
+    const role = Object.keys(PASSWORDS).find(r => PASSWORDS[r] === pw);
+    if (role) {
+      try { localStorage.setItem(GATE_KEY, "1"); localStorage.setItem(ROLE_KEY, role); } catch {}
+      onUnlock(role);
+    } else { setErr("Password incorrecta"); setPw(""); }
   };
   return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:C.bg }}>
@@ -1112,7 +1125,8 @@ function CopyBtn({ text }) {
 }
 
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
-function PartnerFollowup({ year, month }) {
+function PartnerFollowup({ year, month, gestor: gestorFilter }) {
+  const isGestorFiltered = !!gestorFilter;
   const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
   const MKT_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
@@ -1135,7 +1149,7 @@ function PartnerFollowup({ year, month }) {
   const [clientId, setClientId] = useState("");
   const [mkt, setMkt] = useState("");
   const [prog, setProg] = useState("");
-  const [gestor, setGestor] = useState("");
+  const [gestor, setGestor] = useState(gestorFilter||"");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -1148,7 +1162,9 @@ function PartnerFollowup({ year, month }) {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false });
+    let q = supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false });
+    if (gestorFilter) q = q.eq("gestor", gestorFilter);
+    const { data } = await q;
     setRecords(data || []);
     setLoading(false);
   };
@@ -1169,7 +1185,7 @@ function PartnerFollowup({ year, month }) {
       gestor,
     });
     if (error) { alert("Erro ao guardar: " + error.message); setSaving(false); return; }
-    setClientId(""); setProg(""); setMkt(""); setGestor("");
+    setClientId(""); setProg(""); setMkt(""); setGestor(gestorFilter||"");
     setStartDate(new Date().toISOString().slice(0,10));
     await load();
     setSaving(false);
@@ -1354,8 +1370,8 @@ function PartnerFollowup({ year, month }) {
             </div>
             <div>
               <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>Gestor</p>
-              <select value={gestor} onChange={e=>setGestor(e.target.value)} required
-                style={{ width:"100%", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }}>
+              <select value={gestor} onChange={e=>!isGestorFiltered&&setGestor(e.target.value)} disabled={isGestorFiltered} required
+                style={{ width:"100%", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:isGestorFiltered?C.card:C.bg, color:C.text, outline:"none", opacity:isGestorFiltered?0.7:1 }}>
                 <option value="">Seleccionar…</option>
                 {GESTORS.map(g=><option key={g} value={g}>{g}</option>)}
               </select>
@@ -1575,7 +1591,9 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function MainApp() {
+function MainApp({ role, onLogout }) {
+  const isAdmin = role.isAdmin;
+  const gestor = role.gestor;
   const [tab, setTab] = useState("analise");
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
   const [monthData, setMonthData] = useState({ entries:{}, team_goals:{} });
@@ -1594,15 +1612,23 @@ function MainApp() {
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem" }}>
           <div>
             <p style={{ fontSize:20, fontWeight:500, margin:0, color:C.text }}>Faturação da Equipa</p>
-            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · França + CH-BNL-DEAT</p>
+            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · {role.name}{isAdmin?" · Admin":""}</p>
           </div>
-          <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
             style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
             {monthOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+            </select>
+            <button onClick={onLogout}
+              style={{ fontSize:12, padding:"6px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, background:"transparent", color:C.muted, cursor:"pointer" }}>
+              → Sair
+            </button>
+          </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard"},{id:"registo",l:"Registo"},{id:"parceiros",l:"Follow-up"},{id:"topparceiros",l:"Top Parceiros"}].map(t=>(
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true}]
+            .filter(t=>!t.adminOnly||isAdmin)
+            .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
                 background:"transparent", color:tab===t.id?C.green:C.muted, fontWeight:tab===t.id?500:400, fontSize:14, cursor:"pointer" }}>
@@ -1616,7 +1642,7 @@ function MainApp() {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : <PartnerFollowup year={year} month={month} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
           </div>
         )}
       </div>
@@ -1625,7 +1651,7 @@ function MainApp() {
 }
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(()=>{ try { return localStorage.getItem(GATE_KEY)==="1"; } catch { return false; } });
-  if (!unlocked) return <PasswordGate onUnlock={()=>setUnlocked(true)} />;
-  return <MainApp />;
+  const [role, setRole] = useState(()=>{ try { return localStorage.getItem(GATE_KEY)==="1" ? localStorage.getItem(ROLE_KEY)||"admin" : null; } catch { return null; } });
+  if (!role) return <PasswordGate onUnlock={(r)=>setRole(r)} />;
+  return <MainApp role={ROLES[role]} onLogout={()=>{ try { localStorage.removeItem(GATE_KEY); localStorage.removeItem(ROLE_KEY); } catch {} setRole(null); }} />;
 }
