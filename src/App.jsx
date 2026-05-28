@@ -33,250 +33,270 @@ const T = {
 
 
 // ── TopParceirosTab ────────────────────────────────────────────────────────────
-const TOP_CLIENTS = [{"id":"P2867825","mercado":"FR","programa":"Corporate","n_encomendas":12,"valor_total":18373,"valor_medio":1837,"frequencia":53,"dias_desde_ultima":31,"ultima_compra":"25/04/2026","proxima_compra":"17/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Multivitamínico","trend":"down","trend_pct":14,"churn":false,"comprou_3m":"Sim"},{"id":"P5614226","mercado":"FR","programa":"Professionals","n_encomendas":13,"valor_total":22404,"valor_medio":1867,"frequencia":44,"dias_desde_ultima":7,"ultima_compra":"19/05/2026","proxima_compra":"02/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Magnésio","trend":"down","trend_pct":23,"churn":false,"comprou_3m":"Sim"},{"id":"P3341057","mercado":"FR","programa":"Corporate","n_encomendas":15,"valor_total":36623,"valor_medio":2616,"frequencia":30,"dias_desde_ultima":84,"ultima_compra":"03/03/2026","proxima_compra":"02/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"down","trend_pct":40,"churn":false,"comprou_3m":"Sim"},{"id":"P2458591","mercado":"BNL","programa":"Elite","n_encomendas":14,"valor_total":26768,"valor_medio":1912,"frequencia":25,"dias_desde_ultima":129,"ultima_compra":"17/01/2026","proxima_compra":"11/02/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"flat","trend_pct":0,"churn":true,"comprou_3m":"Não"},{"id":"P1499914","mercado":"FR","programa":"Professionals","n_encomendas":13,"valor_total":22859,"valor_medio":1758,"frequencia":39,"dias_desde_ultima":27,"ultima_compra":"29/04/2026","proxima_compra":"07/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"down","trend_pct":56,"churn":false,"comprou_3m":"Sim"},{"id":"P4903402","mercado":"FR","programa":"Performance","n_encomendas":4,"valor_total":10674,"valor_medio":2669,"frequencia":23,"dias_desde_ultima":290,"ultima_compra":"09/08/2025","proxima_compra":"01/09/2025","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"down","trend_pct":37,"churn":true,"comprou_3m":"Não"},{"id":"P4335942","mercado":"BNL","programa":"Professionals","n_encomendas":15,"valor_total":35077,"valor_medio":2505,"frequencia":38,"dias_desde_ultima":12,"ultima_compra":"14/05/2026","proxima_compra":"21/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Glutamina","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P8536477","mercado":"CH","programa":"Horeca","n_encomendas":7,"valor_total":9600,"valor_medio":1371,"frequencia":84,"dias_desde_ultima":7,"ultima_compra":"19/05/2026","proxima_compra":"11/08/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Isolada","trend":"up","trend_pct":47,"churn":false,"comprou_3m":"Sim"},{"id":"P1109031","mercado":"FR","programa":"Corporate","n_encomendas":20,"valor_total":35275,"valor_medio":1764,"frequencia":24,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"18/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"down","trend_pct":10,"churn":false,"comprou_3m":"Sim"},{"id":"P8090293","mercado":"BNL","programa":"Pro Gym","n_encomendas":13,"valor_total":23187,"valor_medio":1932,"frequencia":44,"dias_desde_ultima":3,"ultima_compra":"23/05/2026","proxima_compra":"06/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P3608513","mercado":"FR","programa":"Horeca","n_encomendas":3,"valor_total":7135,"valor_medio":2378,"frequencia":92,"dias_desde_ultima":298,"ultima_compra":"01/08/2025","proxima_compra":"01/11/2025","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"down","trend_pct":21,"churn":true,"comprou_3m":"Não"},{"id":"P6647119","mercado":"FR","programa":"Elite","n_encomendas":12,"valor_total":23409,"valor_medio":1951,"frequencia":35,"dias_desde_ultima":104,"ultima_compra":"11/02/2026","proxima_compra":"18/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"up","trend_pct":16,"churn":true,"comprou_3m":"Não"},{"id":"P7374122","mercado":"FR","programa":"Pro Gym","n_encomendas":14,"valor_total":29718,"valor_medio":2123,"frequencia":35,"dias_desde_ultima":19,"ultima_compra":"07/05/2026","proxima_compra":"11/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Vegana","trend":"down","trend_pct":43,"churn":false,"comprou_3m":"Sim"},{"id":"P6770619","mercado":"CH","programa":"Horeca","n_encomendas":13,"valor_total":27266,"valor_medio":2097,"frequencia":38,"dias_desde_ultima":5,"ultima_compra":"21/05/2026","proxima_compra":"28/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Barra Proteica","trend":"down","trend_pct":13,"churn":false,"comprou_3m":"Sim"},{"id":"P1728977","mercado":"DEAT","programa":"Performance","n_encomendas":10,"valor_total":21944,"valor_medio":2438,"frequencia":46,"dias_desde_ultima":114,"ultima_compra":"01/02/2026","proxima_compra":"19/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Barra Proteica","trend":"down","trend_pct":47,"churn":true,"comprou_3m":"Não"},{"id":"P3094235","mercado":"BNL","programa":"Elite","n_encomendas":8,"valor_total":14717,"valor_medio":1840,"frequencia":66,"dias_desde_ultima":32,"ultima_compra":"24/04/2026","proxima_compra":"29/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Caseína Micelar","trend":"up","trend_pct":117,"churn":false,"comprou_3m":"Sim"},{"id":"P5918715","mercado":"BNL","programa":"Performance","n_encomendas":14,"valor_total":22327,"valor_medio":1595,"frequencia":34,"dias_desde_ultima":41,"ultima_compra":"15/04/2026","proxima_compra":"19/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P4226067","mercado":"FR","programa":"Elite","n_encomendas":13,"valor_total":17540,"valor_medio":1349,"frequencia":30,"dias_desde_ultima":76,"ultima_compra":"11/03/2026","proxima_compra":"10/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"down","trend_pct":23,"churn":false,"comprou_3m":"Sim"},{"id":"P4823498","mercado":"CH","programa":"Elite","n_encomendas":18,"valor_total":34175,"valor_medio":2136,"frequencia":33,"dias_desde_ultima":10,"ultima_compra":"16/05/2026","proxima_compra":"18/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Barra Proteica","trend":"down","trend_pct":34,"churn":false,"comprou_3m":"Sim"},{"id":"P4905582","mercado":"FR","programa":"Pro Box","n_encomendas":17,"valor_total":43268,"valor_medio":2704,"frequencia":30,"dias_desde_ultima":28,"ultima_compra":"28/04/2026","proxima_compra":"28/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P5663623","mercado":"DEAT","programa":"Corporate","n_encomendas":14,"valor_total":24813,"valor_medio":1909,"frequencia":34,"dias_desde_ultima":70,"ultima_compra":"17/03/2026","proxima_compra":"20/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Vitamina D3","trend":"down","trend_pct":14,"churn":false,"comprou_3m":"Sim"},{"id":"P7120868","mercado":"FR","programa":"Pro Gym","n_encomendas":15,"valor_total":16564,"valor_medio":1183,"frequencia":35,"dias_desde_ultima":17,"ultima_compra":"09/05/2026","proxima_compra":"13/06/2026","ss_pct":2,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P6960453","mercado":"FR","programa":"Corporate","n_encomendas":15,"valor_total":23070,"valor_medio":1538,"frequencia":34,"dias_desde_ultima":19,"ultima_compra":"07/05/2026","proxima_compra":"10/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"up","trend_pct":46,"churn":false,"comprou_3m":"Sim"},{"id":"P5479144","mercado":"FR","programa":"Performance","n_encomendas":7,"valor_total":12245,"valor_medio":1749,"frequencia":83,"dias_desde_ultima":7,"ultima_compra":"19/05/2026","proxima_compra":"10/08/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"down","trend_pct":22,"churn":false,"comprou_3m":"Sim"},{"id":"P3871230","mercado":"FR","programa":"Professionals","n_encomendas":10,"valor_total":22444,"valor_medio":2244,"frequencia":50,"dias_desde_ultima":12,"ultima_compra":"14/05/2026","proxima_compra":"03/07/2026","ss_pct":2,"ss_class":"Regular","top_produto":"Omega 3","trend":"up","trend_pct":22,"churn":false,"comprou_3m":"Sim"},{"id":"P8755439","mercado":"BNL","programa":"Pro Gym","n_encomendas":14,"valor_total":28219,"valor_medio":2016,"frequencia":38,"dias_desde_ultima":14,"ultima_compra":"12/05/2026","proxima_compra":"19/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Pre-Treino Intenso","trend":"up","trend_pct":20,"churn":false,"comprou_3m":"Sim"},{"id":"P4684531","mercado":"BNL","programa":"Horeca","n_encomendas":14,"valor_total":26860,"valor_medio":1919,"frequencia":33,"dias_desde_ultima":61,"ultima_compra":"26/03/2026","proxima_compra":"28/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Vitamina D3","trend":"up","trend_pct":21,"churn":false,"comprou_3m":"Sim"},{"id":"P1938483","mercado":"FR","programa":"Horeca","n_encomendas":9,"valor_total":15659,"valor_medio":1740,"frequencia":36,"dias_desde_ultima":109,"ultima_compra":"06/02/2026","proxima_compra":"14/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"down","trend_pct":19,"churn":true,"comprou_3m":"Não"},{"id":"P1538552","mercado":"BNL","programa":"Pro Box","n_encomendas":3,"valor_total":4656,"valor_medio":1552,"frequencia":124,"dias_desde_ultima":135,"ultima_compra":"11/01/2026","proxima_compra":"15/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Multivitamínico","trend":"flat","trend_pct":0,"churn":true,"comprou_3m":"Não"},{"id":"P5491946","mercado":"FR","programa":"Professionals","n_encomendas":10,"valor_total":11581,"valor_medio":1158,"frequencia":55,"dias_desde_ultima":6,"ultima_compra":"20/05/2026","proxima_compra":"14/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Vitamina D3","trend":"down","trend_pct":51,"churn":false,"comprou_3m":"Sim"},{"id":"P6279418","mercado":"FR","programa":"Corporate","n_encomendas":7,"valor_total":13757,"valor_medio":1965,"frequencia":62,"dias_desde_ultima":53,"ultima_compra":"03/04/2026","proxima_compra":"04/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"up","trend_pct":143,"churn":false,"comprou_3m":"Sim"},{"id":"P9375710","mercado":"BNL","programa":"Corporate","n_encomendas":5,"valor_total":11502,"valor_medio":2300,"frequencia":46,"dias_desde_ultima":100,"ultima_compra":"15/02/2026","proxima_compra":"02/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Multivitamínico","trend":"up","trend_pct":516,"churn":true,"comprou_3m":"Não"},{"id":"P8698256","mercado":"FR","programa":"Pro Gym","n_encomendas":16,"valor_total":26569,"valor_medio":1661,"frequencia":28,"dias_desde_ultima":34,"ultima_compra":"22/04/2026","proxima_compra":"20/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"down","trend_pct":22,"churn":false,"comprou_3m":"Sim"},{"id":"P3342608","mercado":"FR","programa":"Corporate","n_encomendas":7,"valor_total":14520,"valor_medio":2074,"frequencia":72,"dias_desde_ultima":77,"ultima_compra":"10/03/2026","proxima_compra":"21/05/2026","ss_pct":26,"ss_class":"Misto","top_produto":"Proteína Isolada","trend":"down","trend_pct":41,"churn":false,"comprou_3m":"Sim"},{"id":"P5408072","mercado":"BNL","programa":"Performance","n_encomendas":9,"valor_total":12549,"valor_medio":1394,"frequencia":57,"dias_desde_ultima":13,"ultima_compra":"13/05/2026","proxima_compra":"09/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"down","trend_pct":21,"churn":false,"comprou_3m":"Sim"},{"id":"P7700828","mercado":"BNL","programa":"Professionals","n_encomendas":9,"valor_total":13740,"valor_medio":1527,"frequencia":51,"dias_desde_ultima":74,"ultima_compra":"13/03/2026","proxima_compra":"03/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"down","trend_pct":48,"churn":false,"comprou_3m":"Sim"},{"id":"P3320821","mercado":"DEAT","programa":"Elite","n_encomendas":8,"valor_total":12406,"valor_medio":1551,"frequencia":59,"dias_desde_ultima":25,"ultima_compra":"01/05/2026","proxima_compra":"29/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Vegana","trend":"down","trend_pct":51,"churn":false,"comprou_3m":"Sim"},{"id":"P1790481","mercado":"FR","programa":"Professionals","n_encomendas":7,"valor_total":13368,"valor_medio":1910,"frequencia":73,"dias_desde_ultima":54,"ultima_compra":"02/04/2026","proxima_compra":"14/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"up","trend_pct":42,"churn":false,"comprou_3m":"Sim"},{"id":"P3684052","mercado":"BNL","programa":"Performance","n_encomendas":18,"valor_total":28113,"valor_medio":1562,"frequencia":24,"dias_desde_ultima":46,"ultima_compra":"10/04/2026","proxima_compra":"04/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P2065818","mercado":"BNL","programa":"Pro Box","n_encomendas":13,"valor_total":30939,"valor_medio":2380,"frequencia":37,"dias_desde_ultima":26,"ultima_compra":"30/04/2026","proxima_compra":"06/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"down","trend_pct":40,"churn":false,"comprou_3m":"Sim"},{"id":"P8852574","mercado":"CH","programa":"Performance","n_encomendas":14,"valor_total":24482,"valor_medio":1749,"frequencia":37,"dias_desde_ultima":17,"ultima_compra":"09/05/2026","proxima_compra":"15/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P1192619","mercado":"FR","programa":"Corporate","n_encomendas":18,"valor_total":33153,"valor_medio":1842,"frequencia":26,"dias_desde_ultima":59,"ultima_compra":"28/03/2026","proxima_compra":"23/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Vitamina D3","trend":"down","trend_pct":50,"churn":false,"comprou_3m":"Sim"},{"id":"P5476583","mercado":"BNL","programa":"Elite","n_encomendas":9,"valor_total":19315,"valor_medio":2146,"frequencia":39,"dias_desde_ultima":118,"ultima_compra":"28/01/2026","proxima_compra":"08/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Glutamina","trend":"up","trend_pct":41,"churn":true,"comprou_3m":"Não"},{"id":"P5924115","mercado":"BNL","programa":"Professionals","n_encomendas":11,"valor_total":17836,"valor_medio":1621,"frequencia":50,"dias_desde_ultima":7,"ultima_compra":"19/05/2026","proxima_compra":"08/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Vegana","trend":"up","trend_pct":74,"churn":false,"comprou_3m":"Sim"},{"id":"P8612220","mercado":"FR","programa":"Corporate","n_encomendas":5,"valor_total":8925,"valor_medio":1785,"frequencia":48,"dias_desde_ultima":114,"ultima_compra":"01/02/2026","proxima_compra":"21/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"up","trend_pct":38,"churn":true,"comprou_3m":"Não"},{"id":"P5418934","mercado":"FR","programa":"Performance","n_encomendas":7,"valor_total":9770,"valor_medio":1396,"frequencia":73,"dias_desde_ultima":66,"ultima_compra":"21/03/2026","proxima_compra":"02/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Magnésio","trend":"down","trend_pct":63,"churn":false,"comprou_3m":"Sim"},{"id":"P2785277","mercado":"CH","programa":"Horeca","n_encomendas":3,"valor_total":6173,"valor_medio":2058,"frequencia":100,"dias_desde_ultima":25,"ultima_compra":"01/05/2026","proxima_compra":"09/08/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P9517169","mercado":"FR","programa":"Professionals","n_encomendas":19,"valor_total":34688,"valor_medio":1927,"frequencia":28,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"22/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P7273233","mercado":"FR","programa":"Performance","n_encomendas":4,"valor_total":8366,"valor_medio":2092,"frequencia":45,"dias_desde_ultima":81,"ultima_compra":"06/03/2026","proxima_compra":"20/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"down","trend_pct":17,"churn":false,"comprou_3m":"Sim"},{"id":"P9897858","mercado":"FR","programa":"Performance","n_encomendas":19,"valor_total":37429,"valor_medio":1970,"frequencia":26,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"20/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Glutamina","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P6438436","mercado":"DEAT","programa":"Elite","n_encomendas":8,"valor_total":17843,"valor_medio":2230,"frequencia":22,"dias_desde_ultima":54,"ultima_compra":"02/04/2026","proxima_compra":"24/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P2876828","mercado":"BNL","programa":"Horeca","n_encomendas":4,"valor_total":9602,"valor_medio":2401,"frequencia":124,"dias_desde_ultima":92,"ultima_compra":"23/02/2026","proxima_compra":"27/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"up","trend_pct":102,"churn":true,"comprou_3m":"Não"},{"id":"P6159230","mercado":"FR","programa":"Elite","n_encomendas":3,"valor_total":7685,"valor_medio":2562,"frequencia":67,"dias_desde_ultima":90,"ultima_compra":"25/02/2026","proxima_compra":"03/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"down","trend_pct":33,"churn":false,"comprou_3m":"Sim"},{"id":"P5041154","mercado":"FR","programa":"Elite","n_encomendas":18,"valor_total":36040,"valor_medio":2002,"frequencia":27,"dias_desde_ultima":4,"ultima_compra":"22/05/2026","proxima_compra":"18/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"down","trend_pct":13,"churn":false,"comprou_3m":"Sim"},{"id":"P9153566","mercado":"FR","programa":"Horeca","n_encomendas":3,"valor_total":3390,"valor_medio":1130,"frequencia":210,"dias_desde_ultima":85,"ultima_compra":"02/03/2026","proxima_compra":"28/09/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"up","trend_pct":192,"churn":false,"comprou_3m":"Sim"},{"id":"P9937326","mercado":"FR","programa":"Professionals","n_encomendas":11,"valor_total":15967,"valor_medio":1597,"frequencia":42,"dias_desde_ultima":48,"ultima_compra":"08/04/2026","proxima_compra":"20/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P8973915","mercado":"FR","programa":"Pro Gym","n_encomendas":4,"valor_total":4860,"valor_medio":1215,"frequencia":118,"dias_desde_ultima":97,"ultima_compra":"18/02/2026","proxima_compra":"16/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"down","trend_pct":69,"churn":true,"comprou_3m":"Não"},{"id":"P9852897","mercado":"BNL","programa":"Professionals","n_encomendas":7,"valor_total":12706,"valor_medio":1815,"frequencia":50,"dias_desde_ultima":123,"ultima_compra":"23/01/2026","proxima_compra":"14/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"down","trend_pct":59,"churn":true,"comprou_3m":"Não"},{"id":"P4374754","mercado":"CH","programa":"Pro Box","n_encomendas":10,"valor_total":18339,"valor_medio":1834,"frequencia":40,"dias_desde_ultima":51,"ultima_compra":"05/04/2026","proxima_compra":"15/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P7264956","mercado":"DEAT","programa":"Performance","n_encomendas":12,"valor_total":20420,"valor_medio":1702,"frequencia":39,"dias_desde_ultima":71,"ultima_compra":"16/03/2026","proxima_compra":"24/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Vegana","trend":"up","trend_pct":48,"churn":false,"comprou_3m":"Sim"},{"id":"P8574680","mercado":"FR","programa":"Professionals","n_encomendas":19,"valor_total":41662,"valor_medio":2315,"frequencia":16,"dias_desde_ultima":79,"ultima_compra":"08/03/2026","proxima_compra":"24/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Multivitamínico","trend":"down","trend_pct":14,"churn":false,"comprou_3m":"Sim"},{"id":"P4769795","mercado":"FR","programa":"Pro Gym","n_encomendas":14,"valor_total":15178,"valor_medio":1084,"frequencia":32,"dias_desde_ultima":89,"ultima_compra":"26/02/2026","proxima_compra":"30/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Caseína Micelar","trend":"down","trend_pct":34,"churn":false,"comprou_3m":"Sim"},{"id":"P1352896","mercado":"FR","programa":"Performance","n_encomendas":19,"valor_total":36791,"valor_medio":1936,"frequencia":27,"dias_desde_ultima":6,"ultima_compra":"20/05/2026","proxima_compra":"16/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"up","trend_pct":10,"churn":false,"comprou_3m":"Sim"},{"id":"P4694634","mercado":"FR","programa":"Elite","n_encomendas":14,"valor_total":25902,"valor_medio":1850,"frequencia":35,"dias_desde_ultima":12,"ultima_compra":"14/05/2026","proxima_compra":"18/06/2026","ss_pct":1,"ss_class":"Regular","top_produto":"Vitamina D3","trend":"up","trend_pct":65,"churn":false,"comprou_3m":"Sim"},{"id":"P1987737","mercado":"FR","programa":"Elite","n_encomendas":4,"valor_total":5693,"valor_medio":1423,"frequencia":56,"dias_desde_ultima":152,"ultima_compra":"25/12/2025","proxima_compra":"19/02/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"up","trend_pct":539,"churn":true,"comprou_3m":"Não"},{"id":"P1527021","mercado":"BNL","programa":"Elite","n_encomendas":10,"valor_total":20079,"valor_medio":2008,"frequencia":43,"dias_desde_ultima":42,"ultima_compra":"14/04/2026","proxima_compra":"27/05/2026","ss_pct":11,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P9626108","mercado":"FR","programa":"Pro Gym","n_encomendas":9,"valor_total":17014,"valor_medio":1890,"frequencia":52,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"16/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"up","trend_pct":67,"churn":false,"comprou_3m":"Sim"},{"id":"P9143903","mercado":"FR","programa":"Performance","n_encomendas":17,"valor_total":34551,"valor_medio":2159,"frequencia":33,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"27/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Magnésio","trend":"down","trend_pct":15,"churn":false,"comprou_3m":"Sim"},{"id":"P3219824","mercado":"DEAT","programa":"Professionals","n_encomendas":3,"valor_total":4599,"valor_medio":1533,"frequencia":100,"dias_desde_ultima":308,"ultima_compra":"22/07/2025","proxima_compra":"30/10/2025","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"down","trend_pct":63,"churn":true,"comprou_3m":"Não"},{"id":"P8935169","mercado":"BNL","programa":"Professionals","n_encomendas":20,"valor_total":34128,"valor_medio":1706,"frequencia":25,"dias_desde_ultima":17,"ultima_compra":"09/05/2026","proxima_compra":"03/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"down","trend_pct":26,"churn":false,"comprou_3m":"Sim"},{"id":"P2582524","mercado":"FR","programa":"Corporate","n_encomendas":19,"valor_total":37757,"valor_medio":1987,"frequencia":26,"dias_desde_ultima":23,"ultima_compra":"03/05/2026","proxima_compra":"29/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"up","trend_pct":40,"churn":false,"comprou_3m":"Sim"},{"id":"P8231838","mercado":"BNL","programa":"Pro Box","n_encomendas":7,"valor_total":10904,"valor_medio":1558,"frequencia":53,"dias_desde_ultima":120,"ultima_compra":"26/01/2026","proxima_compra":"20/03/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"down","trend_pct":39,"churn":true,"comprou_3m":"Não"},{"id":"P7897151","mercado":"DEAT","programa":"Horeca","n_encomendas":13,"valor_total":24450,"valor_medio":1881,"frequencia":38,"dias_desde_ultima":9,"ultima_compra":"17/05/2026","proxima_compra":"24/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P1908841","mercado":"FR","programa":"Elite","n_encomendas":18,"valor_total":30981,"valor_medio":1822,"frequencia":28,"dias_desde_ultima":54,"ultima_compra":"02/04/2026","proxima_compra":"30/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"down","trend_pct":33,"churn":false,"comprou_3m":"Sim"},{"id":"P7754864","mercado":"BNL","programa":"Horeca","n_encomendas":7,"valor_total":6935,"valor_medio":991,"frequencia":68,"dias_desde_ultima":71,"ultima_compra":"16/03/2026","proxima_compra":"23/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"up","trend_pct":73,"churn":false,"comprou_3m":"Sim"},{"id":"P2833230","mercado":"FR","programa":"Professionals","n_encomendas":9,"valor_total":17858,"valor_medio":2232,"frequencia":52,"dias_desde_ultima":57,"ultima_compra":"30/03/2026","proxima_compra":"21/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"up","trend_pct":22,"churn":false,"comprou_3m":"Sim"},{"id":"P4191175","mercado":"DEAT","programa":"Professionals","n_encomendas":10,"valor_total":18752,"valor_medio":1875,"frequencia":47,"dias_desde_ultima":49,"ultima_compra":"07/04/2026","proxima_compra":"24/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"up","trend_pct":65,"churn":false,"comprou_3m":"Sim"},{"id":"P8077999","mercado":"FR","programa":"Pro Gym","n_encomendas":18,"valor_total":29152,"valor_medio":1715,"frequencia":30,"dias_desde_ultima":17,"ultima_compra":"09/05/2026","proxima_compra":"08/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Magnésio","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P8761611","mercado":"FR","programa":"Horeca","n_encomendas":8,"valor_total":8741,"valor_medio":1093,"frequencia":56,"dias_desde_ultima":93,"ultima_compra":"22/02/2026","proxima_compra":"19/04/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"flat","trend_pct":0,"churn":true,"comprou_3m":"Não"},{"id":"P2264748","mercado":"DEAT","programa":"Horeca","n_encomendas":10,"valor_total":21262,"valor_medio":2126,"frequencia":32,"dias_desde_ultima":193,"ultima_compra":"14/11/2025","proxima_compra":"16/12/2025","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Isolada","trend":"down","trend_pct":51,"churn":true,"comprou_3m":"Não"},{"id":"P2642635","mercado":"FR","programa":"Corporate","n_encomendas":11,"valor_total":16267,"valor_medio":1479,"frequencia":29,"dias_desde_ultima":43,"ultima_compra":"13/04/2026","proxima_compra":"12/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"up","trend_pct":59,"churn":false,"comprou_3m":"Sim"},{"id":"P1247595","mercado":"FR","programa":"Horeca","n_encomendas":5,"valor_total":5895,"valor_medio":1179,"frequencia":40,"dias_desde_ultima":317,"ultima_compra":"13/07/2025","proxima_compra":"22/08/2025","ss_pct":0,"ss_class":"Regular","top_produto":"ZMA","trend":"up","trend_pct":178,"churn":true,"comprou_3m":"Não"},{"id":"P4965789","mercado":"FR","programa":"Pro Box","n_encomendas":14,"valor_total":33820,"valor_medio":2416,"frequencia":38,"dias_desde_ultima":11,"ultima_compra":"15/05/2026","proxima_compra":"22/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Queimador de Gordura","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P9147706","mercado":"DEAT","programa":"Professionals","n_encomendas":13,"valor_total":23889,"valor_medio":1838,"frequencia":38,"dias_desde_ultima":32,"ultima_compra":"24/04/2026","proxima_compra":"01/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Pre-Treino Intenso","trend":"down","trend_pct":26,"churn":false,"comprou_3m":"Sim"},{"id":"P7728339","mercado":"FR","programa":"Professionals","n_encomendas":20,"valor_total":43949,"valor_medio":2313,"frequencia":28,"dias_desde_ultima":10,"ultima_compra":"16/05/2026","proxima_compra":"13/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Omega 3","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P7358113","mercado":"FR","programa":"Pro Box","n_encomendas":6,"valor_total":8281,"valor_medio":1380,"frequencia":45,"dias_desde_ultima":240,"ultima_compra":"28/09/2025","proxima_compra":"12/11/2025","ss_pct":0,"ss_class":"Regular","top_produto":"Pre-Treino Intenso","trend":"down","trend_pct":11,"churn":true,"comprou_3m":"Não"},{"id":"P5449368","mercado":"DEAT","programa":"Pro Gym","n_encomendas":6,"valor_total":6705,"valor_medio":1117,"frequencia":79,"dias_desde_ultima":105,"ultima_compra":"10/02/2026","proxima_compra":"30/04/2026","ss_pct":8,"ss_class":"Regular","top_produto":"Colagénio","trend":"down","trend_pct":13,"churn":true,"comprou_3m":"Não"},{"id":"P8096887","mercado":"DEAT","programa":"Professionals","n_encomendas":15,"valor_total":27094,"valor_medio":1935,"frequencia":36,"dias_desde_ultima":9,"ultima_compra":"17/05/2026","proxima_compra":"22/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"up","trend_pct":25,"churn":false,"comprou_3m":"Sim"},{"id":"P4185957","mercado":"CH","programa":"Professionals","n_encomendas":20,"valor_total":32414,"valor_medio":1621,"frequencia":26,"dias_desde_ultima":6,"ultima_compra":"20/05/2026","proxima_compra":"15/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"down","trend_pct":58,"churn":false,"comprou_3m":"Sim"},{"id":"P1981186","mercado":"FR","programa":"Corporate","n_encomendas":7,"valor_total":8007,"valor_medio":1144,"frequencia":47,"dias_desde_ultima":13,"ultima_compra":"13/05/2026","proxima_compra":"29/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"up","trend_pct":55,"churn":false,"comprou_3m":"Sim"},{"id":"P6261415","mercado":"FR","programa":"Elite","n_encomendas":15,"valor_total":23877,"valor_medio":1592,"frequencia":25,"dias_desde_ultima":25,"ultima_compra":"01/05/2026","proxima_compra":"26/05/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Ganho de Massa","trend":"down","trend_pct":25,"churn":false,"comprou_3m":"Sim"},{"id":"P8999183","mercado":"FR","programa":"Elite","n_encomendas":8,"valor_total":11092,"valor_medio":1387,"frequencia":53,"dias_desde_ultima":6,"ultima_compra":"20/05/2026","proxima_compra":"12/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Isolada","trend":"down","trend_pct":46,"churn":false,"comprou_3m":"Sim"},{"id":"P9519948","mercado":"FR","programa":"Horeca","n_encomendas":9,"valor_total":14834,"valor_medio":1648,"frequencia":61,"dias_desde_ultima":5,"ultima_compra":"21/05/2026","proxima_compra":"21/07/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Whey Concentrada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P4117625","mercado":"FR","programa":"Performance","n_encomendas":19,"valor_total":31057,"valor_medio":1725,"frequencia":26,"dias_desde_ultima":12,"ultima_compra":"14/05/2026","proxima_compra":"09/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Creatina Monohidratada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P2140194","mercado":"FR","programa":"Pro Box","n_encomendas":18,"valor_total":27854,"valor_medio":1547,"frequencia":30,"dias_desde_ultima":1,"ultima_compra":"25/05/2026","proxima_compra":"24/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Proteína Isolada","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"},{"id":"P3011363","mercado":"FR","programa":"Performance","n_encomendas":5,"valor_total":11237,"valor_medio":2247,"frequencia":68,"dias_desde_ultima":105,"ultima_compra":"10/02/2026","proxima_compra":"19/04/2026","ss_pct":18,"ss_class":"Regular","top_produto":"ZMA","trend":"up","trend_pct":75,"churn":true,"comprou_3m":"Não"},{"id":"P1666754","mercado":"FR","programa":"Pro Box","n_encomendas":12,"valor_total":18459,"valor_medio":1538,"frequencia":38,"dias_desde_ultima":41,"ultima_compra":"15/04/2026","proxima_compra":"23/05/2026","ss_pct":22,"ss_class":"Misto","top_produto":"Proteína Whey Concentrada","trend":"down","trend_pct":18,"churn":false,"comprou_3m":"Sim"},{"id":"P9770838","mercado":"BNL","programa":"Pro Gym","n_encomendas":14,"valor_total":29760,"valor_medio":2126,"frequencia":38,"dias_desde_ultima":4,"ultima_compra":"22/05/2026","proxima_compra":"29/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Colagénio","trend":"up","trend_pct":22,"churn":false,"comprou_3m":"Sim"},{"id":"P4426900","mercado":"BNL","programa":"Professionals","n_encomendas":7,"valor_total":15479,"valor_medio":2211,"frequencia":72,"dias_desde_ultima":50,"ultima_compra":"06/04/2026","proxima_compra":"17/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"BCAA Premium","trend":"down","trend_pct":30,"churn":false,"comprou_3m":"Sim"},{"id":"P5456272","mercado":"BNL","programa":"Professionals","n_encomendas":12,"valor_total":24549,"valor_medio":2232,"frequencia":44,"dias_desde_ultima":19,"ultima_compra":"07/05/2026","proxima_compra":"20/06/2026","ss_pct":0,"ss_class":"Regular","top_produto":"Pre-Treino Intenso","trend":"flat","trend_pct":0,"churn":false,"comprou_3m":"Sim"}];
-const BENCH_PROG = {"Corporate":{"val_medio":1865,"freq":41},"Professionals":{"val_medio":1897,"freq":46},"Elite":{"val_medio":1860,"freq":40},"Performance":{"val_medio":1892,"freq":43},"Horeca":{"val_medio":1715,"freq":72},"Pro Gym":{"val_medio":1642,"freq":48},"Pro Box":{"val_medio":1879,"freq":48}};
-const BENCH_MKT = {"FR":{"val_medio":1805,"freq":46},"BNL":{"val_medio":1885,"freq":51},"CH":{"val_medio":1838,"freq":51},"DEAT":{"val_medio":1845,"freq":48}};
-const MKT_LABELS_TP = {FR:"França",CH:"Suíça",BNL:"Benelux",DEAT:"DE-AT"};
-const PROGRAMAS_LIST = ["Corporate","Professionals","Elite","Performance","Horeca","Pro Gym","Pro Box"];
+const MKT_MAP_TP = { "FR":"FR","CH":"CH","BNL":"BNL","DEAT":"DEAT","LU":"BNL","BE":"BNL","NL":"BNL","DE":"DEAT","AT":"DEAT" };
+const PROG_MAP_TP = { "PROFESSIONALS":"Professionals","PRO GYM":"Pro Gym","PRO BOX":"Pro Box","PRO TEAMS":"Pro Teams","ELITE":"Elite","ELITE-PARTNER":"Elite","PERFORMANCE":"Performance","HORECA":"Horeca","CORPORATE":"Corporate" };
+const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" };
+const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Performance","Horeca","Corporate"];
 
 function TopParceirosTab() {
-  const [filterMkt, setFilterMkt] = useState("all");
-  const [filterProg, setFilterProg] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [sortBy, setSortBy] = useState("valor_total");
-  const [search, setSearch] = useState("");
+  const [records, setRecords] = useState([]);
+  const [imports, setImports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const [metrica, setMetrica] = useState("faturacao");
+  const [filterCtx, setFilterCtx] = useState("global");
+  const [filterVal, setFilterVal] = useState("");
+  const fileRef = useRef(null);
 
-  const filtered = TOP_CLIENTS
-    .filter(c => filterMkt==="all" || c.mercado===filterMkt)
-    .filter(c => filterProg==="all" || c.programa===filterProg)
-    .filter(c => filterStatus==="all" || (filterStatus==="churn"&&c.churn) || (filterStatus==="ss"&&c.ss_class==="SS-dependente") || (filterStatus==="misto"&&c.ss_class==="Misto"))
-    .filter(c => !search || c.id.toLowerCase().includes(search.toLowerCase()))
-    .sort((a,b) => sortBy==="valor_total" ? b.valor_total-a.valor_total : sortBy==="freq" ? a.frequencia-b.frequencia : a.dias_desde_ultima-b.dias_desde_ultima);
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("top_partners").select("*").order("import_date", { ascending:false });
+    setRecords(data || []);
+    // Get unique import dates
+    const dates = [...new Set((data||[]).map(r=>r.import_date))].sort().reverse();
+    setImports(dates);
+    setLoading(false);
+  };
 
-  const totalFat = TOP_CLIENTS.reduce((s,c)=>s+c.valor_total,0);
-  const churnCount = TOP_CLIENTS.filter(c=>c.churn).length;
-  const ssDep = TOP_CLIENTS.filter(c=>c.ss_class==="SS-dependente").length;
-  const misto = TOP_CLIENTS.filter(c=>c.ss_class==="Misto").length;
+  useEffect(()=>{ load(); }, []);
 
-  const ssLabel = c => c.ss_class==="SS-dependente" ? {bg:"#FAEEDA",color:"#633806",txt:"SS-dependente"} : c.ss_class==="Misto" ? {bg:"#FEF3C7",color:"#92400E",txt:"Misto"} : {bg:"#E1F5EE",color:"#085041",txt:"Regular"};
-  const trendEl = c => c.trend==="up" ? <span style={{color:"#3B6D11",fontSize:12}}>↑ +{c.trend_pct}%</span> : c.trend==="down" ? <span style={{color:"#A32D2D",fontSize:12}}>↓ -{c.trend_pct}%</span> : <span style={{color:C.muted,fontSize:12}}>→ estável</span>;
-  const mktBadge = mkt => <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[mkt]||mkt}</span>;
-  const progBadge = prog => <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{prog}</span>;
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:"array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
+      if (!rows.length) { setImportMsg("❌ Ficheiro vazio"); setImporting(false); return; }
+
+      const today = new Date().toISOString().slice(0,10);
+      // Delete existing records for today's import date to allow re-import
+      await supabase.from("top_partners").delete().eq("import_date", today);
+
+      const findCol = (row, ...keys) => {
+        for (const k of keys) {
+          const found = Object.keys(row).find(rk => rk.toUpperCase().replace(/[^A-Z]/g,"").includes(k.toUpperCase().replace(/[^A-Z]/g,"")));
+          if (found) return row[found];
+        }
+        return "";
+      };
+
+      let ok = 0, skip = 0;
+      const batch = [];
+      for (const r of rows) {
+        const clientId = String(findCol(r,"ID") || "").trim();
+        if (!clientId) { skip++; continue; }
+        const mktRaw = String(findCol(r,"MERCADO","MKT") || "").trim().toUpperCase();
+        const progRaw = String(findCol(r,"PROGRAMA","PROG") || "").trim().toUpperCase();
+        const mkt = MKT_MAP_TP[mktRaw] || mktRaw;
+        const prog = PROG_MAP_TP[progRaw] || progRaw;
+        const nEnc = parseInt(findCol(r,"ENCOMENDAS","NENC","NENCOMENDAS"))||0;
+        const fat = parseFloat(String(findCol(r,"FATURACAO","FATURAÇÃO","FAT")||"0").replace(",","."))||0;
+        const gestor = String(findCol(r,"GESTOR")||"").trim();
+        const ultCompraRaw = findCol(r,"ULTIMA","DATA");
+        let ultCompra = null;
+        if (ultCompraRaw) {
+          if (typeof ultCompraRaw === "number") {
+            const d = new Date((ultCompraRaw - 25569)*86400000);
+            ultCompra = d.toISOString().slice(0,10);
+          } else {
+            const s = String(ultCompraRaw).trim();
+            if (s.match(/^\d{4}-\d{2}-\d{2}/)) ultCompra = s.slice(0,10);
+            else if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) { const [d,m,y]=s.split("/"); ultCompra=`${y}-${m}-${d}`; }
+          }
+        }
+        const valorMedio = nEnc > 0 ? Math.round(fat/nEnc) : 0;
+        batch.push({ import_date:today, client_id:clientId, mercado:mkt, gestor, programa:prog, n_encomendas:nEnc, faturacao:Math.round(fat), valor_medio:valorMedio, data_ultima_compra:ultCompra });
+        ok++;
+      }
+
+      // Insert in batches of 100
+      for (let i=0; i<batch.length; i+=100) {
+        await supabase.from("top_partners").insert(batch.slice(i,i+100));
+      }
+
+      setImportMsg(`✓ ${ok} parceiros importados${skip>0?` · ${skip} ignorados`:""} — ${today}`);
+      await load();
+    } catch(err) {
+      setImportMsg("❌ Erro: " + err.message);
+    }
+    setImporting(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  // Get data from last 3 imports for stability
+  const getAvgData = () => {
+    const last3 = imports.slice(0,3);
+    if (!last3.length) return [];
+    const byClient = {};
+    records.filter(r=>last3.includes(r.import_date)).forEach(r=>{
+      if (!byClient[r.client_id]) byClient[r.client_id] = { ...r, _count:0, _fat:0, _enc:0, _vm:0 };
+      byClient[r.client_id]._count++;
+      byClient[r.client_id]._fat += r.faturacao||0;
+      byClient[r.client_id]._enc += r.n_encomendas||0;
+      byClient[r.client_id]._vm += r.valor_medio||0;
+    });
+    return Object.values(byClient).map(c=>({
+      ...c,
+      faturacao_avg: Math.round(c._fat/c._count),
+      n_encomendas_avg: Math.round(c._enc/c._count),
+      valor_medio_avg: Math.round(c._vm/c._count),
+    }));
+  };
+
+  const getMetricVal = (c) => metrica==="faturacao" ? c.faturacao_avg : metrica==="encomendas" ? c.n_encomendas_avg : c.valor_medio_avg;
+  const getMetricFmt = (v) => metrica==="encomendas" ? fmt(v) : fmtEur(v);
+  const getMetricLabel = () => metrica==="faturacao" ? "Faturação" : metrica==="encomendas" ? "Nº enc." : "Val. médio";
+
+  const allData = getAvgData();
+  const filtered = allData.filter(c => {
+    if (filterCtx==="programa" && filterVal) return c.programa===filterVal;
+    if (filterCtx==="mercado" && filterVal) return c.mercado===filterVal;
+    return true;
+  });
+  const top25 = [...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(0,25);
+  const waiting = [...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(25,30);
+
+  const lastImport = imports[0];
+  const lastData = records.filter(r=>r.import_date===lastImport);
+  const totalFat = lastData.reduce((s,r)=>s+(r.faturacao||0),0);
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
-      {/* Visão geral */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-        {[
-          {label:"Parceiros seguidos", value:TOP_CLIENTS.length, sub:"100 clientes fictícios", subColor:C.muted},
-          {label:"Faturação total", value:fmtEur(totalFat), sub:"Jan 2025 — Mai 2026", subColor:C.muted},
-          {label:"Em risco de churn", value:churnCount, sub:"Sem compra há +90 dias", subColor:churnCount>0?C.red:C.green},
-          {label:"SS-dependentes", value:ssDep+misto>0?ssDep+misto:"0", sub:ssDep+misto>0?`${ssDep} dependentes · ${misto} mistos`:"Nenhum detectado", subColor:ssDep>0?C.amber:C.muted},
-        ].map((s,i)=>(
-          <div key={i} style={{...T.card}}>
-            <p style={{...T.label}}>{s.label}</p>
-            <p style={{...T.value,fontSize:20}}>{s.value}</p>
-            <p style={{fontSize:11,color:s.subColor,margin:"4px 0 0"}}>{s.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Top 10 */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-        {[
-          {title:"Top 10 — faturação", data:[...TOP_CLIENTS].sort((a,b)=>b.valor_total-a.valor_total).slice(0,10), key:"valor_total", fmt:fmtEur},
-          {title:"Top 10 — nº encomendas", data:[...TOP_CLIENTS].sort((a,b)=>b.n_encomendas-a.n_encomendas).slice(0,10), key:"n_encomendas", fmt:n=>n+" enc."},
-        ].map(({title,data,key,fmt:f})=>(
-          <div key={title} style={T.card}>
-            <p style={T.sectionTitle}>{title}</p>
-            {data.map((c,i)=>(
-              <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:i<9?`0.5px solid ${C.border}`:"none"}}>
-                <span style={{fontSize:11,fontWeight:500,color:i<3?C.green:C.muted,minWidth:18,textAlign:"right"}}>{i+1}</span>
-                <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
-                <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
-                <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span>
-                <span style={{fontSize:13,fontWeight:500,color:C.text,textAlign:"right",minWidth:80}}>{f(c[key])}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* Contactar hoje + SS */}
-      {(()=>{
-        const hoje = new Date(2026,4,26);
-        const amanha = new Date(2026,4,27);
-        const fmt_date = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
-        const amanhaStr = fmt_date(amanha);
-        const contactarHoje = TOP_CLIENTS.filter(c=>c.proxima_compra===amanhaStr);
-        const ssClients = [...TOP_CLIENTS].filter(c=>c.ss_pct>0).sort((a,b)=>b.ss_pct-a.ss_pct);
-        return (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-            <div style={{...T.card,borderLeft:contactarHoje.length>0?`3px solid ${C.amber}`:undefined,borderRadius:contactarHoje.length>0?"0 12px 12px 0":12}}>
-              <p style={T.sectionTitle}>Parceiros a contactar hoje</p>
-              <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Próxima compra prevista para amanhã ({amanhaStr})</p>
-              {contactarHoje.length===0
-                ? <p style={{fontSize:13,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum para hoje.</p>
-                : contactarHoje.map(c=>(
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                    <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
-                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
-                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span>
-                    <span style={{fontSize:11,color:C.muted}}>{c.top_produto}</span>
-                  </div>
-                ))
-              }
-            </div>
-            <div style={T.card}>
-              <p style={T.sectionTitle}>Prioritários em Supersales</p>
-              <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Clientes com maior % de compras em dias SS</p>
-              {ssClients.length===0
-                ? <p style={{fontSize:13,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum SS detectado nos dados actuais.</p>
-                : ssClients.map((c,i)=>(
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<ssClients.length-1?`0.5px solid ${C.border}`:"none"}}>
-                    <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{c.id}</span>
-                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span>
-                    <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#FAEEDA",color:"#633806"}}>{c.ss_class}</span>
-                    <span style={{fontSize:13,fontWeight:500,color:C.amber,minWidth:40,textAlign:"right"}}>{c.ss_pct}%</span>
-                  </div>
-                ))
-              }
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Benchmarks */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Por programa</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr>
-              <th style={{textAlign:"left",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Programa</th>
-              <th style={{textAlign:"right",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Val. médio enc.</th>
-              <th style={{textAlign:"right",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Freq. média</th>
-            </tr></thead>
-            <tbody>
-              {Object.entries(BENCH_PROG).map(([prog,v])=>(
-                <tr key={prog} style={{borderTop:`0.5px solid ${C.border}`}}>
-                  <td style={{padding:"6px 0",color:C.text}}>{prog}</td>
-                  <td style={{padding:"6px 0",textAlign:"right",fontWeight:500,color:C.text}}>{fmtEur(v.val_medio)}</td>
-                  <td style={{padding:"6px 0",textAlign:"right",color:C.muted}}>{v.freq} dias</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Header + import */}
+      <div style={{...T.card,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+        <div style={{flex:1}}>
+          <p style={{...T.sectionTitle,marginBottom:4}}>Top Parceiros</p>
+          <p style={{fontSize:12,color:C.muted,margin:0}}>
+            {lastImport ? `Último import: ${lastImport} · ${lastData.length} parceiros · ${imports.length} import${imports.length!==1?"s":""}` : "Sem dados — faz o primeiro import"}
+          </p>
         </div>
-        <div style={T.card}>
-          <p style={T.sectionTitle}>Por mercado</p>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr>
-              <th style={{textAlign:"left",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Mercado</th>
-              <th style={{textAlign:"right",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Val. médio enc.</th>
-              <th style={{textAlign:"right",color:C.muted,fontWeight:400,padding:"4px 0",fontSize:11}}>Freq. média</th>
-            </tr></thead>
-            <tbody>
-              {Object.entries(BENCH_MKT).map(([mkt,v])=>(
-                <tr key={mkt} style={{borderTop:`0.5px solid ${C.border}`}}>
-                  <td style={{padding:"6px 0",color:C.text}}>{MKT_LABELS_TP[mkt]||mkt}</td>
-                  <td style={{padding:"6px 0",textAlign:"right",fontWeight:500,color:C.text}}>{fmtEur(v.val_medio)}</td>
-                  <td style={{padding:"6px 0",textAlign:"right",color:C.muted}}>{v.freq} dias</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <input type="file" accept=".xlsx,.xls" ref={fileRef} onChange={handleImport} style={{display:"none"}} />
+          <button onClick={()=>fileRef.current.click()} disabled={importing}
+            style={{padding:"8px 16px",background:"transparent",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.text,cursor:"pointer",opacity:importing?0.6:1}}>
+            {importing?"A importar…":"📂 Importar Excel"}
+          </button>
+          {importMsg && <span style={{fontSize:12,color:importMsg.startsWith("✓")?C.green:C.red}}>{importMsg}</span>}
         </div>
       </div>
 
-      {/* Filtros + lista */}
-      <div style={T.card}>
-        <div style={{display:"flex",gap:8,flexWrap:"nowrap",alignItems:"center",marginBottom:14,overflowX:"auto"}}>
-          {[{id:"all",l:`Todos (${TOP_CLIENTS.length})`},{id:"churn",l:`Churn (${churnCount})`},{id:"ss",l:`SS-dep. (${ssDep})`},{id:"misto",l:`Misto (${misto})`}].map(f=>(
-            <button key={f.id} onClick={()=>setFilterStatus(f.id)}
-              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",flexShrink:0,
-                background:filterStatus===f.id?C.green:"transparent",color:filterStatus===f.id?"#fff":C.muted}}>
-              {f.l}
-            </button>
+      {!lastImport ? (
+        <div style={{...T.card,textAlign:"center",padding:"3rem",color:C.muted,fontSize:13}}>
+          Importa o ficheiro Excel para ver os top parceiros.
+        </div>
+      ) : (<>
+
+        {/* Visão geral */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+          {[
+            {label:"Parceiros importados", value:fmt(lastData.length), sub:`import de ${lastImport}`},
+            {label:"Faturação total", value:fmtEur(totalFat), sub:"último import"},
+            {label:"Imports realizados", value:imports.length, sub:`média de ${imports.length} períodos`},
+            {label:"No top 25 atual", value:top25.length, sub:`por ${getMetricLabel().toLowerCase()}`},
+          ].map((s,i)=>(
+            <div key={i} style={T.card}>
+              <p style={T.label}>{s.label}</p>
+              <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"4px 0"}}>{s.value}</p>
+              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
+            </div>
           ))}
-          <div style={{width:1,height:20,background:C.border,flexShrink:0}} />
-          <select value={filterMkt} onChange={e=>setFilterMkt(e.target.value)}
-            style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.muted,outline:"none",flexShrink:0}}>
-            <option value="all">Mercado</option>
-            {Object.entries(MKT_LABELS_TP).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-          </select>
-          <select value={filterProg} onChange={e=>setFilterProg(e.target.value)}
-            style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.muted,outline:"none",flexShrink:0}}>
-            <option value="all">Programa</option>
-            {PROGRAMAS_LIST.map(p=><option key={p} value={p}>{p}</option>)}
-          </select>
-          <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
-            style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.muted,outline:"none",flexShrink:0}}>
-            <option value="valor_total">↓ Maior faturação</option>
-            <option value="freq">↑ Mais frequente</option>
-            <option value="churn">⚠ Mais urgente</option>
-          </select>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar ID..."
-            style={{padding:"5px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",width:130,flexShrink:0}} />
-          <span style={{fontSize:12,color:C.muted,flexShrink:0,marginLeft:"auto"}}>{filtered.length} resultado{filtered.length!==1?"s":""}</span>
         </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {filtered.map(c => {
-            const ssl = ssLabel(c);
-            const benchP = BENCH_PROG[c.programa];
-            const benchM = BENCH_MKT[c.mercado];
-            const vsMktBench = benchM ? (c.valor_medio > benchM.val_medio ? "↑" : c.valor_medio < benchM.val_medio*0.9 ? "↓" : "→") : null;
-            return (
-              <div key={c.id} style={{background:c.churn?"#FCEBEB":C.bg,border:`0.5px solid ${c.churn?"#F09595":C.border}`,borderRadius:10,padding:"12px 14px",
-                borderLeft:c.churn?"3px solid #E24B4A":undefined}}>
-                {/* Linha 1 */}
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                  <span style={{fontWeight:500,fontSize:14,color:C.text}}>{c.id}</span>
-                  {mktBadge(c.mercado)}
-                  {progBadge(c.programa)}
-                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:ssl.bg,color:ssl.color}}>{ssl.txt}</span>
-                  <span style={{marginLeft:"auto"}}>{trendEl(c)}</span>
-                </div>
-                {/* Linha 2 — métricas */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:6}}>
-                  <div>
-                    <p style={{fontSize:10,color:C.muted,margin:"0 0 2px"}}>Faturação total</p>
-                    <p style={{fontSize:13,fontWeight:500,margin:0,color:C.text}}>{fmtEur(c.valor_total)}</p>
-                  </div>
-                  <div>
-                    <p style={{fontSize:10,color:C.muted,margin:"0 0 2px"}}>Nº encomendas</p>
-                    <p style={{fontSize:13,fontWeight:500,margin:0,color:C.text}}>{c.n_encomendas}</p>
-                  </div>
-                  <div>
-                    <p style={{fontSize:10,color:C.muted,margin:"0 0 2px"}}>Val. médio enc.</p>
-                    <p style={{fontSize:13,fontWeight:500,margin:0,color:C.text}}>{fmtEur(c.valor_medio)}</p>
-                    {vsMktBench&&<p style={{fontSize:10,margin:0,color:vsMktBench==="↑"?"#3B6D11":vsMktBench==="↓"?"#A32D2D":C.muted}}>{vsMktBench} vs. benchmark</p>}
-                  </div>
-                  <div>
-                    <p style={{fontSize:10,color:C.muted,margin:"0 0 2px"}}>Frequência</p>
-                    <p style={{fontSize:13,fontWeight:500,margin:0,color:C.text}}>{c.frequencia} dias</p>
-                  </div>
-                  <div>
-                    <p style={{fontSize:10,color:C.muted,margin:"0 0 2px"}}>Última compra</p>
-                    <p style={{fontSize:13,fontWeight:500,margin:0,color:c.churn?C.red:C.text}}>há {c.dias_desde_ultima} dias</p>
-                  </div>
-                </div>
-                {/* Linha 3 — footer */}
-                <div style={{display:"flex",gap:8,marginTop:10,paddingTop:8,borderTop:`0.5px solid ${C.border}`,fontSize:11,color:C.muted,alignItems:"center"}}>
-                  {c.churn
-                    ? <span style={{background:"#FCEBEB",color:"#791F1F",padding:"3px 8px",borderRadius:6}}>⚠ Risco de churn — contactar urgente</span>
-                    : <span style={{background:"#E1F5EE",color:"#085041",padding:"3px 8px",borderRadius:6}}>Próxima compra prevista: {c.proxima_compra}</span>
-                  }
-                  {c.ss_pct>0&&<span style={{background:"#FAEEDA",color:"#633806",padding:"3px 8px",borderRadius:6}}>{c.ss_pct}% compras em Supersales</span>}
-                  <span style={{color:C.muted}}>Produto top: {c.top_produto}</span>
-                </div>
-              </div>
-            );
-          })}
-          {filtered.length===0&&<p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"2rem"}}>Nenhum resultado.</p>}
+        {/* Controlos */}
+        <div style={{...T.card}}>
+          <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:16}}>
+            <p style={{...T.sectionTitle,margin:0,marginRight:4}}>Top 25</p>
+            {/* Métrica */}
+            {[{id:"faturacao",l:"Faturação"},{id:"encomendas",l:"Nº encomendas"},{id:"valor_medio",l:"Valor médio"}].map(m=>(
+              <button key={m.id} onClick={()=>setMetrica(m.id)}
+                style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                  background:metrica===m.id?C.green:"transparent",color:metrica===m.id?"#fff":C.muted}}>
+                {m.l}
+              </button>
+            ))}
+            <div style={{width:1,height:20,background:C.border}} />
+            {/* Contexto */}
+            {[{id:"global",l:"Global"},{id:"programa",l:"Por programa"},{id:"mercado",l:"Por mercado"}].map(c=>(
+              <button key={c.id} onClick={()=>{setFilterCtx(c.id);setFilterVal("");}}
+                style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                  background:filterCtx===c.id?"#6366F1":"transparent",color:filterCtx===c.id?"#fff":C.muted}}>
+                {c.l}
+              </button>
+            ))}
+            {filterCtx==="programa" && (
+              <select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
+                style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
+                <option value="">Todos os programas</option>
+                {PROGS_TP.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+            )}
+            {filterCtx==="mercado" && (
+              <select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
+                style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
+                <option value="">Todos os mercados</option>
+                {Object.entries(MKT_LABELS_TP).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>
+            )}
+            <span style={{fontSize:12,color:C.muted,marginLeft:"auto"}}>{imports.length>=2?`Média de ${Math.min(imports.length,3)} imports`:"1 import — ranking direto"}</span>
+          </div>
+
+          {/* Top 25 */}
+          {top25.length===0 ? (
+            <p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"2rem"}}>Nenhum resultado.</p>
+          ) : (
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead>
+                <tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                  {["#","ID","Mercado","Programa",getMetricLabel(),"Últ. compra"].map((h,i)=>(
+                    <th key={i} style={{padding:"8px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {top25.map((c,i)=>(
+                  <tr key={c.client_id} style={{borderBottom:`0.5px solid ${C.card}`,background:i%2===0?"transparent":C.card+"44"}}>
+                    <td style={{padding:"9px 10px",fontWeight:600,color:i<3?C.green:C.muted,width:30}}>{i+1}</td>
+                    <td style={{padding:"9px 10px",fontWeight:500,color:C.text}}>{c.client_id}</td>
+                    <td style={{padding:"9px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
+                    <td style={{padding:"9px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
+                    <td style={{padding:"9px 10px",textAlign:"right",fontWeight:500,color:C.text}}>{getMetricFmt(getMetricVal(c))}</td>
+                    <td style={{padding:"9px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{c.data_ultima_compra||"—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* Lista de espera */}
+          {waiting.length>0 && (
+            <div style={{marginTop:16,paddingTop:12,borderTop:`0.5px solid ${C.border}`}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".06em"}}>À entrada (26º–30º)</p>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <tbody>
+                  {waiting.map((c,i)=>(
+                    <tr key={c.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                      <td style={{padding:"6px 10px",color:C.muted,width:30}}>{i+26}</td>
+                      <td style={{padding:"6px 10px",color:C.text}}>{c.client_id}</td>
+                      <td style={{padding:"6px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
+                      <td style={{padding:"6px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
+                      <td style={{padding:"6px 10px",textAlign:"right",color:C.muted}}>{getMetricFmt(getMetricVal(c))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
+      </>)}
     </div>
   );
 }
