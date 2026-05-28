@@ -356,8 +356,8 @@ async function loadPartnersCount(year, month) {
   const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
   const { count } = await supabase.from("partner_followup")
     .select("*", { count:"exact", head:true })
-    .gte("stage_started_at", start)
-    .lte("stage_started_at", end)
+    .gte("original_created_at", start)
+    .lte("original_created_at", end)
     .neq("status", "deleted");
   return count || 0;
 }
@@ -367,8 +367,8 @@ async function loadPartnersCountPrev(year, month) {
   const end = new Date(year - 1, month + 1, 0, 23, 59, 59).toISOString();
   const { count } = await supabase.from("partner_followup")
     .select("*", { count:"exact", head:true })
-    .gte("stage_started_at", start)
-    .lte("stage_started_at", end);
+    .gte("original_created_at", start)
+    .lte("original_created_at", end);
   return count || 0;
 }
 
@@ -552,12 +552,12 @@ function PartnersDetailModal({ year, month, closedDay, onClose }) {
   useEffect(()=>{
     const start = new Date(year, month, 1).toISOString();
     const end = new Date(year, month+1, 0, 23, 59, 59).toISOString();
-    supabase.from("partner_followup").select("stage_started_at").gte("stage_started_at", start).lte("stage_started_at", end).neq("status","deleted")
+    supabase.from("partner_followup").select("original_created_at").gte("original_created_at", start).lte("original_created_at", end).neq("status","deleted")
       .then(({data})=>{
         if (!data) return;
         const byDay = {};
         data.forEach(r=>{
-          const d = new Date(r.stage_started_at).getDate();
+          const d = new Date(r.original_created_at).getDate();
           byDay[d] = (byDay[d]||0)+1;
         });
         const today = new Date();
@@ -1180,6 +1180,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
       programme: prog,
       stage: "s30",
       stage_started_at: new Date(startDate).toISOString(),
+      original_created_at: new Date(startDate).toISOString(),
       status: "pending",
       market: mkt,
       gestor,
@@ -1261,7 +1262,8 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
         if (existing) { skipDup++; dupDetails.push({ id: clientId }); continue; }
         const { error } = await supabase.from("partner_followup").insert({
           client_id: clientId, gestor: gestorVal, market: mktVal, programme: progVal,
-          stage:"s30", stage_started_at: parseDate(dateRaw), status:"pending",
+          stage:"s30", stage_started_at: parseDate(dateRaw),
+          original_created_at: parseDate(dateRaw), status:"pending",
         });
         if (!error) ok++; else { skipInvalid++; invalidDetails.push({ id: clientId, motivo: "Erro ao inserir" }); }
       }
@@ -1301,7 +1303,8 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
 
   const getInfo = (r) => {
     const stage = STAGES.find(s=>s.key===r.stage)||STAGES[0];
-    const diff = Math.floor((new Date()-new Date(r.stage_started_at))/86400000);
+    const regDate = r.original_created_at || r.stage_started_at;
+    const diff = Math.floor((new Date()-new Date(regDate))/86400000);
     const left = stage.days-diff;
     return { stage, diff, left, overdue: left<=0 };
   };
@@ -1323,8 +1326,8 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
 
   const applySort = (arr) => {
     if (sortOrder==="urgency") return sortByUrgency(arr);
-    if (sortOrder==="newest") return [...arr].sort((a,b)=>new Date(b.stage_started_at)-new Date(a.stage_started_at));
-    if (sortOrder==="oldest") return [...arr].sort((a,b)=>new Date(a.stage_started_at)-new Date(b.stage_started_at));
+    if (sortOrder==="newest") return [...arr].sort((a,b)=>new Date(b.original_created_at||b.stage_started_at)-new Date(a.original_created_at||a.stage_started_at));
+    if (sortOrder==="oldest") return [...arr].sort((a,b)=>new Date(a.original_created_at||a.stage_started_at)-new Date(b.original_created_at||b.stage_started_at));
     return arr;
   };
 
