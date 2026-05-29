@@ -1822,7 +1822,7 @@ function TestesTab({ year, month }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programa,status,original_created_at")
+      .select("gestor,programme,status,original_created_at")
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
@@ -1845,7 +1845,7 @@ function TestesTab({ year, month }) {
     if (!byGestor[g]) byGestor[g]={total:0,bought:0,progs:{}};
     byGestor[g].total++;
     if (r.status==="bought") byGestor[g].bought++;
-    const p = r.programa||"—";
+    const p = r.programme||"—";
     byGestor[g].progs[p]=(byGestor[g].progs[p]||0)+1;
   });
 
