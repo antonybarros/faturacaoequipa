@@ -963,15 +963,11 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             {mktList.map(mkt=>(
               <div key={mkt.key} style={T.card}>
                 <p style={T.sectionTitle}>{mkt.label}</p>
-                <div style={{display:"grid",gridTemplateColumns:year<2027?"repeat(2,minmax(0,1fr))":"repeat(1,minmax(0,1fr))",gap:16}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(1,minmax(0,1fr))",gap:16}}>
                   <div>
                     <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year} (€)</p>
                     {inpAfil(`afil_${mkt.key}`)}
                   </div>
-                  {year<2027&&<div>
-                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year-1} (€)</p>
-                    {inpAfil(`afil_prev_${mkt.key}`)}
-                  </div>}
                 </div>
               </div>
             ))}
@@ -984,17 +980,11 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         const ENC_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
         const ENC_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
         const mktList = newStruct ? ENC_MARKETS_NEW : ENC_MARKETS_OLD;
-        const ENC_FIELDS_CURR = [
+        const ENC_FIELDS = [
           {field:"orders_total",    label:`Total enc. ${year}`},
           {field:"orders_first",    label:`1ªs enc. ${year}`},
           {field:"orders_first_rev",label:`Fat. 1ªs enc. ${year} (€)`},
         ];
-        const ENC_FIELDS_PREV = year<2027 ? [
-          {field:"orders_total_prev",    label:`Total enc. ${year-1}`},
-          {field:"orders_first_prev",    label:`1ªs enc. ${year-1}`},
-          {field:"orders_first_rev_prev",label:`Fat. 1ªs enc. ${year-1} (€)`},
-        ] : [];
-        const ENC_FIELDS = [...ENC_FIELDS_CURR, ...ENC_FIELDS_PREV];
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
             {mktList.map(mkt => (
@@ -1055,7 +1045,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               <div key={mkt.key} style={T.card}>
                 <p style={T.sectionTitle}>{mkt.label}</p>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 280px))", gap:16 }}>
-                  {(year<2027?[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"},{f:`margin_pct_prev_${mkt.key}`,l:"Margem mesmo mês ano anterior (%)"}]:[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"}]).map(({f,l}) => (
+                  {[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"}].map(({f,l}) => (
                     <div key={f}>
                       <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{l}</p>
                       <input type="number" step="0.01" value={goals[f] ?? ""}
