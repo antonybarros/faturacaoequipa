@@ -1810,14 +1810,16 @@ function TestesTab({ year, month }) {
   useEffect(()=>{
     setLoading(true);
     let start, end;
+    const pad = n => String(n).padStart(2,"0");
+    const lastDay = new Date(year,month+1,0).getDate();
     if (periodo==="mes") {
-      start = new Date(year,month,1).toISOString();
-      end = new Date(year,month+1,0,23,59,59).toISOString();
+      start = `${year}-${pad(month+1)}-01T00:00:00.000Z`;
+      end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     } else {
-      // last 3 months
-      const s = new Date(year,month-2,1);
-      start = s.toISOString();
-      end = new Date(year,month+1,0,23,59,59).toISOString();
+      const sm = month-2 < 0 ? month+10 : month-2;
+      const sy = month-2 < 0 ? year-1 : year;
+      start = `${sy}-${pad(sm+1)}-01T00:00:00.000Z`;
+      end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
       .select("gestor,programa,status,original_created_at")
