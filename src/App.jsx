@@ -1724,7 +1724,6 @@ function ResultadosTab({ year, month, partnersCount }) {
     const up=c>=p;
     return <span style={{fontSize:12,fontWeight:500,color:up?C.green:C.red}}>{up?"↑":"↓"} {Math.abs(pctVar(c,p))}%</span>;
   };
-  const byMkt={}, byProg={};
   const totalPC = partnersCount||0;
   const histTotal = Number(pg["hist_partners_total"])||0;
   const totalPP = partnersPrev > 0 ? partnersPrev : histTotal;
