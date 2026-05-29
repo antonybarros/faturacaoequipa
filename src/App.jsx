@@ -618,13 +618,9 @@ function PartnersDetailModal({ year, month, closedDay, onClose }) {
   );
 }
 
-function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals }) {
+function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, partnersCount }) {
   const [modal, setModal] = useState(null);
-  const [partnersCount, setPartnersCount] = useState(null);
 
-  useEffect(()=>{
-    loadPartnersCount(year, month).then(setPartnersCount);
-  }, [year, month]);
 
   const newStruct = isNewStructure(year, month);
   const [historicalSSAvg, setHistoricalSSAvg] = useState(0);
@@ -2000,6 +1996,8 @@ function MainApp({ role, onLogout }) {
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
   useEffect(()=>{ setLoading(true); loadMonthData(year,month).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month]);
+  const [partnersCount, setPartnersCount] = useState(null);
+  useEffect(()=>{ loadPartnersCount(year,month).then(setPartnersCount); },[year,month]);
   const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
   const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
   return (
@@ -2035,7 +2033,7 @@ function MainApp({ role, onLogout }) {
         {loading?(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
         ):tab==="analise"?(
-          <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
+          <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
             {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
