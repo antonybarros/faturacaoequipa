@@ -820,6 +820,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     { id:"encomendas",  label:"Encomendas" },
     { id:"parceiros",   label:"Parceiros / Leads" },
     { id:"margem",      label:"Margem" },
+    { id:"fat_programa", label:"Fat. Programa" },
     { id:"objetivos",   label:"Objetivos" },
   ];
 
@@ -962,15 +963,15 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             {mktList.map(mkt=>(
               <div key={mkt.key} style={T.card}>
                 <p style={T.sectionTitle}>{mkt.label}</p>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:16}}>
+                <div style={{display:"grid",gridTemplateColumns:year<2027?"repeat(2,minmax(0,1fr))":"repeat(1,minmax(0,1fr))",gap:16}}>
                   <div>
                     <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year} (€)</p>
                     {inpAfil(`afil_${mkt.key}`)}
                   </div>
-                  <div>
+                  {year<2027&&<div>
                     <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Afiliação {year-1} (€)</p>
                     {inpAfil(`afil_prev_${mkt.key}`)}
-                  </div>
+                  </div>}
                 </div>
               </div>
             ))}
@@ -983,14 +984,17 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         const ENC_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
         const ENC_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
         const mktList = newStruct ? ENC_MARKETS_NEW : ENC_MARKETS_OLD;
-        const ENC_FIELDS = [
+        const ENC_FIELDS_CURR = [
           {field:"orders_total",    label:`Total enc. ${year}`},
           {field:"orders_first",    label:`1ªs enc. ${year}`},
           {field:"orders_first_rev",label:`Fat. 1ªs enc. ${year} (€)`},
+        ];
+        const ENC_FIELDS_PREV = year<2027 ? [
           {field:"orders_total_prev",    label:`Total enc. ${year-1}`},
           {field:"orders_first_prev",    label:`1ªs enc. ${year-1}`},
           {field:"orders_first_rev_prev",label:`Fat. 1ªs enc. ${year-1} (€)`},
-        ];
+        ] : [];
+        const ENC_FIELDS = [...ENC_FIELDS_CURR, ...ENC_FIELDS_PREV];
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
             {mktList.map(mkt => (
@@ -1051,7 +1055,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               <div key={mkt.key} style={T.card}>
                 <p style={T.sectionTitle}>{mkt.label}</p>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 280px))", gap:16 }}>
-                  {[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"},{f:`margin_pct_prev_${mkt.key}`,l:"Margem mesmo mês ano anterior (%)"}].map(({f,l}) => (
+                  {(year<2027?[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"},{f:`margin_pct_prev_${mkt.key}`,l:"Margem mesmo mês ano anterior (%)"}]:[{f:`margin_pct_${mkt.key}`,l:"Margem do mês (%)"}]).map(({f,l}) => (
                     <div key={f}>
                       <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{l}</p>
                       <input type="number" step="0.01" value={goals[f] ?? ""}
@@ -1066,6 +1070,27 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
           </div>
         );
       })()}
+
+      {/* ── Faturação por programa ── */}
+      {subTab === "fat_programa" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Faturação por programa — {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
+            {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog => {
+              const fkey = `fat_prog_${prog.replace(/ /g,"_").toLowerCase()}`;
+              return (
+                <div key={fkey}>
+                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{prog}</p>
+                  <input type="number" value={goals[fkey]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Objetivos ── */}
       {subTab === "objetivos" && (
