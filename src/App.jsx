@@ -1674,12 +1674,12 @@ function ResultadosTab({ year, month }) {
     Promise.all([
       loadMonthData(year, month),
       loadMonthData(prevYear, month),
-      supabase.from("partner_followup").select("mercado,programme,original_created_at").gte("original_created_at", new Date(year,month,1).toISOString().slice(0,7)+"-01T00:00:00.000Z").lte("original_created_at", new Date(year,month+1,0).toISOString().slice(0,10)+"T23:59:59.999Z").neq("status","deleted"),
-      supabase.from("partner_followup").select("mercado,programme,original_created_at").gte("original_created_at", new Date(prevYear,month,1).toISOString().slice(0,7)+"-01T00:00:00.000Z").lte("original_created_at", new Date(prevYear,month+1,0).toISOString().slice(0,10)+"T23:59:59.999Z").neq("status","deleted"),
+      loadPartnersCount(year, month),
+      loadPartnersCount(prevYear, month),
     ]).then(([c,p,pc,pp])=>{
       setCurr(c); setPrev(p);
-      setPartnersCurr(pc.data||[]);
-      setPartnersPrev(pp.data||[]);
+      setPartnersCurr(pc||0);
+      setPartnersPrev(pp||0);
       setLoading(false);
     });
   },[year,month]);
@@ -1729,20 +1729,16 @@ function ResultadosTab({ year, month }) {
   };
   const byMkt={}, byProg={};
   partnersCurr.forEach(p=>{ byMkt[p.mercado]=(byMkt[p.mercado]||0)+1; byProg[p.programa]=(byProg[p.programa]||0)+1; });
-  const totalPC = partnersCurr.length;
-  // Use historical data from billing_months if no partner_followup data for prevYear
+  const totalPC = partnersCurr||0;
   const histTotal = Number(pg["hist_partners_total"])||0;
-  const totalPP = partnersPrev.length > 0 ? partnersPrev.length : histTotal;
+  const totalPP = partnersPrev > 0 ? partnersPrev : histTotal;
 
-  // Historical breakdown by market and programme
+  // Breakdown by market and programme from historical data
+  const byMkt={}, byProg={};
   const byMktPrev = {};
   const byProgPrev = {};
-  if (partnersPrev.length > 0) {
-    partnersPrev.forEach(p=>{ byMktPrev[p.mercado]=(byMktPrev[p.mercado]||0)+1; byProgPrev[p.programme]=(byProgPrev[p.programme]||0)+1; });
-  } else {
-    ["FR","CH","BNL","DEAT"].forEach(k=>{ const v=Number(pg[`hist_partners_mkt_${k}`])||0; if(v>0) byMktPrev[k]=v; });
-    ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].forEach(p=>{ const v=Number(pg[`hist_partners_prog_${p.replace(/ /g,"_").toLowerCase()}`])||0; if(v>0) byProgPrev[p]=v; });
-  }
+  ["FR","CH","BNL","DEAT"].forEach(k=>{ const v=Number(pg[`hist_partners_mkt_${k}`])||0; if(v>0) byMktPrev[k]=v; });
+  ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].forEach(p=>{ const v=Number(pg[`hist_partners_prog_${p.replace(/ /g,"_").toLowerCase()}`])||0; if(v>0) byProgPrev[p]=v; });
   const getFatProg = g => PROGS_RES.reduce((s,p)=>s+(Number(g["fat_prog_"+p.replace(/ /g,"_").toLowerCase()])||0),0);
   const totalFatProg = getFatProg(cg);
   const nextMonth = month===11?0:month+1;
