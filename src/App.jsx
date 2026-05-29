@@ -1818,7 +1818,8 @@ function MainApp({ role, onLogout }) {
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
   useEffect(()=>{ setLoading(true); loadMonthData(year,month).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month]);
-  const monthOptions = Array.from({length:12},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
+  const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
+  const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
       <div style={{ maxWidth:920, margin:"0 auto", padding:"1.25rem 1rem" }}>
