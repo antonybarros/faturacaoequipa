@@ -1661,10 +1661,9 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
 const PROGS_RES = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 const MKT_RES_LIST = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
 
-function ResultadosTab({ year, month }) {
+function ResultadosTab({ year, month, partnersCount }) {
   const [curr, setCurr] = useState(null);
   const [prev, setPrev] = useState(null);
-  const [partnersCurr, setPartnersCurr] = useState([]);
   const [partnersPrev, setPartnersPrev] = useState([]);
   const [loading, setLoading] = useState(true);
   const prevYear = year-1;
@@ -1674,11 +1673,9 @@ function ResultadosTab({ year, month }) {
     Promise.all([
       loadMonthData(year, month),
       loadMonthData(prevYear, month),
-      loadPartnersCount(year, month),
       loadPartnersCount(prevYear, month),
-    ]).then(([c,p,pc,pp])=>{
+    ]).then(([c,p,pp])=>{
       setCurr(c); setPrev(p);
-      setPartnersCurr(pc||0);
       setPartnersPrev(pp||0);
       setLoading(false);
     });
@@ -1728,8 +1725,7 @@ function ResultadosTab({ year, month }) {
     return <span style={{fontSize:12,fontWeight:500,color:up?C.green:C.red}}>{up?"↑":"↓"} {Math.abs(pctVar(c,p))}%</span>;
   };
   const byMkt={}, byProg={};
-  partnersCurr.forEach(p=>{ byMkt[p.mercado]=(byMkt[p.mercado]||0)+1; byProg[p.programa]=(byProg[p.programa]||0)+1; });
-  const totalPC = partnersCurr||0;
+  const totalPC = partnersCount||0;
   const histTotal = Number(pg["hist_partners_total"])||0;
   const totalPP = partnersPrev > 0 ? partnersPrev : histTotal;
 
@@ -2043,7 +2039,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
           </div>
         )}
       </div>
