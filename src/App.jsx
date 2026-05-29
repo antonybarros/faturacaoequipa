@@ -1660,17 +1660,26 @@ function ResultadosTab({ year, month }) {
   const getMkts = (y,m) => isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   const encCurr = sumMkts("orders_total", cg, getMkts(year,month));
   const enc1Curr = sumMkts("orders_first", cg, getMkts(year,month));
-  const fat1Curr = sumMkts("orders_first_rev", cg, getMkts(year,month));
   const afilCurr = sumMkts("afil", cg, getMkts(year,month));
   const encPrev = sumMkts("orders_total", pg, getMkts(prevYear,month));
   const enc1Prev = sumMkts("orders_first", pg, getMkts(prevYear,month));
-  const fat1Prev = sumMkts("orders_first_rev", pg, getMkts(prevYear,month));
   const afilPrev = sumMkts("afil", pg, getMkts(prevYear,month));
   const getMargem = (g,y,m) => { const mkts=getMkts(y,m); const vs=mkts.map(k=>Number(g["margin_pct_"+k])||0).filter(v=>v>0); return vs.length>0?(vs.reduce((s,v)=>s+v,0)/vs.length).toFixed(1):null; };
   const margemCurr = getMargem(cg,year,month);
   const margemPrev = getMargem(pg,prevYear,month);
   const ticketCurr = encCurr>0 ? Math.round(fatCurr/encCurr) : null;
   const ticketPrev = encPrev>0 ? Math.round(fatPrev/encPrev) : null;
+  // 1ªs compras from daily entries (like Dashboard)
+  const newStructCurr = isNewStructure(year,month);
+  const newStructPrev = isNewStructure(prevYear,month);
+  const dailyFirstCurr = buildDailyFirstRev(ce, totalDaysCurr, newStructCurr);
+  const dailyFirstPrev = buildDailyFirstRev(pe, totalDaysPrev, newStructPrev);
+  const fat1Curr = dailyFirstCurr.length>0 ? dailyFirstCurr[totalDaysCurr-1]?.cumul||0 : 0;
+  const fat1Prev = dailyFirstPrev.length>0 ? dailyFirstPrev[totalDaysPrev-1]?.cumul||0 : 0;
+  const ticket1Curr = enc1Curr>0 ? Math.round(fat1Curr/enc1Curr) : null;
+  const ticket1Prev = enc1Prev>0 ? Math.round(fat1Prev/enc1Prev) : null;
+  const revendaAfilCurr = (fatCurr||0)+(afilCurr||0);
+  const revendaAfilPrev = (fatPrev||0)+(afilPrev||0);
   const pctVar = (c,p) => p>0 ? ((c-p)/p*100).toFixed(1) : null;
   const varEl = (c,p) => {
     if (c==null||p==null||p===0) return <span style={{color:C.muted,fontSize:12}}>—</span>;
@@ -1718,13 +1727,15 @@ function ResultadosTab({ year, month }) {
           </tr></thead>
           <tbody>
             <Row label="Faturação total" c={fatCurr||null} p={fatPrev||null} />
-            <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
+            <Row label="Margem" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
             <Row label="Nº encomendas" c={encCurr||null} p={encPrev||null} f={fmt} />
-            <Row label="1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
             <Row label="Ticket médio" c={ticketCurr} p={ticketPrev} />
+            <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
+            <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
+            <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
             <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
             <Row label="Afiliação" c={afilCurr||null} p={afilPrev||null} />
-            <Row label="Margem média" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
+            <Row label="Revenda + Afiliação" c={revendaAfilCurr||null} p={revendaAfilPrev||null} />
           </tbody>
         </table>
       </div>
