@@ -1031,6 +1031,45 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               ))}
             </div>
           </div>
+
+          {/* Novos Parceiros histórico */}
+          <div style={T.card}>
+            <p style={T.sectionTitle}>Novos Parceiros — dados históricos</p>
+            <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Preenche para meses anteriores a 2026 (comparação YoY no separador Resultados).</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12, marginBottom:16 }}>
+              <div>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total novos parceiros</p>
+                <input type="number" value={goals["hist_partners_total"]??""} placeholder="0"
+                  onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,hist_partners_total:e.target.value}}))}
+                  onBlur={saveAll}
+                  style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+              </div>
+            </div>
+            <p style={{ fontSize:12, color:C.muted, margin:"0 0 10px" }}>Por mercado:</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12, marginBottom:16 }}>
+              {mktList.map(mkt => (
+                <div key={mkt.key}>
+                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{mkt.label}</p>
+                  <input type="number" value={goals[`hist_partners_mkt_${mkt.key}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`hist_partners_mkt_${mkt.key}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize:12, color:C.muted, margin:"0 0 10px" }}>Por programa:</p>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
+              {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog => (
+                <div key={prog}>
+                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{prog}</p>
+                  <input type="number" value={goals[`hist_partners_prog_${prog.replace(/ /g,"_").toLowerCase()}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`hist_partners_prog_${prog.replace(/ /g,"_").toLowerCase()}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              ))}
+            </div>
+          </div>
         );
       })()}
 
@@ -1689,7 +1728,19 @@ function ResultadosTab({ year, month }) {
   const byMkt={}, byProg={};
   partnersCurr.forEach(p=>{ byMkt[p.mercado]=(byMkt[p.mercado]||0)+1; byProg[p.programa]=(byProg[p.programa]||0)+1; });
   const totalPC = partnersCurr.length;
-  const totalPP = partnersPrev.length;
+  // Use historical data from billing_months if no partner_followup data for prevYear
+  const histTotal = Number(pg["hist_partners_total"])||0;
+  const totalPP = partnersPrev.length > 0 ? partnersPrev.length : histTotal;
+
+  // Historical breakdown by market and programme
+  const byMktPrev = {};
+  const byProgPrev = {};
+  if (partnersPrev.length > 0) {
+    partnersPrev.forEach(p=>{ byMktPrev[p.mercado]=(byMktPrev[p.mercado]||0)+1; byProgPrev[p.programme]=(byProgPrev[p.programme]||0)+1; });
+  } else {
+    ["FR","CH","BNL","DEAT"].forEach(k=>{ const v=Number(pg[`hist_partners_mkt_${k}`])||0; if(v>0) byMktPrev[k]=v; });
+    ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].forEach(p=>{ const v=Number(pg[`hist_partners_prog_${p.replace(/ /g,"_").toLowerCase()}`])||0; if(v>0) byProgPrev[p]=v; });
+  }
   const getFatProg = g => PROGS_RES.reduce((s,p)=>s+(Number(g["fat_prog_"+p.replace(/ /g,"_").toLowerCase()])||0),0);
   const totalFatProg = getFatProg(cg);
   const nextMonth = month===11?0:month+1;
