@@ -1016,6 +1016,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         const LD_MKTS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
         const mktList = newStruct ? LD_MKTS_NEW : LD_MKTS_OLD;
         return (
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={T.card}>
             <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
             <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Os novos parceiros são registados automaticamente no separador Parceiros.</p>
@@ -1069,6 +1070,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                 </div>
               ))}
             </div>
+          </div>
           </div>
         );
       })()}
