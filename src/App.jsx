@@ -1625,6 +1625,181 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
   );
 }
 
+
+// ── ResultadosTab ──────────────────────────────────────────────────────────────
+const PROGS_RES = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
+const MKT_RES_LIST = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
+
+function ResultadosTab({ year, month }) {
+  const [curr, setCurr] = useState(null);
+  const [prev, setPrev] = useState(null);
+  const [partnersCurr, setPartnersCurr] = useState([]);
+  const [partnersPrev, setPartnersPrev] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const prevYear = year-1;
+
+  useEffect(()=>{
+    setLoading(true);
+    Promise.all([
+      loadMonthData(year, month),
+      loadMonthData(prevYear, month),
+      supabase.from("partner_followup").select("mercado,programa,original_created_at").gte("original_created_at", new Date(year,month,1).toISOString()).lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString()).neq("status","deleted"),
+      supabase.from("partner_followup").select("mercado,programa,original_created_at").gte("original_created_at", new Date(prevYear,month,1).toISOString()).lte("original_created_at", new Date(prevYear,month+1,0,23,59,59).toISOString()).neq("status","deleted"),
+    ]).then(([c,p,pc,pp])=>{
+      setCurr(c); setPrev(p);
+      setPartnersCurr(pc.data||[]);
+      setPartnersPrev(pp.data||[]);
+      setLoading(false);
+    });
+  },[year,month]);
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
+
+  const cg = curr?.team_goals||{};
+  const pg = prev?.team_goals||{};
+  const ce = curr?.entries||{};
+  const pe = prev?.entries||{};
+  const totalDaysCurr = daysInMonth(year,month);
+  const totalDaysPrev = daysInMonth(prevYear,month);
+  const dailyCurr = buildDaily(ce, totalDaysCurr, year, month);
+  const dailyPrev = buildDaily(pe, totalDaysPrev, prevYear, month);
+  const fatCurr = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
+  const fatPrev = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
+
+  const sumMkts = (prefix, g, mkts) => mkts.reduce((s,mk)=>s+(Number(g[prefix+"_"+mk])||0),0);
+  const getMkts = (y,m) => isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
+  const encCurr = sumMkts("orders_total", cg, getMkts(year,month));
+  const enc1Curr = sumMkts("orders_first", cg, getMkts(year,month));
+  const fat1Curr = sumMkts("orders_first_rev", cg, getMkts(year,month));
+  const afilCurr = sumMkts("afil", cg, getMkts(year,month));
+  const encPrev = sumMkts("orders_total", pg, getMkts(prevYear,month));
+  const enc1Prev = sumMkts("orders_first", pg, getMkts(prevYear,month));
+  const fat1Prev = sumMkts("orders_first_rev", pg, getMkts(prevYear,month));
+  const afilPrev = sumMkts("afil", pg, getMkts(prevYear,month));
+  const getMargem = (g,y,m) => { const mkts=getMkts(y,m); const vs=mkts.map(k=>Number(g["margin_pct_"+k])||0).filter(v=>v>0); return vs.length>0?(vs.reduce((s,v)=>s+v,0)/vs.length).toFixed(1):null; };
+  const margemCurr = getMargem(cg,year,month);
+  const margemPrev = getMargem(pg,prevYear,month);
+  const ticketCurr = encCurr>0 ? Math.round(fatCurr/encCurr) : null;
+  const ticketPrev = encPrev>0 ? Math.round(fatPrev/encPrev) : null;
+  const pctVar = (c,p) => p>0 ? ((c-p)/p*100).toFixed(1) : null;
+  const varEl = (c,p) => {
+    if (c==null||p==null||p===0) return <span style={{color:C.muted,fontSize:12}}>—</span>;
+    const up=c>=p;
+    return <span style={{fontSize:12,fontWeight:500,color:up?C.green:C.red}}>{up?"↑":"↓"} {Math.abs(pctVar(c,p))}%</span>;
+  };
+  const byMkt={}, byProg={};
+  partnersCurr.forEach(p=>{ byMkt[p.mercado]=(byMkt[p.mercado]||0)+1; byProg[p.programa]=(byProg[p.programa]||0)+1; });
+  const totalPC = partnersCurr.length;
+  const totalPP = partnersPrev.length;
+  const getFatProg = g => PROGS_RES.reduce((s,p)=>s+(Number(g["fat_prog_"+p.replace(/ /g,"_").toLowerCase()])||0),0);
+  const totalFatProg = getFatProg(cg);
+  const nextMonth = month===11?0:month+1;
+  const nextYear2 = month===11?year+1:year;
+  const dowAvg={}, dowCnt={};
+  dailyCurr.filter(d=>!d.supersales&&d.dayValue>0).forEach(d=>{ if(d.dow==null)return; dowAvg[d.dow]=(dowAvg[d.dow]||0)+d.dayValue; dowCnt[d.dow]=(dowCnt[d.dow]||0)+1; });
+  const tdNext = daysInMonth(nextYear2,nextMonth);
+  let suggestDow = 0;
+  for(let d=1;d<=tdNext;d++){ const dow=new Date(nextYear2,nextMonth,d).getDay(); suggestDow+=(dowAvg[dow]&&dowCnt[dow]?Math.round(dowAvg[dow]/dowCnt[dow]):0); }
+  const growthYoY = fatPrev>0?(fatCurr-fatPrev)/fatPrev:0;
+  const suggestYoY = fatPrev>0 ? Math.round(fatPrev*(1+growthYoY)) : null;
+  const suggestLinear = fatCurr>0 ? Math.round(fatCurr*(1+growthYoY*0.5)) : null;
+
+  const Row = ({label,c,p,f=fmtEur,suf=""}) => (
+    <tr style={{borderBottom:"0.5px solid "+C.border}}>
+      <td style={{padding:"10px 12px",fontSize:13,color:C.text}}>{label}</td>
+      <td style={{padding:"10px 12px",fontSize:13,fontWeight:500,color:C.text,textAlign:"right"}}>{c!=null?f(c)+suf:"—"}</td>
+      <td style={{padding:"10px 12px",fontSize:13,color:C.muted,textAlign:"right"}}>{p!=null?f(p)+suf:"—"}</td>
+      <td style={{padding:"10px 12px",textAlign:"right"}}>{varEl(c,p)}</td>
+    </tr>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Resultados — {MONTH_NAMES[month]} {year} vs. {MONTH_NAMES[month]} {prevYear}</p>
+      </div>
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:12}}>Scorecard</p>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{borderBottom:"0.5px solid "+C.border}}>
+            {["Métrica",MONTH_NAMES[month]+" "+year,MONTH_NAMES[month]+" "+prevYear,"Var. YoY"].map((h,i)=>(
+              <th key={i} style={{padding:"8px 12px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            <Row label="Faturação total" c={fatCurr||null} p={fatPrev||null} />
+            <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
+            <Row label="Nº encomendas" c={encCurr||null} p={encPrev||null} f={fmt} />
+            <Row label="1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
+            <Row label="Ticket médio" c={ticketCurr} p={ticketPrev} />
+            <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
+            <Row label="Afiliação" c={afilCurr||null} p={afilPrev||null} />
+            <Row label="Margem média" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
+          </tbody>
+        </table>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
+          {MKT_RES_LIST.map(({key,label})=>{
+            const n=byMkt[key]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
+            return <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
+            </div>;
+          })}
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+            <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
+            <span style={{fontSize:13,fontWeight:500,color:C.text}}>{totalPC}</span>
+          </div>
+        </div>
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
+          {PROGS_RES.map(prog=>{
+            const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
+            return <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
+            </div>;
+          })}
+        </div>
+      </div>
+      {totalFatProg>0&&<div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por programa</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:4}}>
+          {PROGS_RES.map(prog=>{
+            const v=Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0;
+            const p=totalFatProg>0?(v/totalFatProg*100).toFixed(1):0;
+            return v>0?<div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
+            </div>:null;
+          })}
+        </div>
+      </div>}
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:12}}>Sugestão objetivo — {MONTH_NAMES[nextMonth]} {nextYear2}</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+          {[
+            {label:"Tendência linear",value:suggestLinear,sub:"Crescimento YoY de "+(growthYoY*100).toFixed(1)+"%"},
+            {label:"Base YoY",value:suggestYoY,sub:MONTH_NAMES[month]+" "+prevYear+" × variação atual"},
+            {label:"Média dia da semana",value:suggestDow>0?suggestDow:null,sub:tdNext+" dias em "+MONTH_NAMES[nextMonth]},
+          ].map((s,i)=>(
+            <div key={i} style={{...T.card,background:C.bg}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
+              <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"0 0 4px"}}>{s.value?fmtEur(s.value):"—"}</p>
+              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(e) { return { error: e }; }
@@ -1674,7 +1849,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:true}]
             .filter(t=>!t.adminOnly||isAdmin)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -1690,7 +1865,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
           </div>
         )}
       </div>
