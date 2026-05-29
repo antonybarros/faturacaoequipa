@@ -1674,8 +1674,8 @@ function ResultadosTab({ year, month }) {
     Promise.all([
       loadMonthData(year, month),
       loadMonthData(prevYear, month),
-      supabase.from("partner_followup").select("mercado,programa,original_created_at").gte("original_created_at", new Date(year,month,1).toISOString()).lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString()).neq("status","deleted"),
-      supabase.from("partner_followup").select("mercado,programa,original_created_at").gte("original_created_at", new Date(prevYear,month,1).toISOString()).lte("original_created_at", new Date(prevYear,month+1,0,23,59,59).toISOString()).neq("status","deleted"),
+      supabase.from("partner_followup").select("mercado,programme,original_created_at").gte("original_created_at", new Date(year,month,1).toISOString().slice(0,7)+"-01T00:00:00.000Z").lte("original_created_at", new Date(year,month+1,0).toISOString().slice(0,10)+"T23:59:59.999Z").neq("status","deleted"),
+      supabase.from("partner_followup").select("mercado,programme,original_created_at").gte("original_created_at", new Date(prevYear,month,1).toISOString().slice(0,7)+"-01T00:00:00.000Z").lte("original_created_at", new Date(prevYear,month+1,0).toISOString().slice(0,10)+"T23:59:59.999Z").neq("status","deleted"),
     ]).then(([c,p,pc,pp])=>{
       setCurr(c); setPrev(p);
       setPartnersCurr(pc.data||[]);
