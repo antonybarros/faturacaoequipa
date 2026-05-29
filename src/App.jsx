@@ -1127,9 +1127,9 @@ const MKT_MAP = {
 const PROG_MAP = {
   "ELITE-PARTNER":"Elite","ELITE":"Elite",
   "PROFESSIONALS":"Professionals","PROFESSIONAL":"Professionals",
-  "PRO GYM":"ProGym","PROGYM":"ProGym",
-  "PRO BOX":"ProBox","PROBOX":"ProBox",
-  "PRO TEAMS":"ProTeams","PROTEAMS":"ProTeams",
+  "PRO GYM":"Pro Gym","PROGYM":"Pro Gym",
+  "PRO BOX":"Pro Box","PROBOX":"Pro Box",
+  "PRO TEAMS":"Pro Teams","PROTEAMS":"Pro Teams",
   "PERFORMANCE":"Performance","HORECA":"Horeca","CORPORATE":"Corporate",
 };
 function mapVal(map, val) {
@@ -1162,7 +1162,7 @@ function CopyBtn({ text }) {
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
 function PartnerFollowup({ year, month, gestor: gestorFilter }) {
   const isGestorFiltered = !!gestorFilter;
-  const PROGS = ["Professionals","Elite","ProGym","ProBox","ProTeams","Performance","Horeca","Corporate"];
+  const PROGS = ["Professionals","Elite","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
   const MKT_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
   const isNew = isNewStructure(year, month);
@@ -1532,9 +1532,9 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
           <option value="all">Programa</option>
           <option value="Elite">Elite</option>
           <option value="Professionals">Professionals</option>
-          <option value="ProGym">Pro Gym</option>
-          <option value="ProBox">Pro Box</option>
-          <option value="ProTeams">Pro Teams</option>
+          <option value="Pro Gym">Pro Gym</option>
+          <option value="Pro Box">Pro Box</option>
+          <option value="Pro Teams">Pro Teams</option>
           <option value="Performance">Performance</option>
           <option value="Horeca">Horeca</option>
           <option value="Corporate">Corporate</option>
