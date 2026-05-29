@@ -1801,6 +1801,131 @@ function ResultadosTab({ year, month }) {
   );
 }
 
+// ── TestesTab ─────────────────────────────────────────────────────────────────
+function TestesTab({ year, month }) {
+  const [periodo, setPeriodo] = useState("mes");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    setLoading(true);
+    let start, end;
+    if (periodo==="mes") {
+      start = new Date(year,month,1).toISOString();
+      end = new Date(year,month+1,0,23,59,59).toISOString();
+    } else {
+      // last 3 months
+      const s = new Date(year,month-2,1);
+      start = s.toISOString();
+      end = new Date(year,month+1,0,23,59,59).toISOString();
+    }
+    supabase.from("partner_followup")
+      .select("gestor,programa,status,original_created_at")
+      .gte("original_created_at", start)
+      .lte("original_created_at", end)
+      .neq("status","deleted")
+      .then(({data:rows})=>{
+        setData(rows||[]);
+        setLoading(false);
+      });
+  },[year,month,periodo]);
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
+
+  const gestors = ["Antony","Fabien","Mónica"];
+  const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
+
+  // By gestor - all
+  const byGestor = {};
+  gestors.forEach(g=>{ byGestor[g]={total:0,bought:0,progs:{}}; });
+  data.forEach(r=>{
+    const g = r.gestor||"—";
+    if (!byGestor[g]) byGestor[g]={total:0,bought:0,progs:{}};
+    byGestor[g].total++;
+    if (r.status==="bought") byGestor[g].bought++;
+    const p = r.programa||"—";
+    byGestor[g].progs[p]=(byGestor[g].progs[p]||0)+1;
+  });
+
+  const totalAll = data.length;
+  const totalBought = data.filter(r=>r.status==="bought").length;
+
+  const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+      {/* Header + toggle */}
+      <div style={{...T.card,display:"flex",alignItems:"center",gap:12}}>
+        <p style={{...T.sectionTitle,margin:0,flex:1}}>Testes — {periodoLabel}</p>
+        <div style={{display:"flex",gap:8}}>
+          {[{id:"mes",l:"Mês atual"},{id:"3meses",l:"Últimos 3 meses"}].map(p=>(
+            <button key={p.id} onClick={()=>setPeriodo(p.id)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:periodo===p.id?C.green:"transparent",color:periodo===p.id?"#fff":C.muted}}>
+              {p.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Resumo geral */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+        <div style={T.card}>
+          <p style={T.label}>Total novos parceiros</p>
+          <p style={{fontSize:24,fontWeight:500,color:C.text,margin:"4px 0"}}>{totalAll}</p>
+        </div>
+        <div style={T.card}>
+          <p style={T.label}>Com 1ª compra</p>
+          <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{totalBought}</p>
+          <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(totalBought/totalAll*100).toFixed(1):0}% de conversão</p>
+        </div>
+        <div style={T.card}>
+          <p style={T.label}>Sem 1ª compra</p>
+          <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{totalAll-totalBought}</p>
+          <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?((totalAll-totalBought)/totalAll*100).toFixed(1):0}% ainda pendentes</p>
+        </div>
+      </div>
+
+      {/* Por gestor */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+        {gestors.map(g=>{
+          const gd = byGestor[g]||{total:0,bought:0,progs:{}};
+          const convPct = gd.total>0?(gd.bought/gd.total*100).toFixed(1):0;
+          return (
+            <div key={g} style={T.card}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
+                <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
+              </div>
+              {/* 1ªs compras */}
+              <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`0.5px solid ${C.border}`,marginBottom:8}}>
+                <span style={{fontSize:12,color:C.muted}}>Com 1ª compra</span>
+                <span style={{fontSize:12,fontWeight:500,color:C.green}}>{gd.bought} <span style={{color:C.muted,fontWeight:400}}>({convPct}%)</span></span>
+              </div>
+              {/* Por programa */}
+              {progs.map(p=>{
+                const n = gd.progs[p]||0;
+                if (n===0) return null;
+                const pct = gd.total>0?(n/gd.total*100).toFixed(0):0;
+                return (
+                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                    <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
+                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{pct}%</span>
+                  </div>
+                );
+              })}
+              {gd.total===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+            </div>
+          );
+        })}
+      </div>
+
+    </div>
+  );
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(e) { return { error: e }; }
@@ -1851,7 +1976,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:true}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:true},{id:"testes",l:"Testes",adminOnly:true}]
             .filter(t=>!t.adminOnly||isAdmin)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -1867,7 +1992,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
           </div>
         )}
       </div>
