@@ -396,14 +396,23 @@ async function loadPartnersByMktProg(year, month) {
 }
 
 function buildDaily(entries, totalDays, year, month) {
-  const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
+  const daily = []; let prevCumul=0;
+  const newStruct = (year!=null&&month!=null) ? isNewStructure(year,month) : false;
+  let lastFR=0, lastCH=0, lastBNL=0, lastDEAT=0;
   for (let d=1; d<=totalDays; d++) {
     const e = entries[d] || {};
-    if (e.FR !== undefined) lastFR = Number(e.FR)||0;
-    if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
-    const cumul = lastFR + lastCH;
+    if (newStruct) {
+      if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+      if (e.CH !== undefined) lastCH = Number(e.CH)||0;
+      if (e.BNL !== undefined) lastBNL = Number(e.BNL)||0;
+      if (e.DEAT !== undefined) lastDEAT = Number(e.DEAT)||0;
+    } else {
+      if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+      if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
+    }
+    const cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
     const dow = (year!=null&&month!=null) ? new Date(year, month, d).getDay() : null;
-    daily.push({ day:d, FR:lastFR, CH:lastCH, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, dow });
+    daily.push({ day:d, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, dow });
     prevCumul = cumul;
   }
   return daily;
@@ -788,8 +797,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
               subColor={pctPartners!=null&&Number(pctPartners)<Number(pctMonth)?C.red:C.green} />
             <StatCard label="Faturação 1ªs compras"
               value={firstRevActual>0?fmtEur(firstRevActual):"—"}
-              sub={firstRevGoal>0?`faltam ${fmtEur(Math.max(0,firstRevGoal-firstRevActual))} para o objetivo`:undefined}
-              subColor={C.muted}
+              sub={firstRevGoal>0?(firstRevActual>=firstRevGoal?"objetivo atingido!":`faltam ${fmtEur(Math.max(0,firstRevGoal-firstRevActual))} para o objetivo`):undefined}
+              subColor={firstRevGoal>0&&firstRevActual>=firstRevGoal?C.green:C.muted}
               onClick={firstRevActual>0?()=>setModal("firstrev_faturado"):undefined}
               highlight />
             <StatCard label="Objetivo faturação primeiras compras"
