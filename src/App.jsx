@@ -382,16 +382,6 @@ async function loadPartnersCount(year, month) {
   return count || 0;
 }
 
-async function loadPartnersCountPrev(year, month) {
-  const start = new Date(year - 1, month, 1).toISOString();
-  const end = new Date(year - 1, month + 1, 0, 23, 59, 59).toISOString();
-  const { count } = await supabase.from("partner_followup")
-    .select("*", { count:"exact", head:true })
-    .gte("original_created_at", start)
-    .lte("original_created_at", end);
-  return count || 0;
-}
-
 async function loadPartnersByMktProg(year, month) {
   const pad = n => String(n).padStart(2,"0");
   const lastDay = new Date(year,month+1,0).getDate();
@@ -2037,7 +2027,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:true},{id:"testes",l:"Testes",adminOnly:true}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true}]
             .filter(t=>!t.adminOnly||isAdmin)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
