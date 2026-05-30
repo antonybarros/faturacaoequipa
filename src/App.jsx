@@ -392,6 +392,19 @@ async function loadPartnersCountPrev(year, month) {
   return count || 0;
 }
 
+async function loadPartnersByMktProg(year, month) {
+  const pad = n => String(n).padStart(2,"0");
+  const lastDay = new Date(year,month+1,0).getDate();
+  const start = `${year}-${pad(month+1)}-01T00:00:00.000Z`;
+  const end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
+  const { data } = await supabase.from("partner_followup")
+    .select("mercado,programme")
+    .gte("original_created_at", start)
+    .lte("original_created_at", end)
+    .neq("status", "deleted");
+  return data || [];
+}
+
 function buildDaily(entries, totalDays, year, month) {
   const daily = []; let lastFR=0, lastCH=0, prevCumul=0;
   for (let d=1; d<=totalDays; d++) {
@@ -1660,7 +1673,8 @@ const MKT_RES_LIST = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key
 function ResultadosTab({ year, month, partnersCount }) {
   const [curr, setCurr] = useState(null);
   const [prev, setPrev] = useState(null);
-  const [partnersPrev, setPartnersPrev] = useState([]);
+  const [partnersPrev, setPartnersPrev] = useState(0);
+  const [partnersCurrData, setPartnersCurrData] = useState([]);
   const [loading, setLoading] = useState(true);
   const prevYear = year-1;
 
@@ -1670,9 +1684,11 @@ function ResultadosTab({ year, month, partnersCount }) {
       loadMonthData(year, month),
       loadMonthData(prevYear, month),
       loadPartnersCount(prevYear, month),
-    ]).then(([c,p,pp])=>{
+      loadPartnersByMktProg(year, month),
+    ]).then(([c,p,pp,pc])=>{
       setCurr(c); setPrev(p);
       setPartnersPrev(pp||0);
+      setPartnersCurrData(pc||[]);
       setLoading(false);
     });
   },[year,month]);
@@ -1724,8 +1740,9 @@ function ResultadosTab({ year, month, partnersCount }) {
   const histTotal = Number(pg["hist_partners_total"])||0;
   const totalPP = partnersPrev > 0 ? partnersPrev : histTotal;
 
-  // Breakdown by market and programme from historical data
+  // Breakdown by market and programme
   const byMkt={}, byProg={};
+  partnersCurrData.forEach(p=>{ byMkt[p.mercado]=(byMkt[p.mercado]||0)+1; byProg[p.programme]=(byProg[p.programme]||0)+1; });
   const byMktPrev = {};
   const byProgPrev = {};
   ["FR","CH","BNL","DEAT"].forEach(k=>{ const v=Number(pg[`hist_partners_mkt_${k}`])||0; if(v>0) byMktPrev[k]=v; });
