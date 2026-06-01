@@ -1693,6 +1693,7 @@ function ResultadosTab({ year, month, partnersCount }) {
   const [loading, setLoading] = useState(true);
   const [prevNextData, setPrevNextData] = useState(null);
   const [explModal, setExplModal] = useState(null);
+  const [mktTab, setMktTab] = useState("global");
   const prevYear = year-1;
   const nextMonth = month===11?0:month+1;
   const nextYear2 = month===11?year+1:year;
@@ -1788,6 +1789,55 @@ function ResultadosTab({ year, month, partnersCount }) {
   const suggestSeason = seasonRatio!=null&&fatCurr>0 ? Math.round(fatCurr*seasonRatio) : null;
   const seasonPct = seasonRatio!=null ? ((seasonRatio-1)*100).toFixed(1) : null;
 
+  // Market-specific data
+  const newStruct = isNewStructure(year,month);
+  const mktList = newStruct
+    ? [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}]
+    : [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+  const getMktData = (mkt) => {
+    if (mkt==="global") return {fatC:fatCurr,fatP:fatPrev,encC:encCurr,encP:encPrev,afilC:afilCurr,afilP:afilPrev,margemC:margemCurr,margemP:margemPrev,ticketC:ticketCurr,ticketP:ticketPrev};
+    const fatC = (() => {
+      let last=0;
+      for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[mkt]!==undefined){ last=Number(e[mkt])||0; break; } }
+      return last;
+    })();
+    const fatP = (() => {
+      let last=0;
+      for(let d=totalDaysPrev;d>=1;d--){ const e=pe[d]||{}; if(e[mkt]!==undefined){ last=Number(e[mkt])||0; break; } }
+      return last;
+    })();
+    const encC = Number(cg["orders_total_"+mkt])||0;
+    const encP = Number(pg["orders_total_"+mkt])||0;
+    const afilC = Number(cg["afil_"+mkt])||0;
+    const afilP = Number(pg["afil_"+mkt])||0;
+    const margemC = cg["margin_pct_"+mkt]?Number(cg["margin_pct_"+mkt]).toFixed(1):null;
+    const margemP = pg["margin_pct_"+mkt]?Number(pg["margin_pct_"+mkt]).toFixed(1):null;
+    const ticketC = encC>0?Math.round(fatC/encC):null;
+    const ticketP = encP>0?Math.round(fatP/encP):null;
+    // 1ªs compras by market
+    const fat1C = (() => {
+      const fkey = newStructCurr ? "first_rev_"+mkt : (mkt==="FR"?"first_rev_FR":"first_rev_CH-BNL-DEAT");
+      let last=0;
+      for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[fkey]!==undefined){ last=Number(e[fkey])||0; break; } }
+      return last;
+    })();
+    const fat1P = (() => {
+      const fkey = newStructPrev ? "first_rev_"+mkt : (mkt==="FR"?"first_rev_FR":"first_rev_CH-BNL-DEAT");
+      let last=0;
+      for(let d=totalDaysPrev;d>=1;d--){ const e=pe[d]||{}; if(e[fkey]!==undefined){ last=Number(e[fkey])||0; break; } }
+      return last;
+    })();
+    const revendaAfilC = (fatC||0)+(afilC||0);
+    const revendaAfilP = (fatP||0)+(afilP||0);
+    // Partners by market
+    const partnersMktC = partnersCurrData.filter(p=>p.market===mkt).length;
+    const partnersMktPByProg = {};
+    partnersCurrData.filter(p=>p.market===mkt).forEach(p=>{ partnersMktPByProg[p.programme]=(partnersMktPByProg[p.programme]||0)+1; });
+    const histMktP = Number(pg["hist_partners_mkt_"+mkt])||0;
+    return {fatC,fatP,encC,encP,afilC,afilP,margemC,margemP,ticketC,ticketP,fat1C,fat1P,revendaAfilC,revendaAfilP,partnersMktC,partnersMktPByProg,histMktP};
+  };
+  const md = getMktData(mktTab);
+
   const Row = ({label,c,p,f=fmtEur,suf=""}) => (
     <tr style={{borderBottom:"0.5px solid "+C.border}}>
       <td style={{padding:"10px 12px",fontSize:13,color:C.text}}>{label}</td>
@@ -1803,7 +1853,15 @@ function ResultadosTab({ year, month, partnersCount }) {
         <p style={T.sectionTitle}>Resultados — {MONTH_NAMES[month]} {year} vs. {MONTH_NAMES[month]} {prevYear}</p>
       </div>
       <div style={T.card}>
-        <p style={{...T.sectionTitle,marginBottom:12}}>Scorecard</p>
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+          {[{key:"global",label:"Global"},...mktList].map(m=>(
+            <button key={m.key} onClick={()=>setMktTab(m.key)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:"0.5px solid "+C.border,cursor:"pointer",
+                background:mktTab===m.key?C.green:"transparent",color:mktTab===m.key?"#fff":C.muted}}>
+              {m.label}
+            </button>
+          ))}
+        </div>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead><tr style={{borderBottom:"0.5px solid "+C.border}}>
             {["Métrica",MONTH_NAMES[month]+" "+year,MONTH_NAMES[month]+" "+prevYear,"Var. YoY"].map((h,i)=>(
@@ -1811,19 +1869,38 @@ function ResultadosTab({ year, month, partnersCount }) {
             ))}
           </tr></thead>
           <tbody>
-            <Row label="Faturação total" c={fatCurr||null} p={fatPrev||null} />
-            <Row label="Margem" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
-            <Row label="Nº encomendas" c={encCurr||null} p={encPrev||null} f={fmt} />
-            <Row label="Ticket médio" c={ticketCurr} p={ticketPrev} />
-            <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
-            <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
-            <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
-            <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
-            <Row label="Afiliação" c={afilCurr||null} p={afilPrev||null} />
-            <Row label="Revenda + Afiliação" c={revendaAfilCurr||null} p={revendaAfilPrev||null} />
+            <Row label="Faturação total" c={md.fatC||null} p={md.fatP||null} />
+            <Row label="Margem" c={md.margemC?Number(md.margemC):null} p={md.margemP?Number(md.margemP):null} f={v=>v.toFixed(1)} suf="%" />
+            <Row label="Nº encomendas" c={md.encC||null} p={md.encP||null} f={fmt} />
+            <Row label="Ticket médio" c={md.ticketC} p={md.ticketP} />
+            {mktTab==="global"?<>
+              <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
+              <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
+              <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
+              <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
+            </>:<>
+              <Row label="Faturação 1ªs compras" c={md.fat1C||null} p={md.fat1P||null} />
+              <Row label="Novos parceiros" c={md.partnersMktC||null} p={md.histMktP||null} f={fmt} />
+            </>}
+            <Row label="Afiliação" c={md.afilC||null} p={md.afilP||null} />
+            <Row label="Revenda + Afiliação" c={md.revendaAfilC||null} p={md.revendaAfilP||null} />
           </tbody>
         </table>
       </div>
+      {mktTab!=="global"&&md.partnersMktC>0&&(
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa — {mktList.find(m=>m.key===mktTab)?.label}</p>
+          {PROGS_RES.map(prog=>{
+            const n=md.partnersMktPByProg[prog]||0;
+            const pct=md.partnersMktC>0?(n/md.partnersMktC*100).toFixed(1):0;
+            return n>0?<div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{pct}%</span>
+            </div>:null;
+          })}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
@@ -2091,7 +2168,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true,hidden:true}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
