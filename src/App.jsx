@@ -1691,6 +1691,8 @@ function ResultadosTab({ year, month, partnersCount }) {
   const [partnersPrev, setPartnersPrev] = useState(0);
   const [partnersCurrData, setPartnersCurrData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [prevNextData, setPrevNextData] = useState(null);
+  const [explModal, setExplModal] = useState(null);
   const prevYear = year-1;
 
   useEffect(()=>{
@@ -1774,7 +1776,7 @@ function ResultadosTab({ year, month, partnersCount }) {
   const growthYoY = fatPrev>0?(fatCurr-fatPrev)/fatPrev:0;
   const suggestYoY = fatPrev>0 ? Math.round(fatPrev*(1+growthYoY)) : null;
   // Seasonality: use ratio of nextMonth/currentMonth from previous year
-  const [prevNextData, setPrevNextData] = useState(null);
+  // hooks moved to top level - see above
   useEffect(()=>{ loadMonthData(prevYear, nextMonth).then(setPrevNextData); },[prevYear, nextMonth]);
   const fatPrevNext = (() => {
     if (!prevNextData) return 0;
@@ -1866,7 +1868,6 @@ function ResultadosTab({ year, month, partnersCount }) {
         </div>
       </div>}
       {(()=>{
-        const [explModal, setExplModal] = useState(null);
         const explanations = {
           season: {
             title:"Sazonalidade",
