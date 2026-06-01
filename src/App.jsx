@@ -412,7 +412,7 @@ function buildDaily(entries, totalDays, year, month) {
     }
     const cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
     const dow = (year!=null&&month!=null) ? new Date(year, month, d).getDay() : null;
-    daily.push({ day:d, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, dow });
+    daily.push({ day:d, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, campanha:e.campanha===true, dow });
     prevCumul = cumul;
   }
   return daily;
@@ -440,7 +440,7 @@ function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0)
   const expected = goal>0&&closedDay>0 ? Math.round(goal/totalDays*closedDay) : null;
   const vsExpected = expected!=null ? actual-expected : null;
   const vsExpPct = expected>0 ? (actual/expected*100) : null;
-  const normal = closed.filter(d=>!d.supersales&&d.dayValue>0);
+  const normal = closed.filter(d=>!d.supersales&&!d.campanha&&d.dayValue>0);
   const ss = closed.filter(d=>d.supersales&&d.dayValue>0);
   const avgNormal = normal.length>0 ? Math.round(normal.reduce((s,d)=>s+d.dayValue,0)/normal.length) : 0;
   const avgSS = ss.length>0 ? Math.round(ss.reduce((s,d)=>s+d.dayValue,0)/ss.length) : 0;
@@ -453,7 +453,7 @@ function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0)
   // Instead, compute dow-based avg using closed days
   const dowAvg = {};
   const dowCount = {};
-  closed.filter(d=>!d.supersales&&d.dayValue>0).forEach(d=>{
+  closed.filter(d=>!d.supersales&&!d.campanha&&d.dayValue>0).forEach(d=>{
     // d.dow is set by buildDaily if available, otherwise skip
     if (d.dow==null) return;
     dowAvg[d.dow] = (dowAvg[d.dow]||0) + d.dayValue;
@@ -853,6 +853,14 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     await save({ entries: updated.entries, team_goals: updated.team_goals });
   };
 
+  const toggleCampanha = async (day) => {
+    const entries = { ...(monthData.entries || {}) };
+    entries[day] = { ...(entries[day] || {}), campanha: !entries[day]?.campanha };
+    const updated = { ...monthData, entries };
+    setMonthData(updated);
+    await save({ entries: updated.entries, team_goals: updated.team_goals });
+  };
+
   const saveAll = () => save({ entries: monthData.entries, team_goals: monthData.team_goals });
 
   const entries   = monthData.entries    || {};
@@ -884,7 +892,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
               <thead>
                 <tr style={{ borderBottom:`0.5px solid ${C.border}` }}>
-                  {["Dia", "França", ...(newStruct?["Suíça","Benelux","DE-AT"]:["CH-BNL-DEAT"]), "Supersales"].map((h,i) => (
+                  {["Dia", "França", ...(newStruct?["Suíça","Benelux","DE-AT"]:["CH-BNL-DEAT"]), "Supersales", "Campanha"].map((h,i) => (
                     <th key={h} style={{ padding:"8px 10px", textAlign:i===0?"left":"center", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
                   ))}
                 </tr>
@@ -893,8 +901,9 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                 {Array.from({length:totalDays}, (_,i) => i+1).map(day => {
                   const e = entries[day] || {};
                   const isSS = !!e.supersales;
+                  const isCampanha = !!e.campanha;
                   return (
-                    <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}`, background:isSS?"#FAEEDA":"transparent" }}>
+                    <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}`, background:isSS?"#FAEEDA":isCampanha?"#EFF6FF":"transparent" }}>
                       <td style={{ padding:"6px 10px", fontWeight:500, color:C.text }}>{day}</td>
                       {(newStruct ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"]).map(field => (
                         <td key={field} style={{ padding:"4px 6px", textAlign:"center" }}>
@@ -907,6 +916,12 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                         <button onClick={() => toggleSS(day)}
                           style={{ padding:"4px 10px", border:`0.5px solid ${isSS?"#d97706":C.border}`, borderRadius:6, background:isSS?"#FEF3C7":"transparent", color:isSS?"#92400E":C.muted, fontSize:12, cursor:"pointer" }}>
                           {isSS ? "⚡ SS" : "—"}
+                        </button>
+                      </td>
+                      <td style={{ padding:"4px 6px", textAlign:"center" }}>
+                        <button onClick={() => toggleCampanha(day)}
+                          style={{ padding:"4px 10px", border:`0.5px solid ${isCampanha?"#2563EB":C.border}`, borderRadius:6, background:isCampanha?"#EFF6FF":"transparent", color:isCampanha?"#1D4ED8":C.muted, fontSize:12, cursor:"pointer" }}>
+                          {isCampanha ? "🏷️ Camp." : "—"}
                         </button>
                       </td>
                     </tr>
