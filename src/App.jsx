@@ -682,7 +682,8 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
       {/* Row 1 — faturação */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, minmax(0,1fr))", gap:10 }}>
         <StatCard label="Faturado" value={fmtEur(stats.actual)}
-          sub={stats.remaining!=null?`faltam ${fmtEur(stats.remaining)} para o objetivo`:undefined}
+          sub={stats.remaining!=null?(stats.remaining<=0?"objetivo atingido!":`faltam ${fmtEur(stats.remaining)} para o objetivo`):undefined}
+          subColor={stats.remaining!=null&&stats.remaining<=0?C.green:undefined}
           subColor={C.muted}
           onClick={()=>setModal("faturado")} highlight />
         <StatCard label="Objetivo" value={stats.goal>0?fmtEur(stats.goal):"Sem objetivo"}
