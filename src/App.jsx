@@ -1773,7 +1773,19 @@ function ResultadosTab({ year, month, partnersCount }) {
   for(let d=1;d<=tdNext;d++){ const dow=new Date(nextYear2,nextMonth,d).getDay(); suggestDow+=(dowAvg[dow]&&dowCnt[dow]?Math.round(dowAvg[dow]/dowCnt[dow]):0); }
   const growthYoY = fatPrev>0?(fatCurr-fatPrev)/fatPrev:0;
   const suggestYoY = fatPrev>0 ? Math.round(fatPrev*(1+growthYoY)) : null;
-  const suggestLinear = fatCurr>0 ? Math.round(fatCurr*(1+growthYoY*0.5)) : null;
+  // Seasonality: use ratio of nextMonth/currentMonth from previous year
+  const [prevNextData, setPrevNextData] = useState(null);
+  useEffect(()=>{ loadMonthData(prevYear, nextMonth).then(setPrevNextData); },[prevYear, nextMonth]);
+  const fatPrevNext = (() => {
+    if (!prevNextData) return 0;
+    const e = prevNextData.entries||{};
+    const td = daysInMonth(prevYear, nextMonth);
+    const d = buildDaily(e, td, prevYear, nextMonth);
+    return d.length>0 ? d[td-1]?.cumul||0 : 0;
+  })();
+  const seasonRatio = fatPrev>0&&fatPrevNext>0 ? fatPrevNext/fatPrev : null;
+  const suggestSeason = seasonRatio!=null&&fatCurr>0 ? Math.round(fatCurr*seasonRatio) : null;
+  const seasonPct = seasonRatio!=null ? ((seasonRatio-1)*100).toFixed(1) : null;
 
   const Row = ({label,c,p,f=fmtEur,suf=""}) => (
     <tr style={{borderBottom:"0.5px solid "+C.border}}>
@@ -1853,22 +1865,49 @@ function ResultadosTab({ year, month, partnersCount }) {
           })}
         </div>
       </div>}
-      <div style={T.card}>
-        <p style={{...T.sectionTitle,marginBottom:12}}>Sugestão objetivo — {MONTH_NAMES[nextMonth]} {nextYear2}</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
-          {[
-            {label:"Tendência linear",value:suggestLinear,sub:"Crescimento YoY de "+(growthYoY*100).toFixed(1)+"%"},
-            {label:"Base YoY",value:suggestYoY,sub:MONTH_NAMES[month]+" "+prevYear+" × variação atual"},
-            {label:"Média dia da semana",value:suggestDow>0?suggestDow:null,sub:tdNext+" dias em "+MONTH_NAMES[nextMonth]},
-          ].map((s,i)=>(
-            <div key={i} style={{...T.card,background:C.bg}}>
-              <p style={{fontSize:11,color:C.muted,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
-              <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"0 0 4px"}}>{s.value?fmtEur(s.value):"—"}</p>
-              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
+      {(()=>{
+        const [explModal, setExplModal] = useState(null);
+        const explanations = {
+          season: {
+            title:"Sazonalidade",
+            body:`Compara a relação entre ${MONTH_NAMES[nextMonth]} e ${MONTH_NAMES[month]} do ano anterior.\n\n${MONTH_NAMES[nextMonth]} ${prevYear}: ${fatPrevNext>0?fmtEur(fatPrevNext):"sem dados"} / ${MONTH_NAMES[month]} ${prevYear}: ${fatPrev>0?fmtEur(fatPrev):"sem dados"}${seasonPct!=null?" = "+seasonPct+"% de variação":""}.\n\nAplica essa relação a ${MONTH_NAMES[month]} ${year} (${fmtEur(fatCurr)}).`
+          },
+          yoy: {
+            title:"Base YoY",
+            body:`Calcula o crescimento de ${MONTH_NAMES[month]} ${prevYear} para ${MONTH_NAMES[month]} ${year} (+${(growthYoY*100).toFixed(1)}%) e aplica-o a ${MONTH_NAMES[nextMonth]} ${prevYear} (${fatPrev>0?fmtEur(fatPrev):"sem dados"}).\n\nPresupõe que ${MONTH_NAMES[nextMonth]} vai crescer ao mesmo ritmo que ${MONTH_NAMES[month]}.`
+          },
+          dow: {
+            title:"Média por dia da semana",
+            body:`Para cada um dos ${tdNext} dias de ${MONTH_NAMES[nextMonth]}, usa a média histórica do dia da semana correspondente calculada com os dias de ${MONTH_NAMES[month]} ${year} (excluindo Supersales e Campanhas).\n\nSoma as médias de todos os ${tdNext} dias.`
+          }
+        };
+        return <>
+          {explModal&&<Modal title={explanations[explModal].title} subtitle="" onClose={()=>setExplModal(null)}>
+            <div style={{padding:"0 1.25rem 1.25rem",fontSize:13,color:C.text,lineHeight:1.6,whiteSpace:"pre-line"}}>
+              {explanations[explModal].body}
             </div>
-          ))}
-        </div>
-      </div>
+          </Modal>}
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:12}}>Sugestão objetivo — {MONTH_NAMES[nextMonth]} {nextYear2}</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+              {[
+                {id:"season",label:"Sazonalidade",value:suggestSeason,sub:seasonPct!=null?`${MONTH_NAMES[nextMonth]}/${MONTH_NAMES[month]} ${prevYear}: ${seasonPct}%`:"introduz dados de "+MONTH_NAMES[nextMonth]+" "+prevYear},
+                {id:"yoy",label:"Base YoY",value:suggestYoY,sub:MONTH_NAMES[month]+" "+prevYear+" × variação atual (+"+((growthYoY||0)*100).toFixed(1)+"%)"},
+                {id:"dow",label:"Média dia da semana",value:suggestDow>0?suggestDow:null,sub:tdNext+" dias em "+MONTH_NAMES[nextMonth]},
+              ].map((s,i)=>(
+                <div key={i} onClick={()=>setExplModal(s.id)}
+                  style={{...T.card,background:C.bg,cursor:"pointer",transition:"opacity .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <p style={{fontSize:11,color:C.muted,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
+                  <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"0 0 4px"}}>{s.value?fmtEur(s.value):"—"}</p>
+                  <p style={{fontSize:11,color:C.muted,margin:"0 0 4px"}}>{s.sub}</p>
+                  <p style={{fontSize:10,color:C.green,margin:0}}>ℹ ver explicação</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>;
+      })()}
     </div>
   );
 }
@@ -2052,8 +2091,8 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true}]
-            .filter(t=>!t.adminOnly||isAdmin)
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true,hidden:true}]
+            .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
