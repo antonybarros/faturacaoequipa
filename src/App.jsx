@@ -1694,6 +1694,8 @@ function ResultadosTab({ year, month, partnersCount }) {
   const [prevNextData, setPrevNextData] = useState(null);
   const [explModal, setExplModal] = useState(null);
   const prevYear = year-1;
+  const nextMonth = month===11?0:month+1;
+  const nextYear2 = month===11?year+1:year;
 
   useEffect(()=>{
     setLoading(true);
@@ -1709,6 +1711,7 @@ function ResultadosTab({ year, month, partnersCount }) {
       setLoading(false);
     });
   },[year,month]);
+  useEffect(()=>{ if(prevYear&&nextMonth!=null) loadMonthData(prevYear, nextMonth).then(setPrevNextData); },[prevYear, nextMonth]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
@@ -1766,8 +1769,6 @@ function ResultadosTab({ year, month, partnersCount }) {
   ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].forEach(p=>{ const v=Number(pg[`hist_partners_prog_${p.replace(/ /g,"_").toLowerCase()}`])||0; if(v>0) byProgPrev[p]=v; });
   const getFatProg = g => PROGS_RES.reduce((s,p)=>s+(Number(g["fat_prog_"+p.replace(/ /g,"_").toLowerCase()])||0),0);
   const totalFatProg = getFatProg(cg);
-  const nextMonth = month===11?0:month+1;
-  const nextYear2 = month===11?year+1:year;
   const dowAvg={}, dowCnt={};
   dailyCurr.filter(d=>!d.supersales&&d.dayValue>0).forEach(d=>{ if(d.dow==null)return; dowAvg[d.dow]=(dowAvg[d.dow]||0)+d.dayValue; dowCnt[d.dow]=(dowCnt[d.dow]||0)+1; });
   const tdNext = daysInMonth(nextYear2,nextMonth);
@@ -1776,8 +1777,6 @@ function ResultadosTab({ year, month, partnersCount }) {
   const growthYoY = fatPrev>0?(fatCurr-fatPrev)/fatPrev:0;
   const suggestYoY = fatPrev>0 ? Math.round(fatPrev*(1+growthYoY)) : null;
   // Seasonality: use ratio of nextMonth/currentMonth from previous year
-  // hooks moved to top level - see above
-  useEffect(()=>{ loadMonthData(prevYear, nextMonth).then(setPrevNextData); },[prevYear, nextMonth]);
   const fatPrevNext = (() => {
     if (!prevNextData) return 0;
     const e = prevNextData.entries||{};
