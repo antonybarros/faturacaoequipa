@@ -1879,10 +1879,13 @@ function ResultadosTab({ year, month, partnersCount }) {
     })();
     const revendaAfilC = (fatC||0)+(afilC||0);
     const revendaAfilP = (fatP||0)+(afilP||0);
-    // Partners by market
-    const partnersMktC = partnersCurrData.filter(p=>p.market===mkt).length;
+    // Partners by market — for CH-BNL-DEAT include all sub-markets
+    const mktFilter = mkt==="CH-BNL-DEAT"
+      ? (p) => ["CH-BNL-DEAT","CH","BNL","DEAT"].includes(p.market)
+      : (p) => p.market===mkt;
+    const partnersMktC = partnersCurrData.filter(mktFilter).length;
     const partnersMktPByProg = {};
-    partnersCurrData.filter(p=>p.market===mkt).forEach(p=>{ partnersMktPByProg[p.programme]=(partnersMktPByProg[p.programme]||0)+1; });
+    partnersCurrData.filter(mktFilter).forEach(p=>{ partnersMktPByProg[p.programme]=(partnersMktPByProg[p.programme]||0)+1; });
     const histMktP = Number(pg["hist_partners_mkt_"+mkt])||0;
     return {fatC,fatP,encC,encP,afilC,afilP,margemC,margemP,ticketC,ticketP,fat1C,fat1P,revendaAfilC,revendaAfilP,partnersMktC,partnersMktPByProg,histMktP};
   };
