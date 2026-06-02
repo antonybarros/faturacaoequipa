@@ -704,15 +704,16 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
   }));
   const barData = daily.filter(d=>d.day<=closedDay&&d.dayValue>0).map(d=>({day:d.day,value:d.dayValue,ss:d.supersales}));
 
-  // Weekday averages from closed non-SS days
+  // Weekday averages from closed non-SS days — fallback to historical when insufficient data
   const wdTotals = Array.from({length:7},()=>({sum:0,count:0}));
-  daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.dayValue>0).forEach(d=>{
+  daily.filter(d=>d.day<=closedDay&&!d.supersales&&!d.campanha&&d.dayValue>0).forEach(d=>{
     const wd = new Date(year, month, d.day).getDay();
     wdTotals[wd].sum += d.dayValue;
     wdTotals[wd].count++;
   });
-  const globalAvg = closedDay>0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&d.dayValue>0).reduce((s,d)=>s+d.dayValue,0)/Math.max(closedDay,1)) : 0;
-  const wdAvgs = wdTotals.map(w=>w.count>0?Math.round(w.sum/w.count):globalAvg);
+  const globalAvg = closedDay>0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&!d.campanha&&d.dayValue>0).reduce((s,d)=>s+d.dayValue,0)/Math.max(closedDay,1)) : 0;
+  const hasFullWdData = wdTotals.filter(w=>w.count>0).length >= 7;
+  const wdAvgs = wdTotals.map((w,i)=>w.count>0?Math.round(w.sum/w.count):(hasFullWdData?globalAvg:(historicalDowAvg[i]||globalAvg)));
 
   // All days bar data (including future days with wdAvg only)
   const allDaysBar = daily.map(d=>{
