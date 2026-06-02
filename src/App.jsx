@@ -2078,21 +2078,22 @@ function TestesTab({ year, month }) {
   const gestors = ["Antony","Fabien","Mónica"];
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 
-  // By gestor - all
+  // By programme
+  const byProg = {};
   const byGestor = {};
-  gestors.forEach(g=>{ byGestor[g]={total:0,bought:0,progs:{}}; });
+  const gestors = ["Antony","Fabien","Mónica"];
+  gestors.forEach(g=>{ byGestor[g]={total:0,progs:{}}; });
   data.forEach(r=>{
-    const g = r.gestor||"—";
-    if (!byGestor[g]) byGestor[g]={total:0,bought:0,progs:{}};
-    byGestor[g].total++;
-    if (r.status==="bought") byGestor[g].bought++;
     const p = r.programme||"—";
+    byProg[p]=(byProg[p]||0)+1;
+    const g = r.gestor||"—";
+    if (!byGestor[g]) byGestor[g]={total:0,progs:{}};
+    byGestor[g].total++;
     byGestor[g].progs[p]=(byGestor[g].progs[p]||0)+1;
   });
 
   const totalAll = data.length;
   const totalBought = data.filter(r=>r.status==="bought").length;
-
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
   return (
@@ -2113,44 +2114,59 @@ function TestesTab({ year, month }) {
       </div>
 
       {/* Resumo geral */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:periodo==="3meses"?"repeat(3,minmax(0,1fr))":"repeat(1,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={T.label}>Total novos parceiros</p>
           <p style={{fontSize:24,fontWeight:500,color:C.text,margin:"4px 0"}}>{totalAll}</p>
         </div>
-        <div style={T.card}>
-          <p style={T.label}>Com 1ª compra</p>
-          <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{totalBought}</p>
-          <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(totalBought/totalAll*100).toFixed(1):0}% de conversão</p>
-        </div>
-        <div style={T.card}>
-          <p style={T.label}>Sem 1ª compra</p>
-          <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{totalAll-totalBought}</p>
-          <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?((totalAll-totalBought)/totalAll*100).toFixed(1):0}% ainda pendentes</p>
-        </div>
+        {periodo==="3meses"&&<>
+          <div style={T.card}>
+            <p style={T.label}>Com 1ª compra</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{totalBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(totalBought/totalAll*100).toFixed(1):0}% de conversão</p>
+          </div>
+          <div style={T.card}>
+            <p style={T.label}>Sem 1ª compra</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{totalAll-totalBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?((totalAll-totalBought)/totalAll*100).toFixed(1):0}% pendentes</p>
+          </div>
+        </>}
       </div>
 
-      {/* Por gestor */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+      {/* Por programa */}
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:10}}>Por programa</p>
+        {progs.map(p=>{
+          const n=byProg[p]||0;
+          if(n===0) return null;
+          const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
+          const bought=periodo==="3meses"?data.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          return (
+            <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
+              {bought!=null&&<span style={{fontSize:11,color:C.green,minWidth:60,textAlign:"right"}}>{bought} compraram</span>}
+            </div>
+          );
+        })}
+        {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+      </div>
+
+      {/* Por gestor — só mês atual */}
+      {periodo==="mes"&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
         {gestors.map(g=>{
-          const gd = byGestor[g]||{total:0,bought:0,progs:{}};
-          const convPct = gd.total>0?(gd.bought/gd.total*100).toFixed(1):0;
+          const gd=byGestor[g]||{total:0,progs:{}};
           return (
             <div key={g} style={T.card}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
                 <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
                 <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
               </div>
-              {/* 1ªs compras */}
-              <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`0.5px solid ${C.border}`,marginBottom:8}}>
-                <span style={{fontSize:12,color:C.muted}}>Com 1ª compra</span>
-                <span style={{fontSize:12,fontWeight:500,color:C.green}}>{gd.bought} <span style={{color:C.muted,fontWeight:400}}>({convPct}%)</span></span>
-              </div>
-              {/* Por programa */}
               {progs.map(p=>{
-                const n = gd.progs[p]||0;
-                if (n===0) return null;
-                const pct = gd.total>0?(n/gd.total*100).toFixed(0):0;
+                const n=gd.progs[p]||0;
+                if(n===0) return null;
+                const pct=gd.total>0?(n/gd.total*100).toFixed(0):0;
                 return (
                   <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
                     <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
@@ -2163,7 +2179,7 @@ function TestesTab({ year, month }) {
             </div>
           );
         })}
-      </div>
+      </div>}
 
     </div>
   );
