@@ -1501,8 +1501,8 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div>
-          <p style={{ fontSize:18, fontWeight:500, margin:0, color:C.text }}>Acompanhamento de Parceiros</p>
-          <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Seguimento de primeiras compras · 30 / 60 / 90 dias</p>
+          <p style={{ fontSize:18, fontWeight:500, margin:0, color:C.text }}>Acompanhamento</p>
+          <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Seguimento 30 / 60 / 90 dias</p>
         </div>
         {overdueCount>0 && (
           <span style={{ background:"#FCEBEB", color:C.red, fontSize:12, fontWeight:500, padding:"5px 12px", borderRadius:20 }}>
@@ -1513,12 +1513,12 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
 
       {/* Form */}
       <div style={T.card}>
-        <p style={T.sectionTitle}>Registar novo parceiro</p>
+        <p style={T.sectionTitle}>Registar Novo</p>
         <form onSubmit={handleAdd}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr auto", gap:10, alignItems:"end" }}>
             <div>
-              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>ID do cliente</p>
-              <input type="text" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="ex: 123456" required
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 5px" }}>ID</p>
+              <input type="text" value={clientId} onChange={e=>setClientId(e.target.value)} placeholder="P (ex: 123456)" required
                 style={{ width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:13, background:C.bg, color:C.text, outline:"none" }} />
             </div>
             <div>
@@ -1704,7 +1704,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
                   <div style={{ display:"flex", gap:8, marginLeft:"auto", flexShrink:0 }}>
                     <button onClick={()=>handleBought(r.id)}
                       style={{ padding:"6px 14px", background:C.green, color:"#fff", border:"none", borderRadius:8, fontSize:12, fontWeight:500, cursor:"pointer" }}>
-                      ✓ Fez compra
+                      ✓ Fez
                     </button>
                     <button onClick={()=>handleNotBought(r)}
                       style={{ padding:"6px 12px", background:C.card, color:C.text, border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:12, cursor:"pointer" }}>
@@ -1845,7 +1845,7 @@ function ResultadosTab({ year, month, partnersCount }) {
     ? [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}]
     : [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
   const getMktData = (mkt) => {
-    if (mkt==="global") return {fatC:fatCurr,fatP:fatPrev,encC:encCurr,encP:encPrev,afilC:afilCurr,afilP:afilPrev,margemC:margemCurr,margemP:margemPrev,ticketC:ticketCurr,ticketP:ticketPrev};
+    if (mkt==="global") return {fatC:fatCurr,fatP:fatPrev,encC:encCurr,encP:encPrev,afilC:afilCurr,afilP:afilPrev,margemC:margemCurr,margemP:margemPrev,ticketC:ticketCurr,ticketP:ticketPrev,revendaAfilC:(fatCurr||0)+(afilCurr||0),revendaAfilP:(fatPrev||0)+(afilPrev||0)};
     const fatC = (() => {
       let last=0;
       for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[mkt]!==undefined){ last=Number(e[mkt])||0; break; } }
@@ -1951,7 +1951,7 @@ function ResultadosTab({ year, month, partnersCount }) {
           })}
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+      {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
           {MKT_RES_LIST.map(({key,label})=>{
@@ -1978,8 +1978,8 @@ function ResultadosTab({ year, month, partnersCount }) {
             </div>;
           })}
         </div>
-      </div>
-      {totalFatProg>0&&<div style={T.card}>
+      </div>}
+      {mktTab==="global"&&totalFatProg>0&&<div style={T.card}>
         <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por programa</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:4}}>
           {PROGS_RES.map(prog=>{
@@ -1993,7 +1993,7 @@ function ResultadosTab({ year, month, partnersCount }) {
           })}
         </div>
       </div>}
-      {(()=>{
+      {mktTab==="global"&&(()=>{
         const explanations = {
           season: {
             title:"Sazonalidade",
