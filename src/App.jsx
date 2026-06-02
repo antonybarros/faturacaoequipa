@@ -371,6 +371,51 @@ async function loadHistoricalSSAvg(year, month) {
   return monthsWithSS > 0 ? Math.round(totalSSValue / monthsWithSS) : 0;
 }
 
+async function loadHistoricalDowAvg(year, month) {
+  // Load last 3 months and compute average day value per day of week
+  const keys = [];
+  for (let i = 1; i <= 3; i++) {
+    const d = new Date(year, month - i, 1);
+    keys.push(monthKey(d.getFullYear(), d.getMonth()));
+  }
+  const { data } = await supabase.from("billing_months").select("entries,month_key").in("month_key", keys);
+  if (!data || data.length === 0) return {};
+  const dowSum = {}, dowCnt = {};
+  for (const row of data) {
+    const [y, m] = row.month_key.split("-").map(Number);
+    const mIdx = m - 1;
+    const entries = row.entries || {};
+    const isNew = isNewStructure(y, mIdx);
+    let prev = 0;
+    const days = Object.keys(entries).map(Number).sort((a,b)=>a-b);
+    for (const d of days) {
+      const e = entries[d];
+      if (e.supersales || e.campanha) { prev = 0; continue; }
+      let lastFR=0, lastCH=0, lastBNL=0, lastDEAT=0;
+      if (isNew) {
+        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+        if (e.CH !== undefined) lastCH = Number(e.CH)||0;
+        if (e.BNL !== undefined) lastBNL = Number(e.BNL)||0;
+        if (e.DEAT !== undefined) lastDEAT = Number(e.DEAT)||0;
+      } else {
+        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+        if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
+      }
+      const cumul = isNew ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
+      const dayVal = cumul > prev ? cumul - prev : 0;
+      if (dayVal > 0) {
+        const dow = new Date(y, mIdx, d).getDay();
+        dowSum[dow] = (dowSum[dow]||0) + dayVal;
+        dowCnt[dow] = (dowCnt[dow]||0) + 1;
+      }
+      prev = cumul;
+    }
+  }
+  const result = {};
+  Object.keys(dowSum).forEach(k => { result[k] = Math.round(dowSum[k]/dowCnt[k]); });
+  return result;
+}
+
 async function loadPartnersCount(year, month) {
   const start = new Date(year, month, 1).toISOString();
   const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
@@ -432,7 +477,7 @@ function buildDailyFirstRev(entries, totalDays, newStruct) {
   return daily;
 }
 
-function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0) {
+function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0, historicalDowAvg={}) {
   const goal = Number(teamGoals?.equipa_fr)||0;
   const partnerGoal = Number(teamGoals?.equipa_fr_partners)||0;
   const closed = daily.filter(d=>d.day<=closedDay);
@@ -461,10 +506,12 @@ function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0)
   });
   const avgByDow = {};
   Object.keys(dowAvg).forEach(k=>{ avgByDow[k] = Math.round(dowAvg[k]/dowCount[k]); });
-  const hasDowData = Object.keys(avgByDow).length >= 3;
+  // Use historical dow averages as fallback when current month has insufficient data
+  const effectiveDowAvg = Object.keys(avgByDow).length >= 3 ? avgByDow : historicalDowAvg;
+  const hasDowData = Object.keys(effectiveDowAvg).length >= 7;
 
   // Project remaining days using dow avg (fallback to avgNormal if dow not available)
-  const remDayValues = hasDowData ? daily.filter(d=>d.day>closedDay&&!d.supersales).map(d=>avgByDow[d.dow]||avgNormal) : [];
+  const remDayValues = hasDowData ? daily.filter(d=>d.day>closedDay&&!d.supersales).map(d=>effectiveDowAvg[d.dow]||avgNormal) : [];
   const projNoSS = hasDowData && remDayValues.length>0
     ? actual + remDayValues.reduce((s,v)=>s+v, 0)
     : avgNormal>0 ? actual+avgNormal*rem : null;
@@ -636,9 +683,11 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
 
   const newStruct = isNewStructure(year, month);
   const [historicalSSAvg, setHistoricalSSAvg] = useState(0);
+  const [historicalDowAvg, setHistoricalDowAvg] = useState({});
   useEffect(()=>{ loadHistoricalSSAvg(year, month).then(setHistoricalSSAvg); }, [year, month]);
+  useEffect(()=>{ loadHistoricalDowAvg(year, month).then(setHistoricalDowAvg); }, [year, month]);
   const daily = useMemo(()=>buildDaily(entries,totalDays,year,month),[entries,totalDays,year,month]);
-  const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg]);
+  const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg]);
   const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
   const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
   const firstRevGoal = stats.firstRevGoal;
