@@ -390,7 +390,6 @@ async function loadHistoricalDowAvg(year, month) {
     const days = Object.keys(entries).map(Number).sort((a,b)=>a-b);
     for (const d of days) {
       const e = entries[d];
-      if (e.supersales || e.campanha) { prev = 0; continue; }
       let lastFR=0, lastCH=0, lastBNL=0, lastDEAT=0;
       if (isNew) {
         if (e.FR !== undefined) lastFR = Number(e.FR)||0;
@@ -403,7 +402,8 @@ async function loadHistoricalDowAvg(year, month) {
       }
       const cumul = isNew ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
       const dayVal = cumul > prev ? cumul - prev : 0;
-      if (dayVal > 0) {
+      // Only include normal days (exclude SS and campaigns from averages)
+      if (dayVal > 0 && !e.supersales && !e.campanha) {
         const dow = new Date(y, mIdx, d).getDay();
         dowSum[dow] = (dowSum[dow]||0) + dayVal;
         dowCnt[dow] = (dowCnt[dow]||0) + 1;
