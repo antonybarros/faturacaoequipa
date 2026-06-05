@@ -1830,12 +1830,14 @@ function AnaliseFollowup({ year, month, isAdmin }) {
           if(n===0) return null;
           const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
           const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          const verifiedProg=periodo==="3meses"?verified.filter(r=>r.programme===p).length:0;
+          const convPct=verifiedProg>0?(bought/verifiedProg*100).toFixed(0):null;
           return (
             <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
-              {bought!=null&&<span style={{fontSize:11,color:C.green,minWidth:60,textAlign:"right"}}>{bought} compraram</span>}
+              {periodo==="3meses"?<span style={{fontSize:11,color:C.green,minWidth:80,textAlign:"right"}}>{bought} compraram ({convPct}%)</span>
+              :<span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>}
             </div>
           );
         })}
@@ -2286,12 +2288,14 @@ function TestesTab({ year, month }) {
           if(n===0) return null;
           const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
           const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          const verifiedProg=periodo==="3meses"?verified.filter(r=>r.programme===p).length:0;
+          const convPct=verifiedProg>0?(bought/verifiedProg*100).toFixed(0):null;
           return (
             <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
-              {bought!=null&&<span style={{fontSize:11,color:C.green,minWidth:60,textAlign:"right"}}>{bought} compraram</span>}
+              {periodo==="3meses"?<span style={{fontSize:11,color:C.green,minWidth:80,textAlign:"right"}}>{bought} compraram ({convPct}%)</span>
+              :<span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>}
             </div>
           );
         })}
