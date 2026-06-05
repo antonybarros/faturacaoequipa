@@ -39,6 +39,7 @@ const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" 
 const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Performance","Horeca","Corporate"];
 
 function TopParceirosTab() {
+  const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [imports, setImports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1274,7 +1275,7 @@ function CopyBtn({ text }) {
 }
 
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
-function PartnerFollowup({ year, month, gestor: gestorFilter }) {
+function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
   const isGestorFiltered = !!gestorFilter;
   const PROGS = ["Professionals","Elite","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -1497,18 +1498,24 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {/* Header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div>
-          <p style={{ fontSize:18, fontWeight:500, margin:0, color:C.text }}>Acompanhamento</p>
-          <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Seguimento 30 / 60 / 90 dias</p>
-        </div>
-        {overdueCount>0 && (
-          <span style={{ background:"#FCEBEB", color:C.red, fontSize:12, fontWeight:500, padding:"5px 12px", borderRadius:20 }}>
+      {/* Sub-tab buttons */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, borderBottom:`0.5px solid ${C.border}`, paddingBottom:8 }}>
+        {["acompanhamento","analise"].map(t=>(
+          <button key={t} onClick={()=>setFollowTab(t)}
+            style={{ padding:"6px 16px", border:"none", borderBottom:followTab===t?`2px solid ${C.green}`:"2px solid transparent",
+              background:"transparent", color:followTab===t?C.green:C.muted, fontWeight:followTab===t?500:400, fontSize:13, cursor:"pointer" }}>
+            {t==="acompanhamento"?"Acompanhamento":"Análise"}
+          </button>
+        ))}
+        {followTab==="acompanhamento"&&overdueCount>0&&(
+          <span style={{ marginLeft:"auto", background:"#FCEBEB", color:C.red, fontSize:12, fontWeight:500, padding:"5px 12px", borderRadius:20 }}>
             ⚠ {overdueCount} {overdueCount===1?"alerta":"alertas"}
           </span>
         )}
       </div>
+
+      {followTab==="analise"&&<AnaliseFollowup year={year} month={month} isAdmin={isAdmin} />}
+      {followTab==="acompanhamento"&&<>
 
       {/* Form */}
       <div style={T.card}>
@@ -1726,9 +1733,144 @@ function PartnerFollowup({ year, month, gestor: gestorFilter }) {
         </div>
       )}
     </div>
+    </>
+    }
   );
 }
 
+
+// ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
+function AnaliseFollowup({ year, month, isAdmin }) {
+  const [periodo, setPeriodo] = useState("mes");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
+  const gestors = ["Antony","Fabien","Mónica"];
+
+  useEffect(()=>{
+    setLoading(true);
+    const pad = n => String(n).padStart(2,"0");
+    const lastDay = new Date(year,month+1,0).getDate();
+    let start, end;
+    if (periodo==="mes") {
+      start = `${year}-${pad(month+1)}-01T00:00:00.000Z`;
+      end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
+    } else {
+      const sm = month-2 < 0 ? month+10 : month-2;
+      const sy = month-2 < 0 ? year-1 : year;
+      start = `${sy}-${pad(sm+1)}-01T00:00:00.000Z`;
+      end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
+    }
+    supabase.from("partner_followup")
+      .select("gestor,programme,status,stage,original_created_at")
+      .gte("original_created_at", start)
+      .lte("original_created_at", end)
+      .neq("status","deleted")
+      .then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
+  },[year,month,periodo]);
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
+
+  const byProg = {}, byGestor = {};
+  gestors.forEach(g=>{ byGestor[g]={total:0,progs:{}}; });
+  data.forEach(r=>{
+    const p = r.programme||"—";
+    byProg[p]=(byProg[p]||0)+1;
+    const g = r.gestor||"—";
+    if (!byGestor[g]) byGestor[g]={total:0,progs:{}};
+    byGestor[g].total++;
+    byGestor[g].progs[p]=(byGestor[g].progs[p]||0)+1;
+  });
+
+  const totalAll = data.length;
+  const verified = data.filter(r=>r.status==="bought"||r.status==="closed"||r.stage==="s60"||r.stage==="s90");
+  const verifiedBought = verified.filter(r=>r.status==="bought").length;
+  const verifiedNotBought = verified.filter(r=>r.status!=="bought").length;
+  const stillInS30 = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
+  const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{...T.card,display:"flex",alignItems:"center",gap:12}}>
+        <p style={{...T.sectionTitle,margin:0,flex:1}}>Análise — {periodoLabel}</p>
+        <div style={{display:"flex",gap:8}}>
+          {[{id:"mes",l:"Mês atual"},{id:"3meses",l:"Últimos 3 meses"}].map(p=>(
+            <button key={p.id} onClick={()=>setPeriodo(p.id)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:periodo===p.id?C.green:"transparent",color:periodo===p.id?"#fff":C.muted}}>
+              {p.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:periodo==="3meses"?"repeat(3,minmax(0,1fr))":"repeat(1,minmax(0,1fr))",gap:10}}>
+        <div style={T.card}>
+          <p style={T.label}>Total novos parceiros</p>
+          <p style={{fontSize:24,fontWeight:500,color:C.text,margin:"4px 0"}}>{totalAll}</p>
+        </div>
+        {periodo==="3meses"&&<>
+          <div style={T.card}>
+            <p style={T.label}>Com 1ª compra</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{verifiedBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{verified.length>0?(verifiedBought/verified.length*100).toFixed(1):0}% de conversão</p>
+          </div>
+          <div style={T.card}>
+            <p style={T.label}>Sem 1ª compra</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{verifiedNotBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{stillInS30>0?`${stillInS30} ainda em avaliação`:"todos verificados"}</p>
+          </div>
+        </>}
+      </div>
+
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:10}}>Por programa</p>
+        {progs.map(p=>{
+          const n=byProg[p]||0;
+          if(n===0) return null;
+          const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
+          const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          return (
+            <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
+              {bought!=null&&<span style={{fontSize:11,color:C.green,minWidth:60,textAlign:"right"}}>{bought} compraram</span>}
+            </div>
+          );
+        })}
+        {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+      </div>
+
+      {isAdmin&&periodo==="mes"&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+        {gestors.map(g=>{
+          const gd=byGestor[g]||{total:0,progs:{}};
+          return (
+            <div key={g} style={T.card}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
+                <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
+              </div>
+              {progs.map(p=>{
+                const n=gd.progs[p]||0;
+                if(n===0) return null;
+                const pct=gd.total>0?(n/gd.total*100).toFixed(0):0;
+                return (
+                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                    <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
+                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{pct}%</span>
+                  </div>
+                );
+              })}
+              {gd.total===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+            </div>
+          );
+        })}
+      </div>}
+    </div>
+  );
+}
 
 // ── ResultadosTab ──────────────────────────────────────────────────────────────
 const PROGS_RES = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
@@ -2256,7 +2398,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
       </div>
