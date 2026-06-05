@@ -507,7 +507,7 @@ function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0,
   const avgByDow = {};
   Object.keys(dowAvg).forEach(k=>{ avgByDow[k] = Math.round(dowAvg[k]/dowCount[k]); });
   // Use historical dow averages as fallback when current month has insufficient data
-  const effectiveDowAvg = Object.keys(avgByDow).length >= 3 ? avgByDow : historicalDowAvg;
+  const effectiveDowAvg = Object.keys(historicalDowAvg).length > 0 ? historicalDowAvg : avgByDow;
   const hasDowData = Object.keys(effectiveDowAvg).length >= 7;
 
   // Project remaining days using dow avg (fallback to avgNormal if dow not available)
@@ -712,8 +712,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
     wdTotals[wd].count++;
   });
   const globalAvg = closedDay>0 ? Math.round(daily.filter(d=>d.day<=closedDay&&!d.supersales&&!d.campanha&&d.dayValue>0).reduce((s,d)=>s+d.dayValue,0)/Math.max(closedDay,1)) : 0;
-  const hasFullWdData = wdTotals.filter(w=>w.count>0).length >= 7;
-  const wdAvgs = wdTotals.map((w,i)=>w.count>0?Math.round(w.sum/w.count):(hasFullWdData?globalAvg:(historicalDowAvg[String(i)]||historicalDowAvg[i]||globalAvg)));
+  const wdAvgs = Array.from({length:7},(_,i)=>historicalDowAvg[String(i)]||historicalDowAvg[i]||globalAvg);
 
   // All days bar data (including future days with wdAvg only)
   const allDaysBar = daily.map(d=>{
