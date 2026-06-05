@@ -1732,9 +1732,9 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
           })}
         </div>
       )}
-    </div>
     </>
     }
+    </div>
   );
 }
 
