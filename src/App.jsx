@@ -186,13 +186,8 @@ function TopParceirosTab() {
     if (filterCtx==="mercado"&&filterVal) return c.mercado===filterVal;
     return true;
   });
-  // SS metric: top25 by SS orders
-  const top25SS = [...allData].filter(c=>filterGestor?c.gestor===filterGestor:true).sort((a,b)=>{
-    const ad=analysisData.find(p=>p.client_id===a.client_id); const bd=analysisData.find(p=>p.client_id===b.client_id);
-    return (bd?.ssOrders||0)-(ad?.ssOrders||0);
-  }).slice(0,25);
-  const top25 = metrica==="ss"?top25SS:[...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(0,25);
-  const waiting = metrica==="ss"?[]:[...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(25,30);
+
+
   const lastImport = imports[0];
   const lastData = records.filter(r=>r.import_date===lastImport);
   const totalFat = lastData.reduce((s,r)=>s+(r.faturacao||0),0);
@@ -239,6 +234,12 @@ function TopParceirosTab() {
     const trend = prev90Val>0&&last90Val>0?(last90Val>prev90Val?"up":last90Val<prev90Val?"down":"stable"):null;
     return {...p, clientOrders, n, lastOrderDate, daysSinceLast, avgFreq, nextPredicted, churn, ssOrders, ssPct, ssDependent, trend};
   });
+  const top25SS = [...allData].filter(c=>filterGestor?c.gestor===filterGestor:true).sort((a,b)=>{
+    const ad=analysisData.find(p=>p.client_id===a.client_id); const bd=analysisData.find(p=>p.client_id===b.client_id);
+    return (bd?.ssOrders||0)-(ad?.ssOrders||0);
+  }).slice(0,25);
+  const top25 = metrica==="ss"?top25SS:[...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(0,25);
+  const waiting = metrica==="ss"?[]:[...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(25,30);
   const neverBought = analysisData.filter(p=>p.n===0);
   const inactiveBought = analysisData.filter(p=>p.n>0&&p.daysSinceLast!=null&&p.daysSinceLast>90);
   const churnPartners = [...neverBought,...inactiveBought];
