@@ -40,6 +40,7 @@ const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Perfo
 
 function TopParceirosTab() {
   const [topTab, setTopTab] = useState("top25");
+  const [analiseTab, setAnaliseTab] = useState("resumo");
   const [records, setRecords] = useState([]);
   const [orders, setOrders] = useState([]);
   const [imports, setImports] = useState([]);
@@ -419,6 +420,23 @@ function TopParceirosTab() {
               Importa o ficheiro de Encomendas para ver a análise.
             </div>
           ):<>
+            {/* Analise sub-tabs */}
+            <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+              {[
+                {id:"resumo",l:"Resumo"},
+                {id:"nunca",l:"Nunca compraram"},
+                {id:"inativos",l:"Inativos +90 dias"},
+                {id:"tendencias",l:"Tendências"},
+                {id:"ss",l:"⚡ Dependentes SS"},
+              ].map(t=>(
+                <button key={t.id} onClick={()=>setAnaliseTab(t.id)}
+                  style={{padding:"7px 14px",border:"none",borderBottom:analiseTab===t.id?`2px solid ${C.green}`:"2px solid transparent",
+                    background:"transparent",color:analiseTab===t.id?C.green:C.muted,fontWeight:analiseTab===t.id?500:400,fontSize:12,cursor:"pointer"}}>
+                  {t.l}
+                </button>
+              ))}
+            </div>
+            {analiseTab==="resumo"&&<>
             {/* Summary cards with evolution */}
             {(()=>{
               const prevImport = imports[1];
@@ -467,9 +485,12 @@ function TopParceirosTab() {
               })()}
             </div>
 
-            {/* Nunca compraram */}
-            {neverBought.length>0&&<div style={T.card}>
+            </>}
+
+            {/* Nunca compraram tab */}
+            {analiseTab==="nunca"&&<div style={T.card}>
               <p style={{...T.sectionTitle,marginBottom:10}}>Nunca compraram — {neverBought.length} parceiros</p>
+              {neverBought.length===0?<p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"1rem"}}>Sem registos</p>:
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
                   {["Nome","ID","Programa","Gestor","Mercado"].map((h,i)=>(
@@ -487,12 +508,12 @@ function TopParceirosTab() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table>}
             </div>}
 
-            {/* Inativos +90 dias */}
-            {inactiveBought.length>0&&<div style={T.card}>
+            {analiseTab==="inativos"&&<div style={T.card}>
               <p style={{...T.sectionTitle,marginBottom:10}}>Inativos há +90 dias — {inactiveBought.length} parceiros</p>
+              {inactiveBought.length===0?<p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"1rem"}}>Sem registos</p>:
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
                   {["Nome","ID","Programa","Gestor","Última compra","Dias sem compra"].map((h,i)=>(
@@ -511,11 +532,72 @@ function TopParceirosTab() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table>}
             </div>}
 
-            {/* Contactar hoje - por gestor */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+            {/* Tendencias tab */}
+            {analiseTab==="tendencias"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+              {[{dir:"up",label:"↑ A subir",color:C.green},{dir:"down",label:"↓ A descer",color:C.red}].map(({dir,label,color})=>{
+                const list = analysisData.filter(p=>p.trend===dir);
+                return <div key={dir} style={T.card}>
+                  <p style={{...T.sectionTitle,marginBottom:10,color}}>{label} — {list.length} parceiros</p>
+                  {list.length===0?<p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"1rem"}}>Sem registos</p>:
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                    <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                      {["Nome","Programa","Últ. 90d","Ant. 90d"].map((h,i)=>(
+                        <th key={i} style={{padding:"6px 8px",textAlign:i>1?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase"}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {list.map(p=>{
+                        const now2=today.getTime(); const d90=90*86400000;
+                        const last90val=p.clientOrders.filter(o=>now2-new Date(o.order_date).getTime()<=d90).reduce((s,o)=>s+(o.order_value||0),0);
+                        const prev90val=p.clientOrders.filter(o=>{const t=now2-new Date(o.order_date).getTime();return t>d90&&t<=d90*2;}).reduce((s,o)=>s+(o.order_value||0),0);
+                        return <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                          <td style={{padding:"7px 8px",fontWeight:500,color:C.text,fontSize:12}}>{p.partner_name||"—"}</td>
+                          <td style={{padding:"7px 8px"}}><span style={{fontSize:10,padding:"1px 6px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                          <td style={{padding:"7px 8px",textAlign:"right",color,fontWeight:500,fontSize:12}}>{fmtEur(last90val)}</td>
+                          <td style={{padding:"7px 8px",textAlign:"right",color:C.muted,fontSize:12}}>{fmtEur(prev90val)}</td>
+                        </tr>;
+                      })}
+                    </tbody>
+                  </table>}
+                </div>;
+              })}
+            </div>}
+
+            {/* SS Dependentes tab */}
+            {analiseTab==="ss"&&(()=>{
+              const ssDependents = analysisData.filter(p=>p.ssDependent);
+              return <div style={T.card}>
+                <p style={{...T.sectionTitle,marginBottom:4}}>Dependência Supersales ⚡ — {ssDependents.length} parceiros</p>
+                <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Parceiros com +50% das encomendas em dias de Supersales</p>
+                {ssDependents.length===0?<p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"1rem"}}>Sem registos</p>:
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                    {["Nome","Programa","Gestor","Nº enc.","Enc. SS","% SS","Última compra"].map((h,i)=>(
+                      <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {ssDependents.sort((a,b)=>b.ssPct-a.ssPct).map(p=>(
+                      <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                        <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
+                        <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                        <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.gestor||"—"}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{fmt(p.n)}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:"#D97706"}}>{fmt(p.ssOrders)}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",fontWeight:500,color:"#D97706"}}>{p.ssPct}%</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>}
+              </div>;
+            })()}
+
+            {/* Contactar hoje - por gestor - moved to Cockpit */}
+            {false&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
               {["Antony","Fabien","Mónica"].map(g=>{
                 const toContact = activePartners.filter(p=>{
                   if (p.gestor!==g||!p.nextPredicted||!p.avgFreq) return false;
@@ -554,8 +636,8 @@ function TopParceirosTab() {
               })}
             </div>
 
-            {/* Dependência Supersales */}
-            {(() => {
+            {/* Dependência Supersales - moved to SS tab */}
+            {false&&(() => {
               const ssDependents = analysisData.filter(p=>p.ssDependent);
               return ssDependents.length>0?(
                 <div style={T.card}>
