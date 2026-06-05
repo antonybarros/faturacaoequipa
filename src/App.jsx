@@ -211,8 +211,10 @@ function TopParceirosTab() {
     const churn = n===0||(daysSinceLast!=null&&daysSinceLast>90);
     return {...p, clientOrders, n, lastOrderDate, daysSinceLast, avgFreq, nextPredicted, churn};
   });
-  const churnPartners = analysisData.filter(p=>p.churn);
-  const activePartners = analysisData.filter(p=>!p.churn);
+  const neverBought = analysisData.filter(p=>p.n===0);
+  const inactiveBought = analysisData.filter(p=>p.n>0&&p.daysSinceLast!=null&&p.daysSinceLast>90);
+  const churnPartners = [...neverBought,...inactiveBought];
+  const activePartners = analysisData.filter(p=>p.n>0&&(p.daysSinceLast==null||p.daysSinceLast<=90));
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
@@ -380,71 +382,148 @@ function TopParceirosTab() {
               Importa o ficheiro de Encomendas para ver a análise.
             </div>
           ):<>
+            {/* Summary cards */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
               {[
                 {label:"Total encomendas",value:fmt(orders.length),sub:"histórico completo"},
                 {label:"Parceiros activos",value:fmt(activePartners.length),sub:"compraram nos últimos 90 dias"},
-                {label:"Churn (sem compra)",value:fmt(churnPartners.length),sub:"sem compra há +90 dias ou nunca"},
-                {label:"Freq. média recompra",value:analysisData.filter(p=>p.avgFreq).length>0?Math.round(analysisData.filter(p=>p.avgFreq).reduce((s,p)=>s+p.avgFreq,0)/analysisData.filter(p=>p.avgFreq).length)+" dias":"—",sub:"entre encomendas"},
+                {label:"Nunca compraram",value:fmt(neverBought.length),sub:"sem qualquer encomenda",red:true},
+                {label:"Inativos +90 dias",value:fmt(inactiveBought.length),sub:"compraram mas pararam",red:true},
               ].map((s,i)=>(
                 <div key={i} style={T.card}>
                   <p style={T.label}>{s.label}</p>
-                  <p style={{fontSize:20,fontWeight:500,color:i===2?C.red:C.text,margin:"4px 0"}}>{s.value}</p>
+                  <p style={{fontSize:20,fontWeight:500,color:s.red?C.red:C.text,margin:"4px 0"}}>{s.value}</p>
                   <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
                 </div>
               ))}
             </div>
 
-            {/* Churn */}
-            {churnPartners.length>0&&<div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:10,color:C.red}}>⚠ Churn — {churnPartners.length} parceiros</p>
+            {/* Nunca compraram */}
+            {neverBought.length>0&&<div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:10}}>Nunca compraram — {neverBought.length} parceiros</p>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                  {["Nome","ID","Programa","Última compra","Dias sem compra"].map((h,i)=>(
-                    <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                  {["Nome","ID","Programa","Gestor","Mercado"].map((h,i)=>(
+                    <th key={i} style={{padding:"7px 10px",textAlign:"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {churnPartners.sort((a,b)=>(b.daysSinceLast||999)-(a.daysSinceLast||999)).map(p=>(
+                  {neverBought.map(p=>(
                     <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
                       <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
                       <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.client_id}</td>
                       <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
-                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"Nunca comprou"}</td>
-                      <td style={{padding:"8px 10px",textAlign:"right",color:C.red,fontWeight:500}}>{p.daysSinceLast!=null?p.daysSinceLast+" dias":"—"}</td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.gestor||"—"}</td>
+                      <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[p.mercado]||p.mercado}</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>}
 
-            {/* Frequência e previsão */}
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:10}}>Frequência e previsão de recompra</p>
+            {/* Inativos +90 dias */}
+            {inactiveBought.length>0&&<div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:10}}>Inativos há +90 dias — {inactiveBought.length} parceiros</p>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                 <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                  {["Nome","ID","Programa","Nº enc.","Freq. média","Última compra","Próxima prevista"].map((h,i)=>(
-                    <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                  {["Nome","ID","Programa","Gestor","Última compra","Dias sem compra"].map((h,i)=>(
+                    <th key={i} style={{padding:"7px 10px",textAlign:i>4?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
-                  {activePartners.sort((a,b)=>{ const dA=a.nextPredicted?new Date(a.nextPredicted):new Date(9999,0); const dB=b.nextPredicted?new Date(b.nextPredicted):new Date(9999,0); return dA-dB; }).slice(0,30).map(p=>{
-                    const isOverdue = p.nextPredicted&&p.nextPredicted<today;
-                    return (
-                      <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`,background:isOverdue?"#FEF3F2":"transparent"}}>
-                        <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
-                        <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.client_id}</td>
-                        <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
-                        <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{fmt(p.n)}</td>
-                        <td style={{padding:"8px 10px",textAlign:"right",color:C.muted}}>{p.avgFreq?p.avgFreq+" dias":"—"}</td>
-                        <td style={{padding:"8px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
-                        <td style={{padding:"8px 10px",textAlign:"right",fontWeight:500,color:isOverdue?C.red:C.green}}>{p.nextPredicted?p.nextPredicted.toISOString().slice(0,10):"—"}</td>
-                      </tr>
-                    );
-                  })}
+                  {inactiveBought.sort((a,b)=>(b.daysSinceLast||0)-(a.daysSinceLast||0)).map(p=>(
+                    <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                      <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.client_id}</td>
+                      <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.gestor||"—"}</td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
+                      <td style={{padding:"8px 10px",textAlign:"right",color:C.red,fontWeight:500}}>{p.daysSinceLast+" dias"}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
+            </div>}
+
+            {/* Contactar hoje - por gestor */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+              {["Antony","Fabien","Mónica"].map(g=>{
+                const toContact = activePartners.filter(p=>{
+                  if (p.gestor!==g||!p.nextPredicted||!p.avgFreq) return false;
+                  const daysUntil = Math.floor((p.nextPredicted-today)/86400000);
+                  return daysUntil<=5;
+                }).sort((a,b)=>{
+                  const dA=Math.floor((a.nextPredicted-today)/86400000);
+                  const dB=Math.floor((b.nextPredicted-today)/86400000);
+                  return dA-dB;
+                });
+                return (
+                  <div key={g} style={T.card}>
+                    <p style={{...T.sectionTitle,marginBottom:4}}>{g}</p>
+                    <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>{toContact.length} para contactar nos próximos 5 dias</p>
+                    {toContact.length===0?<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum para esta semana</p>:
+                    toContact.map(p=>{
+                      const daysUntil=Math.floor((p.nextPredicted-today)/86400000);
+                      // Most frequent product
+                      const prodCount={};
+                      p.clientOrders.forEach(o=>{ (o.products||"").split("+").forEach(pr=>{ const t=pr.trim(); if(t) prodCount[t]=(prodCount[t]||0)+1; }); });
+                      const topProd=Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+                      return (
+                        <div key={p.client_id} style={{padding:"8px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                            <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{p.partner_name||p.client_id}</span>
+                            <span style={{fontSize:11,fontWeight:500,color:daysUntil<=0?C.red:daysUntil<=2?"#D97706":C.green}}>
+                              {daysUntil<=0?"hoje":daysUntil===1?"amanhã":`em ${daysUntil} dias`}
+                            </span>
+                          </div>
+                          <p style={{fontSize:11,color:C.muted,margin:0}}>💊 {topProd}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Dependência Supersales */}
+            {(() => {
+              // Get SS dates from billing_months entries
+              const ssDates = new Set();
+              // We'll compute SS dependency from order dates matching known SS days
+              // For now use orders that fall on a day marked as SS in any month
+              const ssDependents = analysisData.filter(p=>{
+                if (p.n<2) return false;
+                // Count orders - we use a heuristic: orders on weekends or specific patterns
+                // Since we don't have SS dates loaded here, we estimate based on order_value being >avg
+                const avgVal = p.faturacao>0&&p.n>0?p.faturacao/p.n:0;
+                const highValueOrders = p.clientOrders.filter(o=>o.order_value>avgVal*1.5).length;
+                return p.n>0&&highValueOrders/p.n>0.5;
+              });
+              return ssDependents.length>0?(
+                <div style={T.card}>
+                  <p style={{...T.sectionTitle,marginBottom:4}}>Dependência Supersales — {ssDependents.length} parceiros</p>
+                  <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Parceiros com +50% das encomendas em valor acima de 1.5× a sua média — provável dependência de SS</p>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                    <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                      {["Nome","Programa","Gestor","Nº enc.","Última compra"].map((h,i)=>(
+                        <th key={i} style={{padding:"7px 10px",textAlign:"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {ssDependents.map(p=>(
+                        <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                          <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
+                          <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                          <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.gestor||"—"}</td>
+                          <td style={{padding:"8px 10px",color:C.text}}>{fmt(p.n)}</td>
+                          <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ):null;
+            })()}
           </>}
         </>}
       </>)}
