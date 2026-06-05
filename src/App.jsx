@@ -38,7 +38,7 @@ const PROG_MAP_TP = { "PROFESSIONALS":"Professionals","PRO GYM":"Pro Gym","PRO B
 const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" };
 const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Performance","Horeca","Corporate"];
 
-function TopParceirosTab() {
+function TopParceirosTab({ isAdmin=true, gestor=null }) {
   const [topTab, setTopTab] = useState("top25");
   const [analiseTab, setAnaliseTab] = useState("resumo");
   const [records, setRecords] = useState([]);
@@ -317,11 +317,11 @@ function TopParceirosTab() {
                     background:metrica===m.id?C.green:"transparent",color:metrica===m.id?"#fff":C.muted}}>{m.l}</button>
               ))}
               <div style={{width:1,height:16,background:C.border}} />
-              {["","Antony","Fabien","Mónica"].map(g=>(
-                <button key={g} onClick={()=>setFilterGestor(g)}
+              {(isAdmin?["","Antony","Fabien","Mónica"]:["",gestor?.name||gestor]).map(g=>(
+                <button key={g||"todos"} onClick={()=>setFilterGestor(g||"")}
                   style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                    background:filterGestor===g?"#6366F1":"transparent",color:filterGestor===g?"#fff":C.muted}}>
-                  {g||"Todos"}
+                    background:filterGestor===(g||"")?"#6366F1":"transparent",color:filterGestor===(g||"")?"#fff":C.muted}}>
+                  {g||"Global"}
                 </button>
               ))}
               <div style={{width:1,height:16,background:C.border}} />
@@ -2217,10 +2217,17 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
                   return (
                     <div key={p.client_id} style={{padding:"8px 0",borderBottom:`0.5px solid ${C.border}`}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-                        <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{p.partner_name||p.client_id}</span>
+                        <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{p.partner_name||"—"}</span>
                         <span style={{fontSize:11,fontWeight:500,color:daysUntil<=0?C.red:daysUntil<=2?"#D97706":C.green}}>
                           {daysUntil<=0?"hoje":daysUntil===1?"amanhã":`em ${daysUntil} dias`}
                         </span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                        <span style={{fontSize:11,color:C.muted}}>ID: {p.client_id}</span>
+                        <button onClick={()=>navigator.clipboard.writeText(p.client_id)}
+                          style={{fontSize:10,padding:"1px 6px",border:`0.5px solid ${C.border}`,borderRadius:4,background:"transparent",color:C.muted,cursor:"pointer"}}>
+                          ⊕ Copiar
+                        </button>
                       </div>
                       <p style={{fontSize:11,color:C.muted,margin:0}}>💊 {topProd}</p>
                     </div>
@@ -2882,7 +2889,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true},{id:"cockpit",l:"Cockpit",adminOnly:false}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:false}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -2898,7 +2905,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
       </div>
