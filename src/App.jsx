@@ -52,7 +52,8 @@ function TopParceirosTab({ isAdmin=true, gestor=null }) {
   const [metrica, setMetrica] = useState("faturacao");
   const [filterCtx, setFilterCtx] = useState("global");
   const [filterVal, setFilterVal] = useState("");
-  const [filterGestor, setFilterGestor] = useState("");
+  const myGestorName = !isAdmin?(gestor?.name||gestor||""):"";
+  const [filterGestor, setFilterGestor] = useState(myGestorName);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortAll, setSortAll] = useState("faturacao");
   const fileRef = useRef(null);
@@ -198,6 +199,7 @@ function TopParceirosTab({ isAdmin=true, gestor=null }) {
   lastData.forEach(r=>{ latestByClient[r.client_id]=r; });
   const allPartners = Object.values(latestByClient);
   const filteredAll = allPartners.filter(p=>{
+    if (!isAdmin && myGestorName && p.gestor!==myGestorName) return false;
     const term = searchTerm.toLowerCase();
     if (term && !p.client_id?.toLowerCase().includes(term) && !(p.partner_name||"").toLowerCase().includes(term)) return false;
     return true;
@@ -212,7 +214,8 @@ function TopParceirosTab({ isAdmin=true, gestor=null }) {
   const ordersByClient = {};
   orders.forEach(o=>{ if (!ordersByClient[o.client_id]) ordersByClient[o.client_id]=[]; ordersByClient[o.client_id].push(o); });
   const today = new Date();
-  const analysisData = allPartners.map(p=>{
+  const analysisPartners = isAdmin ? allPartners : allPartners.filter(p=>p.gestor===myGestorName);
+  const analysisData = analysisPartners.map(p=>{
     const clientOrders = (ordersByClient[p.client_id]||[]).sort((a,b)=>new Date(a.order_date)-new Date(b.order_date));
     const n = clientOrders.length;
     const lastOrderDate = n>0?new Date(clientOrders[n-1].order_date):null;
