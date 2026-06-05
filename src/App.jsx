@@ -39,22 +39,32 @@ const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" 
 const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Performance","Horeca","Corporate"];
 
 function TopParceirosTab() {
+  const [topTab, setTopTab] = useState("top25");
   const [records, setRecords] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [imports, setImports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [importingOrders, setImportingOrders] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [importOrdersMsg, setImportOrdersMsg] = useState("");
   const [metrica, setMetrica] = useState("faturacao");
   const [filterCtx, setFilterCtx] = useState("global");
   const [filterVal, setFilterVal] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortAll, setSortAll] = useState("faturacao");
   const fileRef = useRef(null);
+  const fileOrdersRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("top_partners").select("*").order("import_date", { ascending:false });
-    setRecords(data || []);
-    // Get unique import dates
-    const dates = [...new Set((data||[]).map(r=>r.import_date))].sort().reverse();
+    const [{ data: tp }, { data: po }] = await Promise.all([
+      supabase.from("top_partners").select("*").order("import_date", { ascending:false }),
+      supabase.from("partner_orders").select("*").order("order_date", { ascending:false }),
+    ]);
+    setRecords(tp || []);
+    setOrders(po || []);
+    const dates = [...new Set((tp||[]).map(r=>r.import_date))].sort().reverse();
     setImports(dates);
     setLoading(false);
   };
@@ -64,8 +74,7 @@ function TopParceirosTab() {
   const handleImport = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImporting(true);
-    setImportMsg("");
+    setImporting(true); setImportMsg("");
     try {
       const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs");
       const buf = await file.arrayBuffer();
@@ -73,229 +82,371 @@ function TopParceirosTab() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
       if (!rows.length) { setImportMsg("❌ Ficheiro vazio"); setImporting(false); return; }
-
       const today = new Date().toISOString().slice(0,10);
-      // Delete existing records for today's import date to allow re-import
       await supabase.from("top_partners").delete().eq("import_date", today);
-
-      const findCol = (row, ...keys) => {
-        for (const k of keys) {
-          const found = Object.keys(row).find(rk => rk.toUpperCase().replace(/[^A-Z]/g,"").includes(k.toUpperCase().replace(/[^A-Z]/g,"")));
-          if (found) return row[found];
-        }
-        return "";
-      };
-
-      let ok = 0, skip = 0;
+      const findCol = (row, ...keys) => { for (const k of keys) { const found = Object.keys(row).find(rk=>rk.toUpperCase().replace(/[^A-Z]/g,"").includes(k.toUpperCase().replace(/[^A-Z]/g,""))); if (found) return row[found]; } return ""; };
+      let ok=0, skip=0;
       const batch = [];
       for (const r of rows) {
-        const clientId = String(findCol(r,"ID") || "").trim();
+        const clientId = String(findCol(r,"CLIENT","ID")||"").trim();
         if (!clientId) { skip++; continue; }
-        const mktRaw = String(findCol(r,"MERCADO","MKT") || "").trim().toUpperCase();
-        const progRaw = String(findCol(r,"PROGRAMA","PROG") || "").trim().toUpperCase();
-        const mkt = MKT_MAP_TP[mktRaw] || mktRaw;
-        const prog = PROG_MAP_TP[progRaw] || progRaw;
-        const nEnc = parseInt(findCol(r,"ENCOMENDAS","NENC","NENCOMENDAS"))||0;
-        const fat = parseFloat(String(findCol(r,"FATURACAO","FATURAÇÃO","FAT")||"0").replace(",","."))||0;
+        const mkt = String(findCol(r,"MARKET","MERCADO")||"").trim();
+        const prog = String(findCol(r,"PROGRAMME","PROGRAMA","PROG")||"").trim();
         const gestor = String(findCol(r,"GESTOR")||"").trim();
-        const ultCompraRaw = findCol(r,"ULTIMA","DATA");
-        let ultCompra = null;
-        if (ultCompraRaw) {
-          if (typeof ultCompraRaw === "number") {
-            const d = new Date((ultCompraRaw - 25569)*86400000);
-            ultCompra = d.toISOString().slice(0,10);
-          } else {
-            const s = String(ultCompraRaw).trim();
-            if (s.match(/^\d{4}-\d{2}-\d{2}/)) ultCompra = s.slice(0,10);
-            else if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) { const [d,m,y]=s.split("/"); ultCompra=`${y}-${m}-${d}`; }
-          }
-        }
-        const valorMedio = nEnc > 0 ? Math.round(fat/nEnc) : 0;
-        batch.push({ import_date:today, client_id:clientId, mercado:mkt, gestor, programa:prog, n_encomendas:nEnc, faturacao:Math.round(fat), valor_medio:valorMedio, data_ultima_compra:ultCompra });
+        const name = String(findCol(r,"NAME","NOME","PARTNER")||"").trim();
+        const email = String(findCol(r,"EMAIL")||"").trim();
+        const nEnc = parseInt(findCol(r,"ENCOMENDAS","N_ENC","NENCOMENDAS","N_ENCOMENDAS"))||0;
+        const fat = parseFloat(String(findCol(r,"FATURACAO","FATURAÇÃO","FAT")||"0").replace(",","."))||0;
+        const valorMedio = nEnc>0?Math.round(fat/nEnc):0;
+        batch.push({ import_date:today, client_id:clientId, partner_name:name, email, mercado:mkt, gestor, programa:prog, n_encomendas:nEnc, faturacao:Math.round(fat), valor_medio:valorMedio });
         ok++;
       }
-
-      // Insert in batches of 100
-      for (let i=0; i<batch.length; i+=100) {
-        await supabase.from("top_partners").insert(batch.slice(i,i+100));
-      }
-
-      setImportMsg(`✓ ${ok} parceiros importados${skip>0?` · ${skip} ignorados`:""} — ${today}`);
+      for (let i=0;i<batch.length;i+=100) await supabase.from("top_partners").insert(batch.slice(i,i+100));
+      setImportMsg(`✓ ${ok} parceiros importados${skip>0?` · ${skip} ignorados`:""}`);
       await load();
-    } catch(err) {
-      setImportMsg("❌ Erro: " + err.message);
-    }
+    } catch(err) { setImportMsg("❌ Erro: "+err.message); }
     setImporting(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  // Get data from last 3 imports for stability
+  const handleImportOrders = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportingOrders(true); setImportOrdersMsg("");
+    try {
+      const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:"array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
+      if (!rows.length) { setImportOrdersMsg("❌ Ficheiro vazio"); setImportingOrders(false); return; }
+      const findCol = (row, ...keys) => { for (const k of keys) { const found = Object.keys(row).find(rk=>rk.toUpperCase().replace(/[^A-Z]/g,"").includes(k.toUpperCase().replace(/[^A-Z]/g,""))); if (found) return row[found]; } return ""; };
+      // Clear all existing orders before reimport
+      await supabase.from("partner_orders").delete().neq("id","00000000-0000-0000-0000-000000000000");
+      let ok=0, skip=0;
+      const batch = [];
+      for (const r of rows) {
+        const clientId = String(findCol(r,"CLIENT","ID")||"").trim();
+        if (!clientId) { skip++; continue; }
+        const dateRaw = findCol(r,"ORDER_DATE","DATE","DATA","ORDER DATE");
+        let orderDate = null;
+        if (dateRaw) {
+          if (typeof dateRaw==="number") { const d=new Date((dateRaw-25569)*86400000); orderDate=d.toISOString().slice(0,10); }
+          else { const s=String(dateRaw).trim(); if (s.match(/^\d{4}-\d{2}-\d{2}/)) orderDate=s.slice(0,10); else if (s.match(/^\d{2}\/\d{2}\/\d{4}/)) { const [d,m,y]=s.split("/"); orderDate=`${y}-${m}-${d}`; } }
+        }
+        if (!orderDate) { skip++; continue; }
+        const val = parseFloat(String(findCol(r,"ORDER_VALUE","VALUE","VALOR")||"0").replace(",","."))||0;
+        const products = String(findCol(r,"PRODUCTS","PRODUTOS")||"").trim();
+        const mkt = String(findCol(r,"MARKET","MERCADO")||"").trim();
+        const gestor = String(findCol(r,"GESTOR")||"").trim();
+        const prog = String(findCol(r,"PROGRAMME","PROGRAMA")||"").trim();
+        batch.push({ client_id:clientId, order_date:orderDate, order_value:Math.round(val), products, market:mkt, gestor, programme:prog });
+        ok++;
+      }
+      for (let i=0;i<batch.length;i+=100) await supabase.from("partner_orders").insert(batch.slice(i,i+100));
+      setImportOrdersMsg(`✓ ${ok} encomendas importadas${skip>0?` · ${skip} ignoradas`:""}`);
+      await load();
+    } catch(err) { setImportOrdersMsg("❌ Erro: "+err.message); }
+    setImportingOrders(false);
+    if (fileOrdersRef.current) fileOrdersRef.current.value = "";
+  };
+
+  // Top 25 logic
   const getAvgData = () => {
     const last3 = imports.slice(0,3);
     if (!last3.length) return [];
     const byClient = {};
     records.filter(r=>last3.includes(r.import_date)).forEach(r=>{
-      if (!byClient[r.client_id]) byClient[r.client_id] = { ...r, _count:0, _fat:0, _enc:0, _vm:0 };
+      if (!byClient[r.client_id]) byClient[r.client_id]={...r,_count:0,_fat:0,_enc:0,_vm:0};
       byClient[r.client_id]._count++;
-      byClient[r.client_id]._fat += r.faturacao||0;
-      byClient[r.client_id]._enc += r.n_encomendas||0;
-      byClient[r.client_id]._vm += r.valor_medio||0;
+      byClient[r.client_id]._fat+=r.faturacao||0;
+      byClient[r.client_id]._enc+=r.n_encomendas||0;
+      byClient[r.client_id]._vm+=r.valor_medio||0;
     });
-    return Object.values(byClient).map(c=>({
-      ...c,
-      faturacao_avg: Math.round(c._fat/c._count),
-      n_encomendas_avg: Math.round(c._enc/c._count),
-      valor_medio_avg: Math.round(c._vm/c._count),
-    }));
+    return Object.values(byClient).map(c=>({...c, faturacao_avg:Math.round(c._fat/c._count), n_encomendas_avg:Math.round(c._enc/c._count), valor_medio_avg:Math.round(c._vm/c._count)}));
   };
-
-  const getMetricVal = (c) => metrica==="faturacao" ? c.faturacao_avg : metrica==="encomendas" ? c.n_encomendas_avg : c.valor_medio_avg;
-  const getMetricFmt = (v) => metrica==="encomendas" ? fmt(v) : fmtEur(v);
-  const getMetricLabel = () => metrica==="faturacao" ? "Faturação" : metrica==="encomendas" ? "Nº enc." : "Val. médio";
-
+  const getMetricVal = (c) => metrica==="faturacao"?c.faturacao_avg:metrica==="encomendas"?c.n_encomendas_avg:c.valor_medio_avg;
+  const getMetricFmt = (v) => metrica==="encomendas"?fmt(v):fmtEur(v);
+  const getMetricLabel = () => metrica==="faturacao"?"Faturação":metrica==="encomendas"?"Nº enc.":"Val. médio";
   const allData = getAvgData();
-  const filtered = allData.filter(c => {
-    if (filterCtx==="programa" && filterVal) return c.programa===filterVal;
-    if (filterCtx==="mercado" && filterVal) return c.mercado===filterVal;
+  const filtered = allData.filter(c=>{
+    if (filterCtx==="programa"&&filterVal) return c.programa===filterVal;
+    if (filterCtx==="mercado"&&filterVal) return c.mercado===filterVal;
     return true;
   });
   const top25 = [...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(0,25);
   const waiting = [...filtered].sort((a,b)=>getMetricVal(b)-getMetricVal(a)).slice(25,30);
-
   const lastImport = imports[0];
   const lastData = records.filter(r=>r.import_date===lastImport);
   const totalFat = lastData.reduce((s,r)=>s+(r.faturacao||0),0);
+
+  // All partners logic
+  const latestByClient = {};
+  lastData.forEach(r=>{ latestByClient[r.client_id]=r; });
+  const allPartners = Object.values(latestByClient);
+  const filteredAll = allPartners.filter(p=>{
+    const term = searchTerm.toLowerCase();
+    if (term && !p.client_id?.toLowerCase().includes(term) && !(p.partner_name||"").toLowerCase().includes(term)) return false;
+    return true;
+  }).sort((a,b)=>{
+    if (sortAll==="faturacao") return (b.faturacao||0)-(a.faturacao||0);
+    if (sortAll==="encomendas") return (b.n_encomendas||0)-(a.n_encomendas||0);
+    if (sortAll==="nome") return (a.partner_name||"").localeCompare(b.partner_name||"");
+    return (b.valor_medio||0)-(a.valor_medio||0);
+  });
+
+  // Analysis logic
+  const ordersByClient = {};
+  orders.forEach(o=>{ if (!ordersByClient[o.client_id]) ordersByClient[o.client_id]=[]; ordersByClient[o.client_id].push(o); });
+  const today = new Date();
+  const analysisData = allPartners.map(p=>{
+    const clientOrders = (ordersByClient[p.client_id]||[]).sort((a,b)=>new Date(a.order_date)-new Date(b.order_date));
+    const n = clientOrders.length;
+    const lastOrderDate = n>0?new Date(clientOrders[n-1].order_date):null;
+    const daysSinceLast = lastOrderDate?Math.floor((today-lastOrderDate)/86400000):null;
+    // Frequency: avg days between orders
+    let avgFreq = null;
+    if (n>=2) { const gaps=[]; for(let i=1;i<n;i++) gaps.push((new Date(clientOrders[i].order_date)-new Date(clientOrders[i-1].order_date))/86400000); avgFreq=Math.round(gaps.reduce((s,g)=>s+g,0)/gaps.length); }
+    const nextPredicted = (lastOrderDate&&avgFreq)?new Date(lastOrderDate.getTime()+avgFreq*86400000):null;
+    const churn = n===0||(daysSinceLast!=null&&daysSinceLast>90);
+    return {...p, clientOrders, n, lastOrderDate, daysSinceLast, avgFreq, nextPredicted, churn};
+  });
+  const churnPartners = analysisData.filter(p=>p.churn);
+  const activePartners = analysisData.filter(p=>!p.churn);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
-      {/* Header + import */}
+      {/* Header */}
       <div style={{...T.card,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
         <div style={{flex:1}}>
           <p style={{...T.sectionTitle,marginBottom:4}}>Top Parceiros</p>
           <p style={{fontSize:12,color:C.muted,margin:0}}>
-            {lastImport ? `Último import: ${lastImport} · ${lastData.length} parceiros · ${imports.length} import${imports.length!==1?"s":""}` : "Sem dados — faz o primeiro import"}
+            {lastImport?`Último import: ${lastImport} · ${lastData.length} parceiros · ${orders.length} encomendas`:"Sem dados — faz o primeiro import"}
           </p>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <input type="file" accept=".xlsx,.xls" ref={fileRef} onChange={handleImport} style={{display:"none"}} />
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <input type="file" accept=".xlsx,.xls,.csv" ref={fileRef} onChange={handleImport} style={{display:"none"}} />
+          <input type="file" accept=".xlsx,.xls,.csv" ref={fileOrdersRef} onChange={handleImportOrders} style={{display:"none"}} />
           <button onClick={()=>fileRef.current.click()} disabled={importing}
-            style={{padding:"8px 16px",background:"transparent",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:13,color:C.text,cursor:"pointer",opacity:importing?0.6:1}}>
-            {importing?"A importar…":"📂 Importar Excel"}
+            style={{padding:"7px 14px",background:"transparent",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,color:C.text,cursor:"pointer",opacity:importing?0.6:1}}>
+            {importing?"A importar…":"📂 Parceiros"}
           </button>
-          {importMsg && <span style={{fontSize:12,color:importMsg.startsWith("✓")?C.green:C.red}}>{importMsg}</span>}
+          <button onClick={()=>fileOrdersRef.current.click()} disabled={importingOrders}
+            style={{padding:"7px 14px",background:"transparent",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,color:C.text,cursor:"pointer",opacity:importingOrders?0.6:1}}>
+            {importingOrders?"A importar…":"📂 Encomendas"}
+          </button>
+          {importMsg&&<span style={{fontSize:11,color:importMsg.startsWith("✓")?C.green:C.red}}>{importMsg}</span>}
+          {importOrdersMsg&&<span style={{fontSize:11,color:importOrdersMsg.startsWith("✓")?C.green:C.red}}>{importOrdersMsg}</span>}
         </div>
       </div>
 
       {!lastImport ? (
         <div style={{...T.card,textAlign:"center",padding:"3rem",color:C.muted,fontSize:13}}>
-          Importa o ficheiro Excel para ver os top parceiros.
+          Importa o ficheiro de Parceiros para começar.
         </div>
       ) : (<>
 
-        {/* Visão geral */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-          {[
-            {label:"Parceiros importados", value:fmt(lastData.length), sub:`import de ${lastImport}`},
-            {label:"Faturação total", value:fmtEur(totalFat), sub:"último import"},
-            {label:"Imports realizados", value:imports.length, sub:`média de ${imports.length} períodos`},
-            {label:"No top 25 atual", value:top25.length, sub:`por ${getMetricLabel().toLowerCase()}`},
-          ].map((s,i)=>(
-            <div key={i} style={T.card}>
-              <p style={T.label}>{s.label}</p>
-              <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"4px 0"}}>{s.value}</p>
-              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
-            </div>
+        {/* Sub-tabs */}
+        <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+          {[{id:"top25",l:"Top 25"},{id:"todos",l:"Todos os parceiros"},{id:"analise",l:"Análise"}].map(t=>(
+            <button key={t.id} onClick={()=>setTopTab(t.id)}
+              style={{padding:"8px 16px",border:"none",borderBottom:topTab===t.id?`2px solid ${C.green}`:"2px solid transparent",
+                background:"transparent",color:topTab===t.id?C.green:C.muted,fontWeight:topTab===t.id?500:400,fontSize:13,cursor:"pointer"}}>
+              {t.l}
+            </button>
           ))}
         </div>
 
-        {/* Controlos */}
-        <div style={{...T.card}}>
-          <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:16}}>
-            <p style={{...T.sectionTitle,margin:0,marginRight:4}}>Top 25</p>
-            {/* Métrica */}
-            {[{id:"faturacao",l:"Faturação"},{id:"encomendas",l:"Nº encomendas"},{id:"valor_medio",l:"Valor médio"}].map(m=>(
-              <button key={m.id} onClick={()=>setMetrica(m.id)}
-                style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                  background:metrica===m.id?C.green:"transparent",color:metrica===m.id?"#fff":C.muted}}>
-                {m.l}
-              </button>
+        {/* TOP 25 */}
+        {topTab==="top25"&&<>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+            {[
+              {label:"Parceiros",value:fmt(lastData.length),sub:`import de ${lastImport}`},
+              {label:"Faturação total",value:fmtEur(totalFat),sub:"último import"},
+              {label:"Imports",value:imports.length,sub:"períodos"},
+              {label:"No top 25",value:top25.length,sub:`por ${getMetricLabel().toLowerCase()}`},
+            ].map((s,i)=>(
+              <div key={i} style={T.card}>
+                <p style={T.label}>{s.label}</p>
+                <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"4px 0"}}>{s.value}</p>
+                <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
+              </div>
             ))}
-            <div style={{width:1,height:20,background:C.border}} />
-            {/* Contexto */}
-            {[{id:"global",l:"Global"},{id:"programa",l:"Por programa"},{id:"mercado",l:"Por mercado"}].map(c=>(
-              <button key={c.id} onClick={()=>{setFilterCtx(c.id);setFilterVal("");}}
-                style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                  background:filterCtx===c.id?"#6366F1":"transparent",color:filterCtx===c.id?"#fff":C.muted}}>
-                {c.l}
-              </button>
-            ))}
-            {filterCtx==="programa" && (
-              <select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
-                style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
-                <option value="">Todos os programas</option>
-                {PROGS_TP.map(p=><option key={p} value={p}>{p}</option>)}
-              </select>
-            )}
-            {filterCtx==="mercado" && (
-              <select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
-                style={{padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
-                <option value="">Todos os mercados</option>
-                {Object.entries(MKT_LABELS_TP).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-              </select>
-            )}
-            <span style={{fontSize:12,color:C.muted,marginLeft:"auto"}}>{imports.length>=2?`Média de ${Math.min(imports.length,3)} imports`:"1 import — ranking direto"}</span>
           </div>
-
-          {/* Top 25 */}
-          {top25.length===0 ? (
-            <p style={{color:C.muted,fontSize:13,textAlign:"center",padding:"2rem"}}>Nenhum resultado.</p>
-          ) : (
+          <div style={T.card}>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
+              <p style={{...T.sectionTitle,margin:0}}>Top 25</p>
+              {[{id:"faturacao",l:"Faturação"},{id:"encomendas",l:"Nº encomendas"},{id:"valor_medio",l:"Valor médio"}].map(m=>(
+                <button key={m.id} onClick={()=>setMetrica(m.id)}
+                  style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                    background:metrica===m.id?C.green:"transparent",color:metrica===m.id?"#fff":C.muted}}>{m.l}</button>
+              ))}
+              <div style={{width:1,height:16,background:C.border}} />
+              {[{id:"global",l:"Global"},{id:"programa",l:"Programa"},{id:"mercado",l:"Mercado"}].map(c=>(
+                <button key={c.id} onClick={()=>{setFilterCtx(c.id);setFilterVal("");}}
+                  style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                    background:filterCtx===c.id?"#6366F1":"transparent",color:filterCtx===c.id?"#fff":C.muted}}>{c.l}</button>
+              ))}
+              {filterCtx==="programa"&&<select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
+                style={{padding:"4px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
+                <option value="">Todos</option>
+                {PROGS_TP.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>}
+              {filterCtx==="mercado"&&<select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
+                style={{padding:"4px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
+                <option value="">Todos</option>
+                {Object.entries(MKT_LABELS_TP).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+              </select>}
+            </div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-              <thead>
-                <tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                  {["#","ID","Mercado","Programa",getMetricLabel(),"Últ. compra"].map((h,i)=>(
-                    <th key={i} style={{padding:"8px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                {["#","ID","Nome","Mercado","Programa",getMetricLabel()].map((h,i)=>(
+                  <th key={i} style={{padding:"7px 10px",textAlign:i>4?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                ))}
+              </tr></thead>
               <tbody>
                 {top25.map((c,i)=>(
                   <tr key={c.client_id} style={{borderBottom:`0.5px solid ${C.card}`,background:i%2===0?"transparent":C.card+"44"}}>
-                    <td style={{padding:"9px 10px",fontWeight:600,color:i<3?C.green:C.muted,width:30}}>{i+1}</td>
-                    <td style={{padding:"9px 10px",fontWeight:500,color:C.text}}>{c.client_id}</td>
-                    <td style={{padding:"9px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
-                    <td style={{padding:"9px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
-                    <td style={{padding:"9px 10px",textAlign:"right",fontWeight:500,color:C.text}}>{getMetricFmt(getMetricVal(c))}</td>
-                    <td style={{padding:"9px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{c.data_ultima_compra||"—"}</td>
+                    <td style={{padding:"8px 10px",fontWeight:600,color:i<3?C.green:C.muted,width:28}}>{i+1}</td>
+                    <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{c.client_id}</td>
+                    <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{c.partner_name||"—"}</td>
+                    <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
+                    <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
+                    <td style={{padding:"8px 10px",textAlign:"right",fontWeight:500,color:C.text}}>{getMetricFmt(getMetricVal(c))}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-
-          {/* Lista de espera */}
-          {waiting.length>0 && (
-            <div style={{marginTop:16,paddingTop:12,borderTop:`0.5px solid ${C.border}`}}>
+            {waiting.length>0&&<div style={{marginTop:14,paddingTop:12,borderTop:`0.5px solid ${C.border}`}}>
               <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".06em"}}>À entrada (26º–30º)</p>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              {waiting.map((c,i)=>(
+                <div key={c.client_id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:`0.5px solid ${C.card}`}}>
+                  <span style={{fontSize:12,color:C.muted,width:28}}>{i+26}</span>
+                  <span style={{fontSize:12,color:C.text,flex:1}}>{c.partner_name||c.client_id}</span>
+                  <span style={{fontSize:11,color:C.muted}}>{getMetricFmt(getMetricVal(c))}</span>
+                </div>
+              ))}
+            </div>}
+          </div>
+        </>}
+
+        {/* TODOS OS PARCEIROS */}
+        {topTab==="todos"&&<div style={T.card}>
+          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:14,flexWrap:"wrap"}}>
+            <p style={{...T.sectionTitle,margin:0}}>{filteredAll.length} parceiros</p>
+            <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Pesquisar ID ou nome..."
+              style={{padding:"6px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",minWidth:180}} />
+            <select value={sortAll} onChange={e=>setSortAll(e.target.value)}
+              style={{padding:"6px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
+              <option value="faturacao">Ordenar: Faturação</option>
+              <option value="encomendas">Ordenar: Encomendas</option>
+              <option value="valor_medio">Ordenar: Valor médio</option>
+              <option value="nome">Ordenar: Nome</option>
+            </select>
+          </div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+              {["Nome","ID","Mercado","Programa","Gestor","Faturação","Nº enc.","Val. médio"].map((h,i)=>(
+                <th key={i} style={{padding:"7px 10px",textAlign:i>4?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {filteredAll.map((c,i)=>{
+                const noOrders = !c.n_encomendas||c.n_encomendas===0;
+                return (
+                  <tr key={c.client_id} style={{borderBottom:`0.5px solid ${C.card}`,background:noOrders?"#FEF3F2":i%2===0?"transparent":C.card+"22"}}>
+                    <td style={{padding:"8px 10px",fontWeight:500,color:noOrders?C.red:C.text}}>{c.partner_name||"—"}</td>
+                    <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{c.client_id}</td>
+                    <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
+                    <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
+                    <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{c.gestor||"—"}</td>
+                    <td style={{padding:"8px 10px",textAlign:"right",color:noOrders?C.muted:C.text}}>{noOrders?"—":fmtEur(c.faturacao)}</td>
+                    <td style={{padding:"8px 10px",textAlign:"right",color:noOrders?C.muted:C.text}}>{noOrders?"0":fmt(c.n_encomendas)}</td>
+                    <td style={{padding:"8px 10px",textAlign:"right",color:noOrders?C.muted:C.text}}>{noOrders?"—":fmtEur(c.valor_medio)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>}
+
+        {/* ANÁLISE */}
+        {topTab==="analise"&&<>
+          {orders.length===0?(
+            <div style={{...T.card,textAlign:"center",padding:"2rem",color:C.muted,fontSize:13}}>
+              Importa o ficheiro de Encomendas para ver a análise.
+            </div>
+          ):<>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+              {[
+                {label:"Total encomendas",value:fmt(orders.length),sub:"histórico completo"},
+                {label:"Parceiros activos",value:fmt(activePartners.length),sub:"compraram nos últimos 90 dias"},
+                {label:"Churn (sem compra)",value:fmt(churnPartners.length),sub:"sem compra há +90 dias ou nunca"},
+                {label:"Freq. média recompra",value:analysisData.filter(p=>p.avgFreq).length>0?Math.round(analysisData.filter(p=>p.avgFreq).reduce((s,p)=>s+p.avgFreq,0)/analysisData.filter(p=>p.avgFreq).length)+" dias":"—",sub:"entre encomendas"},
+              ].map((s,i)=>(
+                <div key={i} style={T.card}>
+                  <p style={T.label}>{s.label}</p>
+                  <p style={{fontSize:20,fontWeight:500,color:i===2?C.red:C.text,margin:"4px 0"}}>{s.value}</p>
+                  <p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Churn */}
+            {churnPartners.length>0&&<div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:10,color:C.red}}>⚠ Churn — {churnPartners.length} parceiros</p>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                  {["Nome","ID","Programa","Última compra","Dias sem compra"].map((h,i)=>(
+                    <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                  ))}
+                </tr></thead>
                 <tbody>
-                  {waiting.map((c,i)=>(
-                    <tr key={c.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
-                      <td style={{padding:"6px 10px",color:C.muted,width:30}}>{i+26}</td>
-                      <td style={{padding:"6px 10px",color:C.text}}>{c.client_id}</td>
-                      <td style={{padding:"6px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E6F1FB",color:"#0C447C"}}>{MKT_LABELS_TP[c.mercado]||c.mercado}</span></td>
-                      <td style={{padding:"6px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{c.programa}</span></td>
-                      <td style={{padding:"6px 10px",textAlign:"right",color:C.muted}}>{getMetricFmt(getMetricVal(c))}</td>
+                  {churnPartners.sort((a,b)=>(b.daysSinceLast||999)-(a.daysSinceLast||999)).map(p=>(
+                    <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
+                      <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.client_id}</td>
+                      <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                      <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"Nunca comprou"}</td>
+                      <td style={{padding:"8px 10px",textAlign:"right",color:C.red,fontWeight:500}}>{p.daysSinceLast!=null?p.daysSinceLast+" dias":"—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>}
+
+            {/* Frequência e previsão */}
+            <div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:10}}>Frequência e previsão de recompra</p>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                  {["Nome","ID","Programa","Nº enc.","Freq. média","Última compra","Próxima prevista"].map((h,i)=>(
+                    <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {activePartners.sort((a,b)=>{ const dA=a.nextPredicted?new Date(a.nextPredicted):new Date(9999,0); const dB=b.nextPredicted?new Date(b.nextPredicted):new Date(9999,0); return dA-dB; }).slice(0,30).map(p=>{
+                    const isOverdue = p.nextPredicted&&p.nextPredicted<today;
+                    return (
+                      <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`,background:isOverdue?"#FEF3F2":"transparent"}}>
+                        <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
+                        <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.client_id}</td>
+                        <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{fmt(p.n)}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:C.muted}}>{p.avgFreq?p.avgFreq+" dias":"—"}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
+                        <td style={{padding:"8px 10px",textAlign:"right",fontWeight:500,color:isOverdue?C.red:C.green}}>{p.nextPredicted?p.nextPredicted.toISOString().slice(0,10):"—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </>}
+        </>}
       </>)}
     </div>
   );
