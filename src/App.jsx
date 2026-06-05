@@ -635,37 +635,6 @@ function TopParceirosTab() {
                 );
               })}
             </div>
-
-            {/* Dependência Supersales - moved to SS tab */}
-            {false&&(() => {
-              const ssDependents = analysisData.filter(p=>p.ssDependent);
-              return ssDependents.length>0?(
-                <div style={T.card}>
-                  <p style={{...T.sectionTitle,marginBottom:4}}>Dependência Supersales ⚡ — {ssDependents.length} parceiros</p>
-                  <p style={{fontSize:11,color:C.muted,margin:"0 0 10px"}}>Parceiros com +50% das encomendas em dias de Supersales</p>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                    <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                      {["Nome","Programa","Gestor","Nº enc.","Enc. SS","% SS","Última compra"].map((h,i)=>(
-                        <th key={i} style={{padding:"7px 10px",textAlign:i>3?"right":"left",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                      ))}
-                    </tr></thead>
-                    <tbody>
-                      {ssDependents.sort((a,b)=>b.ssPct-a.ssPct).map(p=>(
-                        <tr key={p.client_id} style={{borderBottom:`0.5px solid ${C.card}`}}>
-                          <td style={{padding:"8px 10px",fontWeight:500,color:C.text}}>{p.partner_name||"—"}</td>
-                          <td style={{padding:"8px 10px"}}><span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{p.programa}</span></td>
-                          <td style={{padding:"8px 10px",color:C.muted,fontSize:12}}>{p.gestor||"—"}</td>
-                          <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{fmt(p.n)}</td>
-                          <td style={{padding:"8px 10px",textAlign:"right",color:"#D97706"}}>{fmt(p.ssOrders)}</td>
-                          <td style={{padding:"8px 10px",textAlign:"right",fontWeight:500,color:"#D97706"}}>{p.ssPct}%</td>
-                          <td style={{padding:"8px 10px",textAlign:"right",color:C.muted,fontSize:12}}>{p.lastOrderDate?p.lastOrderDate.toISOString().slice(0,10):"—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ):null;
-            })()}
           </>}
         </>}
       </>)}
