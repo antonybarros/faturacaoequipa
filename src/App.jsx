@@ -2062,7 +2062,7 @@ function TestesTab({ year, month }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programme,status,original_created_at")
+      .select("gestor,programme,status,stage,original_created_at")
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
@@ -2092,6 +2092,11 @@ function TestesTab({ year, month }) {
 
   const totalAll = data.length;
   const totalBought = data.filter(r=>r.status==="bought").length;
+  // Only count partners that have been verified (past 30 days): stage s60/s90 or status closed/bought
+  const verified = data.filter(r=>r.status==="bought"||r.status==="closed"||r.stage==="s60"||r.stage==="s90");
+  const verifiedBought = verified.filter(r=>r.status==="bought").length;
+  const verifiedNotBought = verified.filter(r=>r.status!=="bought").length;
+  const stillInS30 = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
   return (
@@ -2120,13 +2125,13 @@ function TestesTab({ year, month }) {
         {periodo==="3meses"&&<>
           <div style={T.card}>
             <p style={T.label}>Com 1ª compra</p>
-            <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{totalBought}</p>
-            <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(totalBought/totalAll*100).toFixed(1):0}% de conversão</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.green,margin:"4px 0"}}>{verifiedBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{verified.length>0?(verifiedBought/verified.length*100).toFixed(1):0}% de conversão</p>
           </div>
           <div style={T.card}>
             <p style={T.label}>Sem 1ª compra</p>
-            <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{totalAll-totalBought}</p>
-            <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?((totalAll-totalBought)/totalAll*100).toFixed(1):0}% pendentes</p>
+            <p style={{fontSize:24,fontWeight:500,color:C.red,margin:"4px 0"}}>{verifiedNotBought}</p>
+            <p style={{fontSize:11,color:C.muted,margin:0}}>{stillInS30>0?`${stillInS30} ainda em avaliação`:"todos verificados"}</p>
           </div>
         </>}
       </div>
@@ -2138,7 +2143,7 @@ function TestesTab({ year, month }) {
           const n=byProg[p]||0;
           if(n===0) return null;
           const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
-          const bought=periodo==="3meses"?data.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
           return (
             <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
