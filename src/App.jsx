@@ -2081,7 +2081,6 @@ function TestesTab({ year, month }) {
   // By programme
   const byProg = {};
   const byGestor = {};
-  const gestors = ["Antony","Fabien","Mónica"];
   gestors.forEach(g=>{ byGestor[g]={total:0,progs:{}}; });
   data.forEach(r=>{
     const p = r.programme||"—";
