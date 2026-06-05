@@ -311,35 +311,34 @@ function TopParceirosTab({ isAdmin=true, gestor=null }) {
           <div style={T.card}>
             <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
               <p style={{...T.sectionTitle,margin:0}}>Top 25</p>
-              {[{id:"faturacao",l:"Faturação"},{id:"encomendas",l:"Nº encomendas"},{id:"valor_medio",l:"Valor médio"},{id:"ss",l:"⚡ SS"}].map(m=>(
-                <button key={m.id} onClick={()=>setMetrica(m.id)}
-                  style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                    background:metrica===m.id?C.green:"transparent",color:metrica===m.id?"#fff":C.muted}}>{m.l}</button>
-              ))}
-              <div style={{width:1,height:16,background:C.border}} />
-              {(isAdmin?["","Antony","Fabien","Mónica"]:["",gestor?.name||gestor]).map(g=>(
-                <button key={g||"todos"} onClick={()=>setFilterGestor(g||"")}
-                  style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                    background:filterGestor===(g||"")?"#6366F1":"transparent",color:filterGestor===(g||"")?"#fff":C.muted}}>
-                  {g||"Global"}
-                </button>
-              ))}
-              <div style={{width:1,height:16,background:C.border}} />
-              {[{id:"global",l:"Global"},{id:"programa",l:"Programa"},{id:"mercado",l:"Mercado"}].map(c=>(
-                <button key={c.id} onClick={()=>{setFilterCtx(c.id);setFilterVal("");}}
-                  style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                    background:filterCtx===c.id?"#6366F1":"transparent",color:filterCtx===c.id?"#fff":C.muted}}>{c.l}</button>
-              ))}
-              {filterCtx==="programa"&&<select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
-                style={{padding:"4px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
-                <option value="">Todos</option>
-                {PROGS_TP.map(p=><option key={p} value={p}>{p}</option>)}
-              </select>}
-              {filterCtx==="mercado"&&<select value={filterVal} onChange={e=>setFilterVal(e.target.value)}
-                style={{padding:"4px 8px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none"}}>
-                <option value="">Todos</option>
+              {/* Métrica */}
+              <select value={metrica} onChange={e=>setMetrica(e.target.value)}
+                style={{padding:"5px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",cursor:"pointer"}}>
+                <option value="faturacao">Faturação</option>
+                <option value="encomendas">Nº encomendas</option>
+                <option value="valor_medio">Valor médio</option>
+                <option value="ss">⚡ SS</option>
+              </select>
+              {/* Gestor */}
+              <select value={filterGestor} onChange={e=>setFilterGestor(e.target.value)}
+                style={{padding:"5px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",cursor:"pointer"}}>
+                <option value="">Gestor</option>
+                {(isAdmin?["Antony","Fabien","Mónica"]:([gestor?.name||gestor].filter(Boolean))).map(g=>(
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+              {/* Mercado */}
+              <select value={filterCtx==="mercado"?filterVal:""} onChange={e=>{setFilterCtx(e.target.value?"mercado":"global");setFilterVal(e.target.value);}}
+                style={{padding:"5px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",cursor:"pointer"}}>
+                <option value="">Mercado</option>
                 {Object.entries(MKT_LABELS_TP).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-              </select>}
+              </select>
+              {/* Programa */}
+              <select value={filterCtx==="programa"?filterVal:""} onChange={e=>{setFilterCtx(e.target.value?"programa":"global");setFilterVal(e.target.value);}}
+                style={{padding:"5px 10px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:12,background:C.bg,color:C.text,outline:"none",cursor:"pointer"}}>
+                <option value="">Programa</option>
+                {PROGS_TP.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
