@@ -2080,6 +2080,161 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
 }
 
 
+// ── CockpitTab ────────────────────────────────────────────────────────────────
+function CockpitTab({ gestor, isAdmin, year, month }) {
+  const [followupData, setFollowupData] = useState([]);
+  const [ordersData, setOrdersData] = useState([]);
+  const [partnersData, setPartnersData] = useState([]);
+  const [ssDates, setSsDates] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+
+  const myGestor = isAdmin ? null : (gestor?.name || gestor);
+  const gestors = isAdmin ? ["Antony","Fabien","Mónica"] : [myGestor];
+
+  useEffect(()=>{
+    setLoading(true);
+    Promise.all([
+      supabase.from("partner_followup").select("*").eq("status","pending"),
+      supabase.from("partner_orders").select("*").order("order_date",{ascending:false}),
+      supabase.from("top_partners").select("*").order("import_date",{ascending:false}),
+      supabase.from("billing_months").select("month_key,entries"),
+    ]).then(([{data:fu},{data:po},{data:tp},{data:bm}])=>{
+      setFollowupData(fu||[]);
+      setOrdersData(po||[]);
+      setPartnersData(tp||[]);
+      // Build SS dates
+      const ssSet = new Set();
+      (bm||[]).forEach(row=>{
+        const [y,m] = row.month_key.split("-").map(Number);
+        Object.entries(row.entries||{}).forEach(([d,e])=>{
+          if(e.supersales) ssSet.add(`${y}-${String(m).padStart(2,"0")}-${String(Number(d)).padStart(2,"0")}`);
+        });
+      });
+      setSsDates(ssSet);
+      setLoading(false);
+    });
+  },[]);
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
+
+  const today = new Date();
+  const STAGES = [
+    {key:"s30",days:30,label:"30 dias"},
+    {key:"s60",days:60,label:"60 dias"},
+    {key:"s90",days:90,label:"90 dias"},
+  ];
+
+  const getInfo = (r) => {
+    const stage = STAGES.find(s=>s.key===r.stage)||STAGES[0];
+    const regDate = r.original_created_at||r.stage_started_at;
+    const diff = Math.floor((new Date()-new Date(regDate))/86400000);
+    const left = stage.days-diff;
+    return {stage,diff,left,overdue:left<=0};
+  };
+
+  // Latest partners by client
+  const imports = [...new Set(partnersData.map(r=>r.import_date))].sort().reverse();
+  const lastImport = imports[0];
+  const latestPartners = {};
+  partnersData.filter(r=>r.import_date===lastImport).forEach(r=>{ latestPartners[r.client_id]=r; });
+
+  // Orders by client
+  const ordersByClient = {};
+  ordersData.forEach(o=>{ if(!ordersByClient[o.client_id]) ordersByClient[o.client_id]=[]; ordersByClient[o.client_id].push(o); });
+
+  // Analysis data for "contactar hoje"
+  const analysisData = Object.values(latestPartners).map(p=>{
+    const clientOrders = (ordersByClient[p.client_id]||[]).sort((a,b)=>new Date(a.order_date)-new Date(b.order_date));
+    const n = clientOrders.length;
+    const lastOrderDate = n>0?new Date(clientOrders[n-1].order_date):null;
+    let avgFreq = null;
+    if(n>=2){const gaps=[];for(let i=1;i<n;i++)gaps.push((new Date(clientOrders[i].order_date)-new Date(clientOrders[i-1].order_date))/86400000);avgFreq=Math.round(gaps.reduce((s,g)=>s+g,0)/gaps.length);}
+    const nextPredicted = (lastOrderDate&&avgFreq)?new Date(lastOrderDate.getTime()+avgFreq*86400000):null;
+    return {...p,clientOrders,n,lastOrderDate,avgFreq,nextPredicted};
+  });
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={T.card}>
+        <p style={T.sectionTitle}>Cockpit — {today.toLocaleDateString("pt-PT",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
+      </div>
+
+      {gestors.map(g=>{
+        // Follow-up overdue for this gestor
+        const myFollowup = followupData.filter(r=>(r.gestor===g)).filter(r=>{
+          const info = getInfo(r);
+          return info.overdue || info.left===0;
+        }).sort((a,b)=>getInfo(a).left-getInfo(b).left);
+
+        // Contactar hoje - next 5 days for this gestor
+        const toContact = analysisData.filter(p=>{
+          if(p.gestor!==g||!p.nextPredicted||!p.avgFreq) return false;
+          const daysUntil = Math.floor((p.nextPredicted-today)/86400000);
+          return daysUntil<=5;
+        }).sort((a,b)=>Math.floor((a.nextPredicted-today)/86400000)-Math.floor((b.nextPredicted-today)/86400000));
+
+        return (
+          <div key={g}>
+            {isAdmin&&<p style={{...T.sectionTitle,marginBottom:10,color:C.muted,fontSize:12,textTransform:"uppercase",letterSpacing:".08em"}}>{g}</p>}
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+              {/* Follow-up pendente */}
+              <div style={T.card}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <p style={{...T.sectionTitle,margin:0,flex:1}}>Follow-up pendente</p>
+                  {myFollowup.length>0&&<span style={{background:"#FCEBEB",color:C.red,fontSize:11,fontWeight:500,padding:"3px 10px",borderRadius:20}}>{myFollowup.length}</span>}
+                </div>
+                {myFollowup.length===0?<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem pendências hoje 🎉</p>:
+                myFollowup.map(r=>{
+                  const info = getInfo(r);
+                  return (
+                    <div key={r.id} style={{padding:"8px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                        <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>ID: {r.client_id}</span>
+                        <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:"#E1F5EE",color:"#085041"}}>{info.stage.label}</span>
+                        <span style={{fontSize:11,fontWeight:500,color:info.overdue?C.red:"#D97706"}}>
+                          {info.overdue?`${Math.abs(info.left)}d em atraso`:"expira hoje"}
+                        </span>
+                      </div>
+                      <p style={{fontSize:11,color:C.muted,margin:0}}>{r.programme} · {r.market}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Contactar hoje */}
+              <div style={T.card}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <p style={{...T.sectionTitle,margin:0,flex:1}}>Contactar nos próximos 5 dias</p>
+                  {toContact.length>0&&<span style={{background:"#EFF6FF",color:"#1D4ED8",fontSize:11,fontWeight:500,padding:"3px 10px",borderRadius:20}}>{toContact.length}</span>}
+                </div>
+                {toContact.length===0?<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Nenhum para esta semana</p>:
+                toContact.map(p=>{
+                  const daysUntil = Math.floor((p.nextPredicted-today)/86400000);
+                  const prodCount = {};
+                  p.clientOrders.forEach(o=>{ (o.products||"").split("+").forEach(pr=>{ const t=pr.trim(); if(t) prodCount[t]=(prodCount[t]||0)+1; }); });
+                  const topProd = Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+                  return (
+                    <div key={p.client_id} style={{padding:"8px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                        <span style={{fontSize:13,fontWeight:500,color:C.text,flex:1}}>{p.partner_name||p.client_id}</span>
+                        <span style={{fontSize:11,fontWeight:500,color:daysUntil<=0?C.red:daysUntil<=2?"#D97706":C.green}}>
+                          {daysUntil<=0?"hoje":daysUntil===1?"amanhã":`em ${daysUntil} dias`}
+                        </span>
+                      </div>
+                      <p style={{fontSize:11,color:C.muted,margin:0}}>💊 {topProd}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
 function AnaliseFollowup({ year, month, isAdmin }) {
   const [periodo, setPeriodo] = useState("mes");
@@ -2727,7 +2882,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"testes",l:"Testes",adminOnly:true},{id:"cockpit",l:"Cockpit",adminOnly:false}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -2743,7 +2898,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="testes" ? <TestesTab year={year} month={month} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
       </div>
