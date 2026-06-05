@@ -39,7 +39,6 @@ const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" 
 const PROGS_TP = ["Professionals","Pro Gym","Pro Box","Pro Teams","Elite","Performance","Horeca","Corporate"];
 
 function TopParceirosTab() {
-  const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [imports, setImports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1289,6 +1288,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
     { key:"s90", days:90, label:"90 dias" },
   ];
 
+  const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
