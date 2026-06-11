@@ -2906,7 +2906,7 @@ function MainApp({ role, onLogout }) {
         ):tab==="analise"?(
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
-          <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>
+          <div>
             {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
