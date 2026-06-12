@@ -1593,7 +1593,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 }
 
 // ── Partner constants & mappings ──────────────────────────────────────────────
-const GESTORS = ["Antony", "Fabien", "Mónica"];
+const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira"];
 const ALL_MKTS = [
   {key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"},
   {key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}
@@ -2030,6 +2030,9 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
           <option value="CH">Suíça</option>
           <option value="BNL">Benelux</option>
           <option value="DEAT">Alemanha e Áustria</option>
+          <option value="IT">Itália</option>
+          <option value="ES">Espanha</option>
+          <option value="PT">Portugal</option>
         </select>
         {/* Programa */}
         <select value={filterProg} onChange={e=>setFilterProg(e.target.value)}
@@ -2132,7 +2135,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
   const [loading, setLoading] = useState(true);
 
   const myGestor = isAdmin ? null : (gestor?.name || gestor);
-  const gestors = isAdmin ? ["Antony","Fabien","Mónica"] : [myGestor];
+  const gestors = isAdmin ? ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"] : [myGestor];
 
   useEffect(()=>{
     setLoading(true);
@@ -2291,7 +2294,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
-  const gestors = ["Antony","Fabien","Mónica"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"];
 
   useEffect(()=>{
     setLoading(true);
@@ -2773,7 +2776,7 @@ function TestesTab({ year, month }) {
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
-  const gestors = ["Antony","Fabien","Mónica"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"];
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 
   // By programme
