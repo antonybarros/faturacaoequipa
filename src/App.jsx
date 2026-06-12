@@ -673,8 +673,8 @@ function PasswordGate({ onUnlock }) {
   );
 }
 
-async function loadMonthData(year, month) {
-  const { data } = await supabase.from("billing_months").select("entries,team_goals").eq("month_key", monthKey(year, month)).maybeSingle();
+async function loadMonthData(year, month, team="equipa_fr") {
+  const { data } = await supabase.from("billing_months").select("entries,team_goals").eq("month_key", monthKey(year, month)).eq("team", team).maybeSingle();
   return data || { entries:{}, team_goals:{} };
 }
 
@@ -1207,10 +1207,17 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
 }
 
 // ── Helper: is new structure (June 2026+) ─────────────────────────────────────
-const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5); // month is 0-indexed, 5 = June
+const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5);
+
+const TEAMS = [
+  { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"] },
+  { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
+  { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
+  { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
+]; // month is 0-indexed, 5 = June
 
 // ── Registo Tab ────────────────────────────────────────────────────────────────
-function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData }) {
+function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData, currentTeam, setCurrentTeam }) {
   const [subTab, setSubTab] = useState("faturacao");
   const newStruct = isNewStructure(year, month);
 
@@ -1227,7 +1234,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   const save = async (newData) => {
     const key = monthKey(year, month);
-    await supabase.from("billing_months").upsert({ month_key: key, ...newData }, { onConflict:"month_key" });
+    await supabase.from("billing_months").upsert({ month_key: key, team: currentTeam, ...newData }, { onConflict:"month_key,team" });
     setMonthData(prev => ({ ...prev, ...newData }));
   };
 
@@ -1260,6 +1267,16 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
+      {/* Team selector */}
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        {TEAMS.map(t=>(
+          <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
+            style={{ padding:"6px 16px", borderRadius:20, fontSize:13, border:`0.5px solid ${C.border}`, cursor:"pointer",
+              background:currentTeam===t.key?C.green:"transparent", color:currentTeam===t.key?"#fff":C.muted, fontWeight:currentTeam===t.key?500:400 }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
       {/* Sub-tabs */}
       <div style={{ display:"flex", gap:0, borderBottom:`0.5px solid ${C.border}`, overflowX:"auto" }}>
         {SUB_TABS.map(t => (
@@ -2866,8 +2883,9 @@ function MainApp({ role, onLogout }) {
   const isCurrentMonth = year===today.getFullYear()&&month===today.getMonth();
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
-  useEffect(()=>{ setLoading(true); loadMonthData(year,month).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month]);
+  useEffect(()=>{ setLoading(true); loadMonthData(year,month,currentTeam).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month,currentTeam]);
   const [partnersCount, setPartnersCount] = useState(null);
+  const [currentTeam, setCurrentTeam] = useState("equipa_fr");
   useEffect(()=>{ loadPartnersCount(year,month).then(setPartnersCount); },[year,month]);
   const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
   const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
@@ -2907,7 +2925,7 @@ function MainApp({ role, onLogout }) {
           <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
         ):(
           <div>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} /> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
+            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} /> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
       </div>
