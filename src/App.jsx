@@ -1276,16 +1276,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {/* Team selector */}
-      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-        {TEAMS.map(t=>(
-          <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
-            style={{ padding:"6px 16px", borderRadius:20, fontSize:13, border:`0.5px solid ${C.border}`, cursor:"pointer",
-              background:currentTeam===t.key?C.green:"transparent", color:currentTeam===t.key?"#fff":C.muted, fontWeight:currentTeam===t.key?500:400 }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+
       {/* Sub-tabs */}
       <div style={{ display:"flex", gap:0, borderBottom:`0.5px solid ${C.border}`, overflowX:"auto" }}>
         {SUB_TABS.map(t => (
@@ -2899,6 +2890,10 @@ function MainApp({ role, onLogout }) {
             <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · {role.name}{isAdmin?" · Admin":""}</p>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <select value={currentTeam} onChange={e=>setCurrentTeam(e.target.value)}
+              style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
+              {TEAMS.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
             <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
             style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
             {monthOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
