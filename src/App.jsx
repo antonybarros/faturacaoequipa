@@ -698,14 +698,24 @@ async function loadMonthData(year, month, team="equipa_fr") {
   return data || { entries:{}, team_goals:{} };
 }
 
-async function loadHistoricalSSAvg(year, month) {
+// Returns total value from an entry object for a given team
+function getEntryTotal(e, team) {
+  if (!e) return 0;
+  if (team === "equipa_it") return Number(e.IT)||0;
+  if (team === "equipa_es") return Number(e.ES)||0;
+  if (team === "equipa_pt") return (Number(e.PT)||0)+(Number(e.OTHER)||0);
+  // equipa_fr — use all FR markets
+  return (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+}
+
+async function loadHistoricalSSAvg(year, month, team="equipa_fr") {
   // Load previous months, find months that had a SS day, sum their SS day values, divide by count
   const keys = [];
   for (let i = 1; i <= 12; i++) {
     const d = new Date(year, month - i, 1);
     keys.push(monthKey(d.getFullYear(), d.getMonth()));
   }
-  const { data } = await supabase.from("billing_months").select("entries").in("month_key", keys);
+  const { data } = await supabase.from("billing_months").select("entries").in("month_key", keys).eq("team", team);
   if (!data || data.length === 0) return 0;
   let totalSSValue = 0, monthsWithSS = 0;
   for (const row of data) {
@@ -716,7 +726,7 @@ async function loadHistoricalSSAvg(year, month) {
     let prev = 0;
     for (const d of days) {
       const e = entries[d];
-      const val = (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+      const val = getEntryTotal(e, team);
       cumuls[d] = val > prev ? val : prev;
       prev = cumuls[d];
     }
@@ -734,14 +744,14 @@ async function loadHistoricalSSAvg(year, month) {
   return monthsWithSS > 0 ? Math.round(totalSSValue / monthsWithSS) : 0;
 }
 
-async function loadHistoricalDowAvg(year, month) {
+async function loadHistoricalDowAvg(year, month, team="equipa_fr") {
   // Load last 3 months and compute average day value per day of week
   const keys = [];
   for (let i = 1; i <= 3; i++) {
     const d = new Date(year, month - i, 1);
     keys.push(monthKey(d.getFullYear(), d.getMonth()));
   }
-  const { data } = await supabase.from("billing_months").select("entries,month_key").in("month_key", keys);
+  const { data } = await supabase.from("billing_months").select("entries,month_key").in("month_key", keys).eq("team", team);
   if (!data || data.length === 0) return {};
   const dowSum = {}, dowCnt = {};
   for (const row of data) {
@@ -753,17 +763,7 @@ async function loadHistoricalDowAvg(year, month) {
     const days = Object.keys(entries).map(Number).sort((a,b)=>a-b);
     for (const d of days) {
       const e = entries[d];
-      let lastFR=0, lastCH=0, lastBNL=0, lastDEAT=0;
-      if (isNew) {
-        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
-        if (e.CH !== undefined) lastCH = Number(e.CH)||0;
-        if (e.BNL !== undefined) lastBNL = Number(e.BNL)||0;
-        if (e.DEAT !== undefined) lastDEAT = Number(e.DEAT)||0;
-      } else {
-        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
-        if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
-      }
-      const cumul = isNew ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
+      const cumul = getEntryTotal(e, team);
       const dayVal = cumul > prev ? cumul - prev : 0;
       // Only include normal days (exclude SS and campaigns from averages)
       if (dayVal > 0 && !e.supersales && !e.campanha) {
@@ -803,22 +803,30 @@ async function loadPartnersByMktProg(year, month) {
   return data || [];
 }
 
-function buildDaily(entries, totalDays, year, month) {
+function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
   const daily = []; let prevCumul=0;
   const newStruct = (year!=null&&month!=null) ? isNewStructure(year,month) : false;
+  // For non-FR teams, use getEntryTotal directly
+  const isFR = !team || team === "equipa_fr";
   let lastFR=0, lastCH=0, lastBNL=0, lastDEAT=0;
   for (let d=1; d<=totalDays; d++) {
     const e = entries[d] || {};
-    if (newStruct) {
-      if (e.FR !== undefined) lastFR = Number(e.FR)||0;
-      if (e.CH !== undefined) lastCH = Number(e.CH)||0;
-      if (e.BNL !== undefined) lastBNL = Number(e.BNL)||0;
-      if (e.DEAT !== undefined) lastDEAT = Number(e.DEAT)||0;
+    let cumul;
+    if (isFR) {
+      if (newStruct) {
+        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+        if (e.CH !== undefined) lastCH = Number(e.CH)||0;
+        if (e.BNL !== undefined) lastBNL = Number(e.BNL)||0;
+        if (e.DEAT !== undefined) lastDEAT = Number(e.DEAT)||0;
+      } else {
+        if (e.FR !== undefined) lastFR = Number(e.FR)||0;
+        if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
+      }
+      cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
     } else {
-      if (e.FR !== undefined) lastFR = Number(e.FR)||0;
-      if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
+      const val = getEntryTotal(e, team);
+      cumul = val > 0 ? val : prevCumul;
     }
-    const cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
     const dow = (year!=null&&month!=null) ? new Date(year, month, d).getDay() : null;
     daily.push({ day:d, cumul, dayValue:cumul>prevCumul?cumul-prevCumul:0, supersales:e.supersales===true, campanha:e.campanha===true, dow });
     prevCumul = cumul;
@@ -1040,16 +1048,16 @@ function PartnersDetailModal({ year, month, closedDay, onClose }) {
   );
 }
 
-function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, partnersCount }) {
+function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, partnersCount, currentTeam="equipa_fr" }) {
   const [modal, setModal] = useState(null);
 
 
   const newStruct = isNewStructure(year, month);
   const [historicalSSAvg, setHistoricalSSAvg] = useState(0);
   const [historicalDowAvg, setHistoricalDowAvg] = useState({});
-  useEffect(()=>{ loadHistoricalSSAvg(year, month).then(setHistoricalSSAvg); }, [year, month]);
-  useEffect(()=>{ loadHistoricalDowAvg(year, month).then(setHistoricalDowAvg); }, [year, month]);
-  const daily = useMemo(()=>buildDaily(entries,totalDays,year,month),[entries,totalDays,year,month]);
+  useEffect(()=>{ loadHistoricalSSAvg(year, month, currentTeam).then(setHistoricalSSAvg); }, [year, month, currentTeam]);
+  useEffect(()=>{ loadHistoricalDowAvg(year, month, currentTeam).then(setHistoricalDowAvg); }, [year, month, currentTeam]);
+  const daily = useMemo(()=>buildDaily(entries,totalDays,year,month,currentTeam),[entries,totalDays,year,month,currentTeam]);
   const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg]);
   const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
   const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
@@ -2924,7 +2932,7 @@ function MainApp({ role, onLogout }) {
                 </button>
               ))}
             </div>
-            <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
+            <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} currentTeam={currentTeam} />
           </div>
         ):(
           <div>
