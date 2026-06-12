@@ -2536,9 +2536,10 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
 
   // Market-specific data
   const newStruct = isNewStructure(year,month);
-  const mktList = newStruct
-    ? [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}]
-    : [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+  const teamMarkets = getTeamMarkets(currentTeam, newStruct);
+  const isSingleMarket = teamMarkets.length === 1;
+  // For single-market teams, use that market directly; for FR show sub-tabs
+  const mktList = isSingleMarket ? [] : teamMarkets;
   const getMktData = (mkt) => {
     if (mkt==="global") return {fatC:fatCurr,fatP:fatPrev,encC:encCurr,encP:encPrev,afilC:afilCurr,afilP:afilPrev,margemC:margemCurr,margemP:margemPrev,ticketC:ticketCurr,ticketP:ticketPrev,revendaAfilC:(fatCurr||0)+(afilCurr||0),revendaAfilP:(fatPrev||0)+(afilPrev||0)};
     const fatC = (() => {
@@ -2602,7 +2603,9 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       </div>
       <div style={T.card}>
         <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-          {[{key:"global",label:"Global"},...mktList].map(m=>(
+          {isSingleMarket ? (
+            <span style={{fontSize:13,fontWeight:500,color:C.green}}>{teamMarkets[0].label}</span>
+          ) : [{key:"global",label:"Global"},...mktList].map(m=>(
             <button key={m.key} onClick={()=>setMktTab(m.key)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:"0.5px solid "+C.border,cursor:"pointer",
                 background:mktTab===m.key?C.green:"transparent",color:mktTab===m.key?"#fff":C.muted}}>
@@ -2649,7 +2652,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           })}
         </div>
       )}
-      {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+      {mktTab==="global"&&!isSingleMarket&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
           {getTeamMarkets(currentTeam, isNewStructure(year,month)).map(({key,label})=>{
