@@ -1449,14 +1449,14 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         const mktList = getTeamMarkets(currentTeam, newStruct);
         return (
           <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-            {/* Total encomendas diário */}
+            {/* Encomendas diário - Total e 1ªs no mesmo card */}
             <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>TOTAL ENCOMENDAS DIÁRIO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+              <p style={{...T.sectionTitle,marginBottom:4}}>ENCOMENDAS DIÁRIO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
               <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Valores cumulativos por dia</p>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                   <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                    {["Dia",...mktList.map(m=>m.label)].map((h,i)=>(
+                    {["Dia",...mktList.flatMap(m=>[`Total ${m.label}`,`1ªs ${m.label}`])].map((h,i)=>(
                       <th key={i} style={{padding:"6px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
                     ))}
                   </tr></thead>
@@ -1466,52 +1466,20 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                       return (
                         <tr key={day} style={{borderBottom:`0.5px solid ${C.card}`}}>
                           <td style={{padding:"6px 10px",fontWeight:500,color:C.text}}>{day}</td>
-                          {mktList.map(mkt=>{
-                            const fkey = `orders_total_d_${mkt.key}`;
-                            return (
-                              <td key={fkey} style={{padding:"4px 6px",textAlign:"right"}}>
-                                <input type="number" value={e[fkey]??""} placeholder="—"
-                                  onChange={ev=>updateEntry(day,fkey,ev.target.value)}
-                                  onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
-                                  style={{width:90,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {/* 1ªs encomendas diário */}
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>1ªS ENCOMENDAS DIÁRIO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Valores cumulativos por dia</p>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                  <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                    {["Dia",...mktList.map(m=>m.label)].map((h,i)=>(
-                      <th key={i} style={{padding:"6px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {Array.from({length:totalDays},(_,i)=>i+1).map(day=>{
-                      const e = entries[day]||{};
-                      return (
-                        <tr key={day} style={{borderBottom:`0.5px solid ${C.card}`}}>
-                          <td style={{padding:"6px 10px",fontWeight:500,color:C.text}}>{day}</td>
-                          {mktList.map(mkt=>{
-                            const fkey = `orders_first_d_${mkt.key}`;
-                            return (
-                              <td key={fkey} style={{padding:"4px 6px",textAlign:"right"}}>
-                                <input type="number" value={e[fkey]??""} placeholder="—"
-                                  onChange={ev=>updateEntry(day,fkey,ev.target.value)}
-                                  onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
-                                  style={{width:90,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
-                              </td>
-                            );
-                          })}
+                          {mktList.flatMap(mkt=>[
+                            <td key={`tot_${mkt.key}`} style={{padding:"4px 6px",textAlign:"right"}}>
+                              <input type="number" value={e[`orders_total_d_${mkt.key}`]??""} placeholder="—"
+                                onChange={ev=>updateEntry(day,`orders_total_d_${mkt.key}`,ev.target.value)}
+                                onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
+                                style={{width:80,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
+                            </td>,
+                            <td key={`fst_${mkt.key}`} style={{padding:"4px 6px",textAlign:"right"}}>
+                              <input type="number" value={e[`orders_first_d_${mkt.key}`]??""} placeholder="—"
+                                onChange={ev=>updateEntry(day,`orders_first_d_${mkt.key}`,ev.target.value)}
+                                onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
+                                style={{width:80,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
+                            </td>
+                          ])}
                         </tr>
                       );
                     })}
@@ -2531,6 +2499,24 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const totalDaysPrev = daysInMonth(prevYear,month);
   const dailyCurr = buildDaily(ce, totalDaysCurr, year, month, currentTeam);
   const dailyPrev = buildDaily(pe, totalDaysPrev, prevYear, month, currentTeam);
+
+  // Helper: get last known cumul value for a daily field from entries
+  const getLastDailyCumul = (entries, totalDays, field) => {
+    let last = 0;
+    for (let d = totalDays; d >= 1; d--) {
+      const v = entries[d]?.[field];
+      if (v !== undefined && v !== "") { last = Number(v)||0; break; }
+    }
+    return last;
+  };
+
+  // Orders and afiliacao from daily entries
+  const getTeamOrdersCumul = (entries, totalDays, team, mkts) =>
+    mkts.reduce((s, mkt) => s + getLastDailyCumul(entries, totalDays, `orders_total_d_${mkt}`), 0);
+  const getTeamFirst1Cumul = (entries, totalDays, team, mkts) =>
+    mkts.reduce((s, mkt) => s + getLastDailyCumul(entries, totalDays, `orders_first_d_${mkt}`), 0);
+  const getTeamAfilCumul = (entries, totalDays, team, mkts) =>
+    mkts.reduce((s, mkt) => s + getLastDailyCumul(entries, totalDays, `afil_d_${mkt}`), 0);
   const fatCurr = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
   const fatPrev = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
 
@@ -2542,12 +2528,14 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     if (team === "equipa_pt") return ["PT","OTHER"];
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
-  const encCurr = sumMkts("orders_total", cg, getMkts(year,month));
-  const enc1Curr = sumMkts("orders_first", cg, getMkts(year,month));
-  const afilCurr = sumMkts("afil", cg, getMkts(year,month));
-  const encPrev = sumMkts("orders_total", pg, getMkts(prevYear,month));
-  const enc1Prev = sumMkts("orders_first", pg, getMkts(prevYear,month));
-  const afilPrev = sumMkts("afil", pg, getMkts(prevYear,month));
+  const currMkts = getMkts(year,month);
+  const prevMkts = getMkts(prevYear,month);
+  const encCurr = getTeamOrdersCumul(ce, totalDaysCurr, currentTeam, currMkts);
+  const enc1Curr = getTeamFirst1Cumul(ce, totalDaysCurr, currentTeam, currMkts);
+  const afilCurr = getTeamAfilCumul(ce, totalDaysCurr, currentTeam, currMkts);
+  const encPrev = getTeamOrdersCumul(pe, totalDaysPrev, currentTeam, prevMkts);
+  const enc1Prev = getTeamFirst1Cumul(pe, totalDaysPrev, currentTeam, prevMkts);
+  const afilPrev = getTeamAfilCumul(pe, totalDaysPrev, currentTeam, prevMkts);
   const getMargem = (g,y,m) => { const mkts=getMkts(y,m); const vs=mkts.map(k=>Number(g["margin_pct_"+k])||0).filter(v=>v>0); return vs.length>0?(vs.reduce((s,v)=>s+v,0)/vs.length).toFixed(1):null; };
   const margemCurr = getMargem(cg,year,month);
   const margemPrev = getMargem(pg,prevYear,month);
