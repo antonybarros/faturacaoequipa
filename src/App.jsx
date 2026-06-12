@@ -1070,7 +1070,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
   useEffect(()=>{ loadHistoricalDowAvg(year, month, currentTeam).then(setHistoricalDowAvg); }, [year, month, currentTeam]);
   const daily = useMemo(()=>buildDaily(entries,totalDays,year,month,currentTeam),[entries,totalDays,year,month,currentTeam]);
   const stats = useMemo(()=>computeStats(daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg),[daily,teamGoals,totalDays,closedDay,historicalSSAvg,historicalDowAvg]);
-  const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct),[entries,totalDays,newStruct]);
+  const dailyFirstRev = useMemo(()=>buildDailyFirstRev(entries,totalDays,newStruct,currentTeam),[entries,totalDays,newStruct,currentTeam]);
   const firstRevActual = closedDay>0&&dailyFirstRev.length>0 ? (dailyFirstRev.filter(d=>d.day<=closedDay).slice(-1)[0]?.cumul||0) : 0;
   const firstRevGoal = stats.firstRevGoal;
 
