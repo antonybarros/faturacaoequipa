@@ -2652,8 +2652,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           })}
         </div>
       )}
-      {mktTab==="global"&&!isSingleMarket&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-        <div style={T.card}>
+      {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:isSingleMarket?"repeat(1,minmax(0,1fr))":"repeat(2,minmax(0,1fr))",gap:10}}>
+        {!isSingleMarket&&<div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
           {getTeamMarkets(currentTeam, isNewStructure(year,month)).map(({key,label})=>{
             const n=byMkt[key]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
@@ -2667,7 +2667,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
             <span style={{fontSize:13,fontWeight:500,color:C.text}}>{totalPC}</span>
           </div>
-        </div>
+        </div>}
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
           {PROGS_RES.map(prog=>{
