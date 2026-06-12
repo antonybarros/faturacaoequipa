@@ -2652,7 +2652,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
-          {MKT_RES_LIST.map(({key,label})=>{
+          {getTeamMarkets(currentTeam, isNewStructure(year,month)).map(({key,label})=>{
             const n=byMkt[key]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
             return <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
