@@ -13,6 +13,16 @@ const TEAMS = [
   { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
   { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
 ];
+
+// Returns market list for a given team and structure
+function getTeamMarkets(team, newStruct) {
+  if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
+  if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
+  if (team === "equipa_pt") return [{key:"PT", label:"Portugal"},{key:"OTHER", label:"Outros"}];
+  // equipa_fr
+  if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
+  return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
+}
 const MARKETS = [{ id: "FR", label: "França" }, { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" }];
 const MARKET_COLORS = { FR: "#9333ea", "CH-BNL-DEAT": "#d97706" };
 const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -1300,7 +1310,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
               <thead>
                 <tr style={{ borderBottom:`0.5px solid ${C.border}` }}>
-                  {["Dia", "França", ...(newStruct?["Suíça","Benelux","DE-AT"]:["CH-BNL-DEAT"]), "Supersales", "Campanha"].map((h,i) => (
+                  {["Dia", ...getTeamMarkets(currentTeam,newStruct).map(m=>m.label), "Supersales", "Campanha"].map((h,i) => (
                     <th key={h} style={{ padding:"8px 10px", textAlign:i===0?"left":"center", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
                   ))}
                 </tr>
@@ -1313,7 +1323,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   return (
                     <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}`, background:isSS?"#FAEEDA":isCampanha?"#EFF6FF":"transparent" }}>
                       <td style={{ padding:"6px 10px", fontWeight:500, color:C.text }}>{day}</td>
-                      {(newStruct ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"]).map(field => (
+                      {getTeamMarkets(currentTeam,newStruct).map(m=>m.key).map(field => (
                         <td key={field} style={{ padding:"4px 6px", textAlign:"center" }}>
                           <input type="number" value={e[field] ?? ""} onChange={ev => updateEntry(day, field, ev.target.value)} onBlur={saveAll}
                             placeholder="0"
@@ -1354,7 +1364,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
               <thead>
                 <tr style={{ borderBottom:`0.5px solid ${C.border}` }}>
-                  {["Dia", "França", ...(newStruct ? ["Suíça","Benelux","DE-AT"] : ["CH-BNL-DEAT"])].map((h,i) => (
+                  {["Dia", ...getTeamMarkets(currentTeam,newStruct).map(m=>m.label)].map((h,i) => (
                     <th key={h} style={{ padding:"8px 10px", textAlign:i===0?"left":"center", color:C.muted, fontWeight:500, fontSize:11, textTransform:"uppercase", letterSpacing:".05em" }}>{h}</th>
                   ))}
                 </tr>
@@ -1365,7 +1375,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   return (
                     <tr key={day} style={{ borderBottom:`0.5px solid ${C.card}` }}>
                       <td style={{ padding:"6px 10px", fontWeight:500, color:C.text }}>{day}</td>
-                      {(newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"]).map(field => (
+                      {getTeamMarkets(currentTeam,newStruct).map(m=>"first_rev_"+m.key).map(field => (
                         <td key={field} style={{ padding:"4px 6px", textAlign:"center" }}>
                           <input type="number" value={e[field] ?? ""} onChange={ev => updateEntry(day, field, ev.target.value)} onBlur={saveAll}
                             placeholder="0"
@@ -1383,9 +1393,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {/* ── Afiliação ── */}
       {subTab === "afiliacao" && (() => {
-        const AFL_MKTS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
-        const AFL_MKTS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
-        const mktList = newStruct ? AFL_MKTS_NEW : AFL_MKTS_OLD;
+        const mktList = getTeamMarkets(currentTeam, newStruct);
         const inpAfil = (field, placeholder="0") => (
           <input type="number" value={goals[field]??""} onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))} onBlur={saveAll}
             placeholder={placeholder} style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
@@ -1409,9 +1417,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {/* ── Encomendas ── */}
       {subTab === "encomendas" && (() => {
-        const ENC_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
-        const ENC_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
-        const mktList = newStruct ? ENC_MARKETS_NEW : ENC_MARKETS_OLD;
+        const mktList = getTeamMarkets(currentTeam, newStruct);
         const ENC_FIELDS = [
           {field:"orders_total",    label:`Total enc. ${year}`},
           {field:"orders_first",    label:`1ªs enc. ${year}`},
@@ -1444,9 +1450,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {/* ── Parceiros / Leads ── */}
       {subTab === "parceiros" && (() => {
-        const LD_MKTS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
-        const LD_MKTS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
-        const mktList = newStruct ? LD_MKTS_NEW : LD_MKTS_OLD;
+        const mktList = getTeamMarkets(currentTeam, newStruct);
         return (
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={T.card}>
@@ -1509,9 +1513,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {/* ── Margem ── */}
       {subTab === "margem" && (() => {
-        const MRG_MARKETS_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
-        const MRG_MARKETS_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
-        const mktList = newStruct ? MRG_MARKETS_NEW : MRG_MARKETS_OLD;
+        const mktList = getTeamMarkets(currentTeam, newStruct);
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
             {mktList.map(mkt => (
