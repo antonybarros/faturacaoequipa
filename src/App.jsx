@@ -779,27 +779,33 @@ async function loadHistoricalDowAvg(year, month, team="equipa_fr") {
   return result;
 }
 
-async function loadPartnersCount(year, month) {
+async function loadPartnersCount(year, month, team="equipa_fr") {
   const start = new Date(year, month, 1).toISOString();
   const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  const teamObj = TEAMS.find(t=>t.key===team);
+  const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
   const { count } = await supabase.from("partner_followup")
     .select("*", { count:"exact", head:true })
     .gte("original_created_at", start)
     .lte("original_created_at", end)
-    .neq("status", "deleted");
+    .neq("status", "deleted")
+    .in("market", markets);
   return count || 0;
 }
 
-async function loadPartnersByMktProg(year, month) {
+async function loadPartnersByMktProg(year, month, team="equipa_fr") {
   const pad = n => String(n).padStart(2,"0");
   const lastDay = new Date(year,month+1,0).getDate();
   const start = `${year}-${pad(month+1)}-01T00:00:00.000Z`;
   const end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
+  const teamObj = TEAMS.find(t=>t.key===team);
+  const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
   const { data } = await supabase.from("partner_followup")
     .select("market,programme")
     .gte("original_created_at", start)
     .lte("original_created_at", end)
-    .neq("status", "deleted");
+    .neq("status", "deleted")
+    .in("market", markets);
   return data || [];
 }
 
@@ -2400,7 +2406,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
 const PROGS_RES = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 const MKT_RES_LIST = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
 
-function ResultadosTab({ year, month, partnersCount }) {
+function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) {
   const [curr, setCurr] = useState(null);
   const [prev, setPrev] = useState(null);
   const [partnersPrev, setPartnersPrev] = useState(0);
@@ -2416,17 +2422,17 @@ function ResultadosTab({ year, month, partnersCount }) {
   useEffect(()=>{
     setLoading(true);
     Promise.all([
-      loadMonthData(year, month),
-      loadMonthData(prevYear, month),
-      loadPartnersCount(prevYear, month),
-      loadPartnersByMktProg(year, month),
+      loadMonthData(year, month, currentTeam),
+      loadMonthData(prevYear, month, currentTeam),
+      loadPartnersCount(prevYear, month, currentTeam),
+      loadPartnersByMktProg(year, month, currentTeam),
     ]).then(([c,p,pp,pc])=>{
       setCurr(c); setPrev(p);
       setPartnersPrev(pp||0);
       setPartnersCurrData(pc||[]);
       setLoading(false);
     });
-  },[year,month]);
+  },[year,month,currentTeam]);
   useEffect(()=>{ if(prevYear&&nextMonth!=null) loadMonthData(prevYear, nextMonth).then(setPrevNextData); },[prevYear, nextMonth]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
@@ -2886,7 +2892,7 @@ function MainApp({ role, onLogout }) {
   const [currentTeam, setCurrentTeam] = useState("equipa_fr");
   useEffect(()=>{ setLoading(true); loadMonthData(year,month,currentTeam).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month,currentTeam]);
   const [partnersCount, setPartnersCount] = useState(null);
-  useEffect(()=>{ loadPartnersCount(year,month).then(setPartnersCount); },[year,month]);
+  useEffect(()=>{ loadPartnersCount(year,month,currentTeam).then(setPartnersCount); },[year,month,currentTeam]);
   const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
   const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
   return (
