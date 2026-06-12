@@ -3,6 +3,16 @@ import { createClient } from "@supabase/supabase-js";
 import { LineChart, Line, BarChart, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 
 const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+
+// ── Helper: is new structure (June 2026+) ─────────────────────────────────────
+const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5);
+
+const TEAMS = [
+  { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"] },
+  { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
+  { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
+  { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
+];
 const MARKETS = [{ id: "FR", label: "França" }, { id: "CH-BNL-DEAT", label: "CH-BNL-DEAT" }];
 const MARKET_COLORS = { FR: "#9333ea", "CH-BNL-DEAT": "#d97706" };
 const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
@@ -1205,17 +1215,6 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
     </div>
   );
 }
-
-// ── Helper: is new structure (June 2026+) ─────────────────────────────────────
-const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5);
-
-const TEAMS = [
-  { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"] },
-  { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
-  { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
-  { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
-]; // month is 0-indexed, 5 = June
-
 // ── Registo Tab ────────────────────────────────────────────────────────────────
 function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData, currentTeam, setCurrentTeam }) {
   const [subTab, setSubTab] = useState("faturacao");
