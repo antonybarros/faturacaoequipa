@@ -840,8 +840,12 @@ function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
   return daily;
 }
 
-function buildDailyFirstRev(entries, totalDays, newStruct) {
-  const fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
+function buildDailyFirstRev(entries, totalDays, newStruct, team="equipa_fr") {
+  let fields;
+  if (team === "equipa_it") fields = ["first_rev_IT"];
+  else if (team === "equipa_es") fields = ["first_rev_ES"];
+  else if (team === "equipa_pt") fields = ["first_rev_PT","first_rev_OTHER"];
+  else fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
   const daily = []; let prevCumul = 0;
   const lastVals = {};
   for (let d = 1; d <= totalDays; d++) {
@@ -855,8 +859,9 @@ function buildDailyFirstRev(entries, totalDays, newStruct) {
 }
 
 function computeStats(daily, teamGoals, totalDays, closedDay, historicalSSAvg=0, historicalDowAvg={}) {
-  const goal = Number(teamGoals?.equipa_fr)||0;
-  const partnerGoal = Number(teamGoals?.equipa_fr_partners)||0;
+  const teamKey = typeof currentTeam !== 'undefined' ? currentTeam : "equipa_fr";
+  const goal = Number(teamGoals?.[teamKey])||Number(teamGoals?.equipa_fr)||0;
+  const partnerGoal = Number(teamGoals?.[teamKey+"_partners"])||Number(teamGoals?.equipa_fr_partners)||0;
   const closed = daily.filter(d=>d.day<=closedDay);
   const actual = closed.length>0 ? closed[closed.length-1].cumul : 0;
   const expected = goal>0&&closedDay>0 ? Math.round(goal/totalDays*closedDay) : null;
@@ -2456,13 +2461,19 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const pe = prev?.entries||{};
   const totalDaysCurr = daysInMonth(year,month);
   const totalDaysPrev = daysInMonth(prevYear,month);
-  const dailyCurr = buildDaily(ce, totalDaysCurr, year, month);
-  const dailyPrev = buildDaily(pe, totalDaysPrev, prevYear, month);
+  const dailyCurr = buildDaily(ce, totalDaysCurr, year, month, currentTeam);
+  const dailyPrev = buildDaily(pe, totalDaysPrev, prevYear, month, currentTeam);
   const fatCurr = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
   const fatPrev = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
 
   const sumMkts = (prefix, g, mkts) => mkts.reduce((s,mk)=>s+(Number(g[prefix+"_"+mk])||0),0);
-  const getMkts = (y,m) => isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
+  const getMkts = (y,m) => {
+    const team = currentTeam || "equipa_fr";
+    if (team === "equipa_it") return ["IT"];
+    if (team === "equipa_es") return ["ES"];
+    if (team === "equipa_pt") return ["PT","OTHER"];
+    return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
+  };
   const encCurr = sumMkts("orders_total", cg, getMkts(year,month));
   const enc1Curr = sumMkts("orders_first", cg, getMkts(year,month));
   const afilCurr = sumMkts("afil", cg, getMkts(year,month));
@@ -2477,8 +2488,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   // 1ªs compras from daily entries (like Dashboard)
   const newStructCurr = isNewStructure(year,month);
   const newStructPrev = isNewStructure(prevYear,month);
-  const dailyFirstCurr = buildDailyFirstRev(ce, totalDaysCurr, newStructCurr);
-  const dailyFirstPrev = buildDailyFirstRev(pe, totalDaysPrev, newStructPrev);
+  const dailyFirstCurr = buildDailyFirstRev(ce, totalDaysCurr, newStructCurr, currentTeam);
+  const dailyFirstPrev = buildDailyFirstRev(pe, totalDaysPrev, newStructPrev, currentTeam);
   const fat1Curr = dailyFirstCurr.length>0 ? dailyFirstCurr[totalDaysCurr-1]?.cumul||0 : 0;
   const fat1Prev = dailyFirstPrev.length>0 ? dailyFirstPrev[totalDaysPrev-1]?.cumul||0 : 0;
   const ticket1Curr = enc1Curr>0 ? Math.round(fat1Curr/enc1Curr) : null;
