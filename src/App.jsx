@@ -1749,14 +1749,14 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XL.utils.sheet_to_json(ws, { header:1, defval:"" });
 
-      let headerIdx = rows.findIndex(r => r.some(c => String(c).trim().toUpperCase() === "ID"));
+      let headerIdx = rows.findIndex(r => r.some(c => ["ID","AFENT_CODIGO","AFÉNT_CODIGO"].includes(String(c).trim().toUpperCase())));
       if (headerIdx < 0) { setImportMsg("❌ Coluna ID não encontrada"); setImporting(false); return; }
       const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
-      const iID   = headers.findIndex(h => h==="ID");
-      const iGest = headers.findIndex(h => h==="GESTOR");
-      const iMkt  = headers.findIndex(h => h==="MERCADO");
-      const iProg = headers.findIndex(h => h==="PROGRAMA");
-      const iDate = headers.findIndex(h => h.includes("DATA"));
+      const iID   = headers.findIndex(h => h==="ID" || h==="AFENT_CODIGO" || h==="AFÉNT_CODIGO");
+      const iGest = headers.findIndex(h => h==="GESTOR" || h==="GUSP_NOME");
+      const iMkt  = headers.findIndex(h => h==="MERCADO" || h==="FPLN_LOJA");
+      const iProg = headers.findIndex(h => h==="PROGRAMA" || h==="FPMO_NOME");
+      const iDate = headers.findIndex(h => h.includes("DATA") || h==="FPLN_DATA_INICIO");
       const dataRows = rows.slice(headerIdx + 1).filter(r => String(r[iID]||"").trim());
       let ok = 0, skipInvalid = 0, skipDup = 0;
       const invalidDetails = [], dupDetails = [];
