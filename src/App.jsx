@@ -2891,7 +2891,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:false}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:false,hidden:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
