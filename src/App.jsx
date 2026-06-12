@@ -1596,6 +1596,9 @@ const ALL_MKTS = [
 const GESTOR_MAP = {
   "ANTONY BARROS":"Antony","FABIEN COLETTE":"Fabien","MONICA OLIVEIRA":"Mónica",
   "ANTONY":"Antony","FABIEN":"Fabien","MONICA":"Mónica","MÓNICA":"Mónica",
+  "KAMILA BARROS":"Kamila Barros","KAMILA":"Kamila Barros",
+  "CATARINA MONTEIRO":"Catarina Monteiro","CATARINA CMONTEIRO":"Catarina Monteiro","CATARINA":"Catarina Monteiro",
+  "BRUNO VIEIRA":"Bruno Vieira","BRUNO":"Bruno Vieira",
 };
 const MKT_MAP = {
   "França":"FR","FRANCA":"FR","FRANCE":"FR",
@@ -1603,6 +1606,16 @@ const MKT_MAP = {
   "AT":"DEAT","DE":"DEAT","DEAT":"DEAT",
   "BE":"BNL","NL":"BNL","LU":"BNL","BNL":"BNL",
   "FR":"FR","CH":"CH",
+  "IT":"IT","ITALY":"IT","ITALIA":"IT","ITÁLIA":"IT",
+  "ES":"ES","SPAIN":"ES","ESPANHA":"ES","ESPANA":"ES",
+  "PT":"PT","PORTUGAL":"PT",
+  "OTHER":"OTHER","OUTROS":"OTHER",
+};
+
+const GESTOR_MAP_IT = {
+  "KAMILA BARROS":"Kamila Barros","KAMILA":"Kamila Barros",
+  "CATARINA MONTEIRO":"Catarina Monteiro","CATARINA":"Catarina Monteiro",
+  "BRUNO VIEIRA":"Bruno Vieira","BRUNO":"Bruno Vieira",
 };
 const PROG_MAP = {
   "ELITE-PARTNER":"Elite","ELITE":"Elite",
