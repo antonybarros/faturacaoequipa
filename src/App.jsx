@@ -2882,9 +2882,9 @@ function MainApp({ role, onLogout }) {
   const isCurrentMonth = year===today.getFullYear()&&month===today.getMonth();
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
+  const [currentTeam, setCurrentTeam] = useState("equipa_fr");
   useEffect(()=>{ setLoading(true); loadMonthData(year,month,currentTeam).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month,currentTeam]);
   const [partnersCount, setPartnersCount] = useState(null);
-  const [currentTeam, setCurrentTeam] = useState("equipa_fr");
   useEffect(()=>{ loadPartnersCount(year,month).then(setPartnersCount); },[year,month]);
   const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
   const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
