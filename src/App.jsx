@@ -2890,10 +2890,6 @@ function MainApp({ role, onLogout }) {
             <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · {role.name}{isAdmin?" · Admin":""}</p>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <select value={currentTeam} onChange={e=>setCurrentTeam(e.target.value)}
-              style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
-              {TEAMS.map(t=><option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
             <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
             style={{ fontSize:13, padding:"7px 12px", borderRadius:8, border:`0.5px solid ${C.border}`, background:C.bg, color:C.text, outline:"none" }}>
             {monthOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
@@ -2918,10 +2914,43 @@ function MainApp({ role, onLogout }) {
         {loading?(
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
         ):tab==="analise"?(
-          <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+              {TEAMS.map(t=>(
+                <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
+                  style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
+                    background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <AnaliseTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} entries={monthData.entries||{}} teamGoals={monthData.team_goals||{}} partnersCount={partnersCount} />
+          </div>
         ):(
           <div>
-            {tab==="registo" ? <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} /> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <ResultadosTab year={year} month={month} partnersCount={partnersCount} /> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
+            {tab==="registo" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+                {TEAMS.map(t=>(
+                  <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
+                    style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
+                      background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
+            </div> : tab==="topparceiros" ? <TopParceirosTab isAdmin={isAdmin} gestor={gestor} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+                {TEAMS.map(t=>(
+                  <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
+                    style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
+                      background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <ResultadosTab year={year} month={month} partnersCount={partnersCount} currentTeam={currentTeam} />
+            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
           </div>
         )}
       </div>
