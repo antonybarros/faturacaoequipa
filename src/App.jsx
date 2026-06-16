@@ -11,16 +11,16 @@ const TEAMS = [
   { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"] },
   { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
   { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
-  { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
-  { key:"equipa_na", label:"Equipa NA", markets:["NA"] },
+  { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","OTHER"] },
+  { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"] },
 ];
 
 // Returns market list for a given team and structure
 function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
-  if (team === "equipa_pt") return [{key:"PT", label:"Portugal"},{key:"OTHER", label:"Outros"}];
-  if (team === "equipa_na") return [{key:"NA", label:"NA"}];
+  if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"IE",label:"Irlanda"},{key:"WW",label:"Worldwide"},{key:"SE",label:"Suécia"},{key:"GB",label:"Reino Unido"},{key:"EU",label:"EU"},{key:"RO",label:"Roménia"},{key:"DK",label:"Dinamarca"},{key:"FI",label:"Finlândia"},{key:"CA",label:"Canadá"},{key:"OTHER",label:"Outros"}];
+  if (team === "equipa_na") return [{key:"NA",label:"NA"},{key:"CZ",label:"República Checa"},{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -1662,6 +1662,21 @@ const MKT_MAP = {
   "ES":"ES","SPAIN":"ES","ESPANHA":"ES","ESPANA":"ES",
   "PT":"PT","PORTUGAL":"PT",
   "OTHER":"OTHER","OUTROS":"OTHER",
+  "NA":"NA",
+  "CZ":"CZ","CZECH":"CZ","REPUBLICA CHECA":"CZ",
+  "SK":"SK","SLOVAKIA":"SK","ESLOVÁQUIA":"SK",
+  "GR":"GR","GREECE":"GR","GRECIA":"GR","GRÉCIA":"GR",
+  "CY":"CY","CYPRUS":"CY","CHIPRE":"CY",
+  "PL":"PL","POLAND":"PL","POLÓNIA":"PL",
+  "IE":"IE","IRELAND":"IE","IRLANDA":"IE",
+  "WW":"WW","WORLDWIDE":"WW",
+  "SE":"SE","SWEDEN":"SE","SUECIA":"SE","SUÉCIA":"SE",
+  "GB":"GB","UK":"GB","REINO UNIDO":"GB","UNITED KINGDOM":"GB",
+  "EU":"EU",
+  "RO":"RO","ROMANIA":"RO","ROMÉNIA":"RO",
+  "DK":"DK","DENMARK":"DK","DINAMARCA":"DK",
+  "FI":"FI","FINLAND":"FI","FINLÂNDIA":"FI",
+  "CA":"CA","CANADA":"CA","CANADÁ":"CA",
 };
 
 const GESTOR_MAP_IT = {
@@ -2080,6 +2095,21 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
           <option value="IT">Itália</option>
           <option value="ES">Espanha</option>
           <option value="PT">Portugal</option>
+          <option value="IE">Irlanda</option>
+          <option value="WW">Worldwide</option>
+          <option value="SE">Suécia</option>
+          <option value="GB">Reino Unido</option>
+          <option value="EU">EU</option>
+          <option value="RO">Roménia</option>
+          <option value="DK">Dinamarca</option>
+          <option value="FI">Finlândia</option>
+          <option value="CA">Canadá</option>
+          <option value="NA">NA</option>
+          <option value="CZ">República Checa</option>
+          <option value="SK">Eslováquia</option>
+          <option value="GR">Grécia</option>
+          <option value="CY">Chipre</option>
+          <option value="PL">Polónia</option>
         </select>
         {/* Programa */}
         <select value={filterProg} onChange={e=>setFilterProg(e.target.value)}
