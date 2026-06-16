@@ -1008,12 +1008,14 @@ function StatCard({ label, value, sub, subColor, onClick, highlight, small }) {
   );
 }
 
-function PartnersDetailModal({ year, month, closedDay, onClose }) {
+function PartnersDetailModal({ year, month, closedDay, onClose, currentTeam="equipa_fr" }) {
   const [rows, setRows] = useState([]);
   useEffect(()=>{
     const start = new Date(year, month, 1).toISOString();
     const end = new Date(year, month+1, 0, 23, 59, 59).toISOString();
-    supabase.from("partner_followup").select("original_created_at").gte("original_created_at", start).lte("original_created_at", end).neq("status","deleted")
+    const teamObj = TEAMS.find(t=>t.key===currentTeam);
+    const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
+    supabase.from("partner_followup").select("original_created_at").gte("original_created_at", start).lte("original_created_at", end).neq("status","deleted").in("market", markets)
       .then(({data})=>{
         if (!data) return;
         const byDay = {};
@@ -1036,7 +1038,7 @@ function PartnersDetailModal({ year, month, closedDay, onClose }) {
   }, [year, month]);
 
   return (
-    <Modal title="Novos parceiros — detalhe" subtitle={`Equipa FR · ${closedDay} dias fechados`} onClose={onClose}>
+    <Modal title="Novos parceiros — detalhe" subtitle={`${TEAMS.find(t=>t.key===currentTeam)?.label||"Equipa FR"} · ${closedDay} dias fechados`} onClose={onClose}>
       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
         <thead style={{ position:"sticky", top:0, background:C.bg, zIndex:1 }}>
           <tr>
@@ -1104,7 +1106,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
-      {modal==="parceiros" && <PartnersDetailModal year={year} month={month} closedDay={closedDay} onClose={()=>setModal(null)} />}
+      {modal==="parceiros" && <PartnersDetailModal year={year} month={month} closedDay={closedDay} onClose={()=>setModal(null)} currentTeam={currentTeam} />}
       {modal && modal!=="parceiros" && (modal==="firstrev_faturado"||modal==="firstrev_objetivo"
         ? <DailyDetailModal daily={dailyFirstRev} closedDay={closedDay} goal={firstRevGoal} mode={modal==="firstrev_faturado"?"faturado":"objetivo"} onClose={()=>setModal(null)} />
         : <DailyDetailModal daily={daily} closedDay={closedDay} goal={stats.goal} mode={modal} onClose={()=>setModal(null)} />
@@ -1626,7 +1628,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 }
 
 // ── Partner constants & mappings ──────────────────────────────────────────────
-const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira"];
+const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira", "Jose Castillo", "Mariana Lopes", "Guilherme Mendes"];
 const ALL_MKTS = [
   {key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"},
   {key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}
@@ -1637,6 +1639,9 @@ const GESTOR_MAP = {
   "KAMILA BARROS":"Kamila Barros","KAMILA":"Kamila Barros",
   "CATARINA MONTEIRO":"Catarina Monteiro","CATARINA CMONTEIRO":"Catarina Monteiro","CATARINA":"Catarina Monteiro",
   "BRUNO VIEIRA":"Bruno Vieira","BRUNO":"Bruno Vieira",
+  "JOSE CASTILLO":"Jose Castillo","JOSÉ CASTILLO":"Jose Castillo","JOSE":"Jose Castillo",
+  "MARIANA LOPES":"Mariana Lopes","MARIANA":"Mariana Lopes",
+  "GUILHERME MENDES":"Guilherme Mendes","GUILHERME":"Guilherme Mendes",
 };
 const MKT_MAP = {
   "França":"FR","FRANCA":"FR","FRANCE":"FR",
@@ -2168,7 +2173,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
   const [loading, setLoading] = useState(true);
 
   const myGestor = isAdmin ? null : (gestor?.name || gestor);
-  const gestors = isAdmin ? ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"] : [myGestor];
+  const gestors = isAdmin ? ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"] : [myGestor];
 
   useEffect(()=>{
     setLoading(true);
@@ -2327,7 +2332,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
-  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"];
 
   useEffect(()=>{
     setLoading(true);
@@ -2829,7 +2834,7 @@ function TestesTab({ year, month }) {
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
-  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"];
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 
   // By programme
