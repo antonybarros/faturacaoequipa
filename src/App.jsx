@@ -807,7 +807,8 @@ async function loadPartnersByMktProg(year, month, team="equipa_fr") {
     .gte("original_created_at", start)
     .lte("original_created_at", end)
     .neq("status", "deleted")
-    .in("market", markets);
+    .in("market", markets)
+    .limit(5000);
   return data || [];
 }
 
@@ -1017,7 +1018,7 @@ function PartnersDetailModal({ year, month, closedDay, onClose, currentTeam="equ
     const end = new Date(year, month+1, 0, 23, 59, 59).toISOString();
     const teamObj = TEAMS.find(t=>t.key===currentTeam);
     const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
-    supabase.from("partner_followup").select("original_created_at").gte("original_created_at", start).lte("original_created_at", end).neq("status","deleted").in("market", markets)
+    supabase.from("partner_followup").select("original_created_at").gte("original_created_at", start).lte("original_created_at", end).neq("status","deleted").in("market", markets).limit(5000)
       .then(({data})=>{
         if (!data) return;
         const byDay = {};
@@ -2392,6 +2393,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
+      .limit(5000)
       .then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
   },[year,month,periodo]);
 
@@ -2865,6 +2867,7 @@ function TestesTab({ year, month }) {
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
+      .limit(5000)
       .then(({data:rows})=>{
         setData(rows||[]);
         setLoading(false);
