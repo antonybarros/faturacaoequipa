@@ -1758,7 +1758,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
 
   const load = async () => {
     setLoading(true);
-    let q = supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false });
+    let q = supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false }).limit(5000);
     if (gestorFilter) q = q.eq("gestor", gestorFilter);
     const { data } = await q;
     setRecords(data || []);
@@ -2217,7 +2217,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
   useEffect(()=>{
     setLoading(true);
     Promise.all([
-      supabase.from("partner_followup").select("*").eq("status","pending"),
+      supabase.from("partner_followup").select("*").eq("status","pending").limit(5000),
       supabase.from("partner_orders").select("*").order("order_date",{ascending:false}),
       supabase.from("top_partners").select("*").order("import_date",{ascending:false}),
       supabase.from("billing_months").select("month_key,entries"),
