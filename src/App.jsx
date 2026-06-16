@@ -12,6 +12,7 @@ const TEAMS = [
   { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
   { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
   { key:"equipa_pt", label:"Equipa PT", markets:["PT","OTHER"] },
+  { key:"equipa_na", label:"Equipa NA", markets:["NA"] },
 ];
 
 // Returns market list for a given team and structure
@@ -19,6 +20,7 @@ function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
   if (team === "equipa_pt") return [{key:"PT", label:"Portugal"},{key:"OTHER", label:"Outros"}];
+  if (team === "equipa_na") return [{key:"NA", label:"NA"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -1628,7 +1630,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 }
 
 // ── Partner constants & mappings ──────────────────────────────────────────────
-const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira", "Jose Castillo", "Mariana Lopes", "Guilherme Mendes"];
+const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira", "Jose Castillo", "Mariana Lopes", "Guilherme Mendes", "Ines Anjo", "Daniel Silva", "Margarida Pinheiro", "Abilio Morais", "Beatriz Beato", "Telma Barroso", "Pedro Oliveira"];
 const ALL_MKTS = [
   {key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"},
   {key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}
@@ -1642,6 +1644,13 @@ const GESTOR_MAP = {
   "JOSE CASTILLO":"Jose Castillo","JOSÉ CASTILLO":"Jose Castillo","JOSE":"Jose Castillo",
   "MARIANA LOPES":"Mariana Lopes","MARIANA":"Mariana Lopes",
   "GUILHERME MENDES":"Guilherme Mendes","GUILHERME":"Guilherme Mendes",
+  "INES ANJO":"Ines Anjo","INÊS ANJO":"Ines Anjo","INES":"Ines Anjo",
+  "DANIEL SILVA":"Daniel Silva","DANIEL":"Daniel Silva",
+  "MARGARIDA PINHEIRO":"Margarida Pinheiro","MARGARIDA":"Margarida Pinheiro",
+  "ABILIO MORAIS":"Abilio Morais","ABÍLIO MORAIS":"Abilio Morais","ABILIO":"Abilio Morais",
+  "BEATRIZ BEATO":"Beatriz Beato","BEATRIZ":"Beatriz Beato",
+  "TELMA BARROSO":"Telma Barroso","TELMA":"Telma Barroso",
+  "PEDRO OLIVEIRA":"Pedro Oliveira","PEDRO":"Pedro Oliveira",
 };
 const MKT_MAP = {
   "França":"FR","FRANCA":"FR","FRANCE":"FR",
@@ -2173,7 +2182,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
   const [loading, setLoading] = useState(true);
 
   const myGestor = isAdmin ? null : (gestor?.name || gestor);
-  const gestors = isAdmin ? ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"] : [myGestor];
+  const gestors = isAdmin ? ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes","Ines Anjo","Daniel Silva","Margarida Pinheiro","Abilio Morais","Beatriz Beato","Telma Barroso","Pedro Oliveira"] : [myGestor];
 
   useEffect(()=>{
     setLoading(true);
@@ -2332,7 +2341,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
-  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes","Ines Anjo","Daniel Silva","Margarida Pinheiro","Abilio Morais","Beatriz Beato","Telma Barroso","Pedro Oliveira"];
 
   useEffect(()=>{
     setLoading(true);
@@ -2834,7 +2843,7 @@ function TestesTab({ year, month }) {
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
-  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes"];
+  const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes","Ines Anjo","Daniel Silva","Margarida Pinheiro","Abilio Morais","Beatriz Beato","Telma Barroso","Pedro Oliveira"];
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 
   // By programme
