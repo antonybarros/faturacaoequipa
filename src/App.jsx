@@ -2667,8 +2667,13 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     mkts.reduce((s, mkt) => s + getLastDailyCumul(entries, totalDays, `orders_first_d_${mkt}`), 0);
   const getTeamAfilCumul = (entries, totalDays, team, mkts) =>
     mkts.reduce((s, mkt) => s + getLastDailyCumul(entries, totalDays, `afil_d_${mkt}`), 0);
-  const fatCurr = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
-  const fatPrev = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
+  const naSecondaryMkts = ["SK","GR","CY","PL"];
+  const fatCurrBase = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
+  const fatPrevBase = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
+  const fatCurrSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(cg["fat_"+mk])||0),0) : 0;
+  const fatPrevSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(pg["fat_"+mk])||0),0) : 0;
+  const fatCurr = fatCurrBase + fatCurrSecondary;
+  const fatPrev = fatPrevBase + fatPrevSecondary;
 
   const sumMkts = (prefix, g, mkts) => mkts.reduce((s,mk)=>s+(Number(g[prefix+"_"+mk])||0),0);
   const getMkts = (y,m) => {
