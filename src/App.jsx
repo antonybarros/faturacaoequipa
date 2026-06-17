@@ -20,7 +20,7 @@ function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
   if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"OTHER",label:"Outros"}];
-  if (team === "equipa_na") return [{key:"NA",label:"USA"}];
+  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"OTHER_NA",label:"Outros NA"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -690,7 +690,7 @@ function PasswordGate({ onUnlock }) {
         <div style={{ width:48, height:48, borderRadius:"50%", background:"#E1F5EE", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 1rem" }}>
           <svg width="20" height="20" fill="none" stroke={C.green} strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-        <p style={{ fontWeight:500, fontSize:18, margin:"0 0 4px", color:C.text }}>Partners França</p>
+        <p style={{ fontWeight:500, fontSize:18, margin:"0 0 4px", color:C.text }}>Resultados</p>
         <p style={{ fontSize:13, color:C.muted, margin:"0 0 1.5rem" }}>Acesso restrito</p>
         <form onSubmit={submit}>
           <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" autoFocus
@@ -714,6 +714,7 @@ function getEntryTotal(e, team) {
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
   if (team === "equipa_pt") return (Number(e.PT)||0)+(Number(e.OTHER)||0);
+  if (team === "equipa_na") return (Number(e.NA)||0)+(Number(e.OTHER_NA)||0);
   // equipa_fr — use all FR markets
   return (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
 }
@@ -2597,6 +2598,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     if (team === "equipa_it") return ["IT"];
     if (team === "equipa_es") return ["ES"];
     if (team === "equipa_pt") return ["PT","OTHER"];
+    if (team === "equipa_na") return ["NA","OTHER_NA"];
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
   const currMkts = getMkts(year,month);
@@ -3055,8 +3057,8 @@ function MainApp({ role, onLogout }) {
       <div style={{ maxWidth:920, margin:"0 auto", padding:"1.25rem 1rem" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem" }}>
           <div>
-            <p style={{ fontSize:20, fontWeight:500, margin:0, color:C.text }}>Partners França</p>
-            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Equipa FR · {role.name}{isAdmin?" · Admin":""}</p>
+            <p style={{ fontSize:20, fontWeight:500, margin:0, color:C.text }}>Resultados</p>
+            <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Partners · {role.name}{isAdmin?" · Admin":""}</p>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <select value={selMonth} onChange={e=>setSelMonth(e.target.value)}
