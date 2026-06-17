@@ -38,11 +38,13 @@ const PASSWORDS = {
   admin: import.meta.env.VITE_PASSWORD_ADMIN || "partnersfranca",
   fabien: import.meta.env.VITE_PASSWORD_FABIEN || "partnersfabien",
   monica: import.meta.env.VITE_PASSWORD_MONICA || "partnersmonica",
+  pedro: import.meta.env.VITE_PASSWORD_PEDRO || "partnersna",
 };
 const ROLES = {
-  admin: { name:"Antony", gestor:"Antony", isAdmin:true },
-  fabien: { name:"Fabien", gestor:"Fabien", isAdmin:false },
-  monica: { name:"Mónica", gestor:"Mónica", isAdmin:false },
+  admin:  { name:"Antony",         gestor:"Antony",         isAdmin:true,  canEditRegisto:true,  registoTeam:null,        followupTeam:null },
+  fabien: { name:"Fabien",         gestor:"Fabien",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"self" },
+  monica: { name:"Mónica",         gestor:"Mónica",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"self" },
+  pedro:  { name:"Pedro Oliveira", gestor:"Pedro Oliveira", isAdmin:false, canEditRegisto:true,  registoTeam:"equipa_na", followupTeam:"equipa_na" },
 };
 const GATE_KEY = "faturacao_gate_v3";
 const ROLE_KEY = "faturacao_role_v3";
@@ -1808,7 +1810,7 @@ function CopyBtn({ text }) {
 }
 
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
-function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
+function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, followupTeam=null }) {
   const isGestorFiltered = !!gestorFilter;
   const PROGS = ["Professionals","Elite","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -1847,6 +1849,10 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false }) {
   const load = async () => {
     setLoading(true);
     let q = supabase.from("partner_followup").select("*").order("stage_started_at", { ascending:false }).limit(5000);
+    if (followupTeam) {
+      const teamObj = TEAMS.find(t=>t.key===followupTeam);
+      if (teamObj) q = q.in("market", teamObj.markets);
+    }
     if (gestorFilter) q = q.eq("gestor", gestorFilter);
     const { data } = await q;
     setRecords(data || []);
@@ -3117,6 +3123,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function MainApp({ role, onLogout }) {
+  // role includes: name, gestor, isAdmin, canEditRegisto, registoTeam, followupTeam
   const isAdmin = role.isAdmin;
   const gestor = role.gestor;
   const [tab, setTab] = useState("analise");
@@ -3156,7 +3163,7 @@ function MainApp({ role, onLogout }) {
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
           {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:true},{id:"resultados",l:"Resultados",adminOnly:false},{id:"topparceiros",l:"Top Parceiros",adminOnly:false,hidden:true}]
-            .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden)
+            .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
               style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
@@ -3184,7 +3191,7 @@ function MainApp({ role, onLogout }) {
           <div>
             {tab==="registo" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
-                {TEAMS.map(t=>(
+                {TEAMS.filter(t=>!role.registoTeam||t.key===role.registoTeam).map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                     style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
                       background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
@@ -3204,7 +3211,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <ResultadosTab year={year} month={month} partnersCount={partnersCount} currentTeam={currentTeam} />
-            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} />}
+            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} />}
           </div>
         )}
       </div>
