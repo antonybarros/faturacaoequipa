@@ -1428,37 +1428,20 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         return (
           <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
             <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>AFILIAÇÃO DIÁRIA — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Valores cumulativos por dia</p>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                  <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                    {["Dia",...mktList.map(m=>m.label)].map((h,i)=>(
-                      <th key={i} style={{padding:"6px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {Array.from({length:totalDays},(_,i)=>i+1).map(day=>{
-                      const e = entries[day]||{};
-                      return (
-                        <tr key={day} style={{borderBottom:`0.5px solid ${C.card}`}}>
-                          <td style={{padding:"6px 10px",fontWeight:500,color:C.text}}>{day}</td>
-                          {mktList.map(mkt=>{
-                            const fkey = `afil_d_${mkt.key}`;
-                            return (
-                              <td key={fkey} style={{padding:"4px 6px",textAlign:"right"}}>
-                                <input type="number" value={e[fkey]??""} placeholder="—"
-                                  onChange={ev=>updateEntry(day,fkey,ev.target.value)}
-                                  onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
-                                  style={{width:90,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <p style={{...T.sectionTitle,marginBottom:14}}>AFILIAÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                {mktList.map(mkt=>{
+                  const fkey = `afil_${mkt.key}`;
+                  return (
+                    <div key={fkey}>
+                      <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label} (€)</p>
+                      <input type="number" value={goals[fkey]??""} placeholder="0"
+                        onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                        onBlur={saveAll}
+                        style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1470,42 +1453,25 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         const mktList = getTeamMarkets(currentTeam, newStruct);
         return (
           <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-            {/* Encomendas diário - Total e 1ªs no mesmo card */}
             <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>ENCOMENDAS DIÁRIO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Valores cumulativos por dia</p>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                  <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-                    {["Dia",...mktList.flatMap(m=>[`Total ${m.label}`,`1ªs ${m.label}`])].map((h,i)=>(
-                      <th key={i} style={{padding:"6px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody>
-                    {Array.from({length:totalDays},(_,i)=>i+1).map(day=>{
-                      const e = entries[day]||{};
-                      return (
-                        <tr key={day} style={{borderBottom:`0.5px solid ${C.card}`}}>
-                          <td style={{padding:"6px 10px",fontWeight:500,color:C.text}}>{day}</td>
-                          {mktList.flatMap(mkt=>[
-                            <td key={`tot_${mkt.key}`} style={{padding:"4px 6px",textAlign:"right"}}>
-                              <input type="number" value={e[`orders_total_d_${mkt.key}`]??""} placeholder="—"
-                                onChange={ev=>updateEntry(day,`orders_total_d_${mkt.key}`,ev.target.value)}
-                                onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
-                                style={{width:80,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
-                            </td>,
-                            <td key={`fst_${mkt.key}`} style={{padding:"4px 6px",textAlign:"right"}}>
-                              <input type="number" value={e[`orders_first_d_${mkt.key}`]??""} placeholder="—"
-                                onChange={ev=>updateEntry(day,`orders_first_d_${mkt.key}`,ev.target.value)}
-                                onBlur={()=>save({entries:monthData.entries,team_goals:monthData.team_goals})}
-                                style={{width:80,padding:"5px 8px",border:`0.5px solid ${C.border}`,borderRadius:6,fontSize:13,background:C.bg,color:C.text,outline:"none",textAlign:"right"}} />
-                            </td>
-                          ])}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <p style={{...T.sectionTitle,marginBottom:14}}>ENCOMENDAS — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                {mktList.flatMap(mkt=>[
+                  <div key={`tot_${mkt.key}`}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Total enc. — {mkt.label}</p>
+                    <input type="number" value={goals[`orders_total_${mkt.key}`]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`orders_total_${mkt.key}`]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>,
+                  <div key={`fst_${mkt.key}`}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>1ªs enc. — {mkt.label}</p>
+                    <input type="number" value={goals[`orders_first_${mkt.key}`]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`orders_first_${mkt.key}`]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                ])}
               </div>
             </div>
           </div>
@@ -1533,44 +1499,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             </div>
           </div>
 
-          {/* Novos Parceiros histórico */}
-          <div style={T.card}>
-            <p style={T.sectionTitle}>Novos Parceiros — dados históricos</p>
-            <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Preenche para meses anteriores a 2026 (comparação YoY no separador Resultados).</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12, marginBottom:16 }}>
-              <div>
-                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Total novos parceiros</p>
-                <input type="number" value={goals["hist_partners_total"]??""} placeholder="0"
-                  onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,hist_partners_total:e.target.value}}))}
-                  onBlur={saveAll}
-                  style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-              </div>
-            </div>
-            <p style={{ fontSize:12, color:C.muted, margin:"0 0 10px" }}>Por mercado:</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12, marginBottom:16 }}>
-              {mktList.map(mkt => (
-                <div key={mkt.key}>
-                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{mkt.label}</p>
-                  <input type="number" value={goals[`hist_partners_mkt_${mkt.key}`]??""} placeholder="0"
-                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`hist_partners_mkt_${mkt.key}`]:e.target.value}}))}
-                    onBlur={saveAll}
-                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize:12, color:C.muted, margin:"0 0 10px" }}>Por programa:</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
-              {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog => (
-                <div key={prog}>
-                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{prog}</p>
-                  <input type="number" value={goals[`hist_partners_prog_${prog.replace(/ /g,"_").toLowerCase()}`]??""} placeholder="0"
-                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`hist_partners_prog_${prog.replace(/ /g,"_").toLowerCase()}`]:e.target.value}}))}
-                    onBlur={saveAll}
-                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-                </div>
-              ))}
-            </div>
-          </div>
+
           </div>
         );
       })()}
@@ -2610,12 +2539,12 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   };
   const currMkts = getMkts(year,month);
   const prevMkts = getMkts(prevYear,month);
-  const encCurr = getTeamOrdersCumul(ce, totalDaysCurr, currentTeam, currMkts);
-  const enc1Curr = getTeamFirst1Cumul(ce, totalDaysCurr, currentTeam, currMkts);
-  const afilCurr = getTeamAfilCumul(ce, totalDaysCurr, currentTeam, currMkts);
-  const encPrev = getTeamOrdersCumul(pe, totalDaysPrev, currentTeam, prevMkts);
-  const enc1Prev = getTeamFirst1Cumul(pe, totalDaysPrev, currentTeam, prevMkts);
-  const afilPrev = getTeamAfilCumul(pe, totalDaysPrev, currentTeam, prevMkts);
+  const encCurr = sumMkts("orders_total", cg, currMkts);
+  const enc1Curr = sumMkts("orders_first", cg, currMkts);
+  const afilCurr = sumMkts("afil", cg, currMkts);
+  const encPrev = sumMkts("orders_total", pg, prevMkts);
+  const enc1Prev = sumMkts("orders_first", pg, prevMkts);
+  const afilPrev = sumMkts("afil", pg, prevMkts);
   const getMargem = (g,y,m) => { const mkts=getMkts(y,m); const vs=mkts.map(k=>Number(g["margin_pct_"+k])||0).filter(v=>v>0); return vs.length>0?(vs.reduce((s,v)=>s+v,0)/vs.length).toFixed(1):null; };
   const margemCurr = getMargem(cg,year,month);
   const margemPrev = getMargem(pg,prevYear,month);
