@@ -2389,7 +2389,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,original_created_at", { count:"exact" })
+      .select("gestor,programme,status,stage,market,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
@@ -2880,7 +2880,7 @@ function TestesTab({ year, month }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,original_created_at", { count:"exact" })
+      .select("gestor,programme,status,stage,market,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
