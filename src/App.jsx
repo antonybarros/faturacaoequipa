@@ -2054,7 +2054,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
         )}
       </div>
 
-      {followTab==="analise"&&<AnaliseFollowup year={year} month={month} isAdmin={isAdmin} />}
+      {followTab==="analise"&&<AnaliseFollowup year={year} month={month} isAdmin={isAdmin} role={role} />}
       {followTab==="acompanhamento"&&<>
 
       {/* Form */}
@@ -2460,7 +2460,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
 }
 
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
-function AnaliseFollowup({ year, month, isAdmin }) {
+function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const [periodo, setPeriodo] = useState("mes");
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2481,13 +2481,17 @@ function AnaliseFollowup({ year, month, isAdmin }) {
       start = `${sy}-${pad(sm+1)}-01T00:00:00.000Z`;
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
-    supabase.from("partner_followup")
+    let q = supabase.from("partner_followup")
       .select("gestor,programme,status,stage,market,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
-      .neq("status","deleted")
-      .range(0, 4999)
-      .then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
+      .neq("status","deleted");
+    // Filter by team markets for non-admin in 3 months view
+    if (!isAdmin && periodo==="3meses" && role?.followupTeam) {
+      const teamObj = TEAMS.find(t=>t.key===role.followupTeam);
+      if (teamObj) q = q.in("market", teamObj.markets);
+    }
+    q.range(0, 4999).then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
   },[year,month,periodo]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
@@ -2582,8 +2586,14 @@ function AnaliseFollowup({ year, month, isAdmin }) {
         {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
       </div>
 
-      {isAdmin&&periodo==="mes"&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
-        {gestors.map(g=>{
+      {(()=>{
+        // Show gestor cards: admin sees all, Pedro sees his team, others see none
+        const naGestors = ["Pedro Oliveira","Telma Barroso","Beatriz Beato"];
+        const showGestorCards = isAdmin || (role?.followupTeam==="equipa_na");
+        const visibleGestors = isAdmin ? gestors : naGestors;
+        if (!showGestorCards || periodo!=="mes") return null;
+        return <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+          {visibleGestors.map(g=>{
           const gd=byGestor[g]||{total:0,progs:{}};
           return (
             <div key={g} style={T.card}>
@@ -2607,7 +2617,8 @@ function AnaliseFollowup({ year, month, isAdmin }) {
             </div>
           );
         })}
-      </div>}
+      </div>;
+      })()}
     </div>
   );
 }
