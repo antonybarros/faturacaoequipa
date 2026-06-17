@@ -3136,7 +3136,7 @@ function MainApp({ role, onLogout }) {
   const isCurrentMonth = year===today.getFullYear()&&month===today.getMonth();
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
-  const [currentTeam, setCurrentTeam] = useState("equipa_fr");
+  const [currentTeam, setCurrentTeam] = useState(role.registoTeam||"equipa_fr");
   useEffect(()=>{ setLoading(true); loadMonthData(year,month,currentTeam).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month,currentTeam]);
   const [partnersCount, setPartnersCount] = useState(null);
   useEffect(()=>{ loadPartnersCount(year,month,currentTeam).then(setPartnersCount); },[year,month,currentTeam]);
