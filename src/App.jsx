@@ -56,11 +56,11 @@ const T = {
 
 // ── TopParceirosTab ────────────────────────────────────────────────────────────
 const MKT_LABELS = {
-  "FR":"França","CH":"Suíça","BNL":"Benelux","DEAT":"DE-AT","CH-BNL-DEAT":"CH-BNL-DEAT",
+  "FR":"França","CH":"Suíça","BNL":"Benelux","DEAT":"Alemanha e Áustria","CH-BNL-DEAT":"CH-BNL-DEAT",
   "IT":"Itália","ES":"Espanha","PT":"Portugal","OTHER":"Outros",
   "IE":"Irlanda","WW":"Worldwide","SE":"Suécia","GB":"Reino Unido","EU":"EU",
   "RO":"Roménia","DK":"Dinamarca","FI":"Finlândia","CA":"Canadá",
-  "NA":"NA","CZ":"República Checa","SK":"Eslováquia","GR":"Grécia","CY":"Chipre","PL":"Polónia",
+  "NA":"USA","CZ":"República Checa","SK":"Eslováquia","GR":"Grécia","CY":"Chipre","PL":"Polónia",
 };
 
 const MKT_MAP_TP = { "FR":"FR","CH":"CH","BNL":"BNL","DEAT":"DEAT","LU":"BNL","BE":"BNL","NL":"BNL","DE":"DEAT","AT":"DEAT" };
