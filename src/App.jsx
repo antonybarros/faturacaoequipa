@@ -857,6 +857,7 @@ function buildDailyFirstRev(entries, totalDays, newStruct, team="equipa_fr") {
   if (team === "equipa_it") fields = ["first_rev_IT"];
   else if (team === "equipa_es") fields = ["first_rev_ES"];
   else if (team === "equipa_pt") fields = ["first_rev_PT","first_rev_OTHER"];
+  else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_OTHER_NA"];
   else fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
   const daily = []; let prevCumul = 0;
   const lastVals = {};
