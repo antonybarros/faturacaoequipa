@@ -55,6 +55,14 @@ const T = {
 
 
 // ── TopParceirosTab ────────────────────────────────────────────────────────────
+const MKT_LABELS = {
+  "FR":"França","CH":"Suíça","BNL":"Benelux","DEAT":"DE-AT","CH-BNL-DEAT":"CH-BNL-DEAT",
+  "IT":"Itália","ES":"Espanha","PT":"Portugal","OTHER":"Outros",
+  "IE":"Irlanda","WW":"Worldwide","SE":"Suécia","GB":"Reino Unido","EU":"EU",
+  "RO":"Roménia","DK":"Dinamarca","FI":"Finlândia","CA":"Canadá",
+  "NA":"NA","CZ":"República Checa","SK":"Eslováquia","GR":"Grécia","CY":"Chipre","PL":"Polónia",
+};
+
 const MKT_MAP_TP = { "FR":"FR","CH":"CH","BNL":"BNL","DEAT":"DEAT","LU":"BNL","BE":"BNL","NL":"BNL","DE":"DEAT","AT":"DEAT" };
 const PROG_MAP_TP = { "PROFESSIONALS":"Professionals","PRO GYM":"Pro Gym","PRO BOX":"Pro Box","PRO TEAMS":"Pro Teams","ELITE":"Elite","ELITE-PARTNER":"Elite","PERFORMANCE":"Performance","HORECA":"Horeca","CORPORATE":"Corporate" };
 const MKT_LABELS_TP = { FR:"França", CH:"Suíça", BNL:"Benelux", DEAT:"DE-AT" };
@@ -2480,7 +2488,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
           const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
           return (
             <div key={mkt} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-              <span style={{fontSize:13,color:C.text,flex:1}}>{mkt}</span>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{MKT_LABELS[mkt]||mkt}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
               <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
             </div>
