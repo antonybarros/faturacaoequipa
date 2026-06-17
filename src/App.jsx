@@ -3211,7 +3211,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <ResultadosTab year={year} month={month} partnersCount={partnersCount} currentTeam={currentTeam} />
-            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} />}
+            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={(isAdmin||role.followupTeam)?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} />}
           </div>
         )}
       </div>
