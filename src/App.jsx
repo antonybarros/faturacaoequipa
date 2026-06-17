@@ -2399,7 +2399,7 @@ function AnaliseFollowup({ year, month, isAdmin }) {
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
-  const byProg = {}, byGestor = {};
+  const byProg = {}, byGestor = {}, byMkt = {};
   gestors.forEach(g=>{ byGestor[g]={total:0,progs:{}}; });
   data.forEach(r=>{
     const p = r.programme||"—";
@@ -2408,6 +2408,8 @@ function AnaliseFollowup({ year, month, isAdmin }) {
     if (!byGestor[g]) byGestor[g]={total:0,progs:{}};
     byGestor[g].total++;
     byGestor[g].progs[p]=(byGestor[g].progs[p]||0)+1;
+    const m = r.market||"—";
+    byMkt[m]=(byMkt[m]||0)+1;
   });
 
   const totalAll = data.length;
@@ -2466,6 +2468,21 @@ function AnaliseFollowup({ year, month, isAdmin }) {
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
               {periodo==="3meses"?<span style={{fontSize:11,color:C.green,minWidth:80,textAlign:"right"}}>{bought} compraram ({convPct}%)</span>
               :<span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>}
+            </div>
+          );
+        })}
+        {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+      </div>
+
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:10}}>Por mercado</p>
+        {Object.entries(byMkt).sort((a,b)=>b[1]-a[1]).map(([mkt,n])=>{
+          const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
+          return (
+            <div key={mkt} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{mkt}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
             </div>
           );
         })}
