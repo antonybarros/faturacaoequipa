@@ -20,7 +20,7 @@ function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
   if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"OTHER",label:"Outros"}];
-  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"OTHER_NA",label:"Outros NA"}];
+  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"CZ",label:"República Checa"},{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -714,7 +714,7 @@ function getEntryTotal(e, team) {
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
   if (team === "equipa_pt") return (Number(e.PT)||0)+(Number(e.OTHER)||0);
-  if (team === "equipa_na") return (Number(e.NA)||0)+(Number(e.OTHER_NA)||0);
+  if (team === "equipa_na") return (Number(e.NA)||0)+(Number(e.CZ)||0)+(Number(e.SK)||0)+(Number(e.GR)||0)+(Number(e.CY)||0)+(Number(e.PL)||0);
   // equipa_fr — use all FR markets
   return (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
 }
@@ -857,7 +857,7 @@ function buildDailyFirstRev(entries, totalDays, newStruct, team="equipa_fr") {
   if (team === "equipa_it") fields = ["first_rev_IT"];
   else if (team === "equipa_es") fields = ["first_rev_ES"];
   else if (team === "equipa_pt") fields = ["first_rev_PT","first_rev_OTHER"];
-  else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_OTHER_NA"];
+  else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_CZ","first_rev_SK","first_rev_GR","first_rev_CY","first_rev_PL"];
   else fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
   const daily = []; let prevCumul = 0;
   const lastVals = {};
@@ -2599,7 +2599,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     if (team === "equipa_it") return ["IT"];
     if (team === "equipa_es") return ["ES"];
     if (team === "equipa_pt") return ["PT","OTHER"];
-    if (team === "equipa_na") return ["NA","OTHER_NA"];
+    if (team === "equipa_na") return ["NA","CZ","SK","GR","CY","PL"];
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
   const currMkts = getMkts(year,month);
