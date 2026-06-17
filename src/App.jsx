@@ -1810,7 +1810,7 @@ function CopyBtn({ text }) {
 }
 
 // ── PartnerFollowup ────────────────────────────────────────────────────────────
-function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, followupTeam=null }) {
+function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, followupTeam=null, role=null }) {
   const isGestorFiltered = !!gestorFilter;
   const PROGS = ["Professionals","Elite","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -2488,7 +2488,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       .neq("status","deleted");
     // Filter by team markets for non-admin in 3 months view
     if (!isAdmin && periodo==="3meses" && role?.followupTeam) {
-      const teamObj = TEAMS.find(t=>t.key===role.followupTeam);
+      const teamObj = TEAMS.find(t=>t.key===role?.followupTeam);
       if (teamObj) q = q.in("market", teamObj.markets);
     }
     q.range(0, 4999).then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
@@ -3222,7 +3222,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <ResultadosTab year={year} month={month} partnersCount={partnersCount} currentTeam={currentTeam} />
-            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={(isAdmin||role.followupTeam)?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} />}
+            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={(isAdmin||role.followupTeam)?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} role={role} />}
           </div>
         )}
       </div>
