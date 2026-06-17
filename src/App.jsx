@@ -2389,11 +2389,11 @@ function AnaliseFollowup({ year, month, isAdmin }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,original_created_at")
+      .select("gestor,programme,status,stage,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
-      .limit(5000)
+      .range(0, 4999)
       .then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
   },[year,month,periodo]);
 
@@ -2863,11 +2863,11 @@ function TestesTab({ year, month }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,original_created_at")
+      .select("gestor,programme,status,stage,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted")
-      .limit(5000)
+      .range(0, 4999)
       .then(({data:rows})=>{
         setData(rows||[]);
         setLoading(false);
