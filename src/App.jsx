@@ -19,8 +19,8 @@ const TEAMS = [
 function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
-  if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"IE",label:"Irlanda"},{key:"WW",label:"Worldwide"},{key:"SE",label:"Suécia"},{key:"GB",label:"Reino Unido"},{key:"EU",label:"EU"},{key:"RO",label:"Roménia"},{key:"DK",label:"Dinamarca"},{key:"FI",label:"Finlândia"},{key:"CA",label:"Canadá"},{key:"OTHER",label:"Outros"}];
-  if (team === "equipa_na") return [{key:"NA",label:"NA"},{key:"CZ",label:"República Checa"},{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+  if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"OTHER",label:"Outros"}];
+  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"OTHER_NA",label:"Outros NA"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
