@@ -1445,7 +1445,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       )}
 
 
-      {currentTeam === "equipa_na" && (() => {
+      {subTab==="primeiras"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         return (
           <div style={T.card}>
@@ -1495,7 +1495,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       })()}
 
 
-      {currentTeam === "equipa_na" && (() => {
+      {subTab==="afiliacao"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         return (
           <div style={T.card}>
@@ -1549,7 +1549,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       })()}
 
 
-      {currentTeam === "equipa_na" && (() => {
+      {subTab==="encomendas"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         return (
           <div style={T.card}>
@@ -1599,7 +1599,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       })()}
 
 
-      {currentTeam === "equipa_na" && (() => {
+      {subTab==="parceiros"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         return (
           <div style={T.card}>
@@ -1648,7 +1648,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       })()}
 
 
-      {currentTeam === "equipa_na" && (() => {
+      {subTab==="margem"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         return (
           <div style={T.card}>
