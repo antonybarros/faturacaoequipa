@@ -26,7 +26,7 @@ function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
   if (team === "equipa_es") return [{key:"ES", label:"Espanha"}];
   if (team === "equipa_pt") return [{key:"PT",label:"Portugal"},{key:"OTHER",label:"Outros"}];
-  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"CZ",label:"República Checa"},{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+  if (team === "equipa_na") return [{key:"NA",label:"USA"},{key:"CZ",label:"República Checa"}];
   // equipa_fr
   if (newStruct) return [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
   return [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
@@ -1382,6 +1382,28 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         </div>
       )}
 
+      {/* ── Mercados mensais Equipa NA ── */}
+      {subTab === "faturacao" && currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>FATURAÇÃO MENSAL — MERCADOS SECUNDÁRIOS</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Eslováquia, Grécia, Chipre e Polónia — valor total do mês</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>(
+                <div key={mkt.key}>
+                  <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label} (€)</p>
+                  <input type="number" value={goals[`fat_${mkt.key}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`fat_${mkt.key}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── 1ªs Compras ── */}
       {subTab === "primeiras" && (
         <div style={T.card}>
@@ -2534,7 +2556,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     if (team === "equipa_it") return ["IT"];
     if (team === "equipa_es") return ["ES"];
     if (team === "equipa_pt") return ["PT","OTHER"];
-    if (team === "equipa_na") return ["NA","CZ","SK","GR","CY","PL"];
+    if (team === "equipa_na") return ["NA","CZ"]; // SK,GR,CY,PL stored monthly in team_goals as fat_SK etc.
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
   const currMkts = getMkts(year,month);
