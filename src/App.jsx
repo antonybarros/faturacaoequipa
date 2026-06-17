@@ -42,8 +42,8 @@ const PASSWORDS = {
 };
 const ROLES = {
   admin:  { name:"Antony",         gestor:"Antony",         isAdmin:true,  canEditRegisto:true,  registoTeam:null,        followupTeam:null },
-  fabien: { name:"Fabien",         gestor:"Fabien",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"self" },
-  monica: { name:"Mónica",         gestor:"Mónica",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"self" },
+  fabien: { name:"Fabien",         gestor:"Fabien",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"equipa_fr" },
+  monica: { name:"Mónica",         gestor:"Mónica",         isAdmin:false, canEditRegisto:false, registoTeam:null,        followupTeam:"equipa_fr" },
   pedro:  { name:"Pedro Oliveira", gestor:"Pedro Oliveira", isAdmin:false, canEditRegisto:true,  registoTeam:"equipa_na", followupTeam:"equipa_na" },
 };
 const GATE_KEY = "faturacao_gate_v3";
@@ -3233,7 +3233,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <ResultadosTab year={year} month={month} partnersCount={partnersCount} currentTeam={currentTeam} />
-            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={(isAdmin||role.followupTeam)?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} role={role} />}
+            </div> : tab==="cockpit" ? <CockpitTab gestor={gestor} isAdmin={isAdmin} year={year} month={month} /> : <PartnerFollowup year={year} month={month} gestor={isAdmin?null:role.canEditRegisto?null:gestor} isAdmin={isAdmin} followupTeam={role.followupTeam} role={role} />}
           </div>
         )}
       </div>
