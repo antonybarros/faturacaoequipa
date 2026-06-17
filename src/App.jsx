@@ -12,8 +12,14 @@ const TEAMS = [
   { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
   { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
   { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","OTHER"] },
-  { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"] },
+  { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"], dashboardMarkets:["NA","CZ"] },
 ];
+
+// Returns the markets that count for dashboard/objectives (may differ from all markets)
+function getDashboardMarkets(team) {
+  const t = TEAMS.find(t=>t.key===team);
+  return t?.dashboardMarkets || t?.markets || [];
+}
 
 // Returns market list for a given team and structure
 function getTeamMarkets(team, newStruct) {
@@ -714,7 +720,7 @@ function getEntryTotal(e, team) {
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
   if (team === "equipa_pt") return (Number(e.PT)||0)+(Number(e.OTHER)||0);
-  if (team === "equipa_na") return (Number(e.NA)||0)+(Number(e.CZ)||0)+(Number(e.SK)||0)+(Number(e.GR)||0)+(Number(e.CY)||0)+(Number(e.PL)||0);
+  if (team === "equipa_na") return (Number(e.NA)||0)+(Number(e.CZ)||0);
   // equipa_fr — use all FR markets
   return (Number(e.FR)||0)+(Number(e["CH-BNL-DEAT"])||0)+(Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
 }
@@ -794,7 +800,7 @@ async function loadPartnersCount(year, month, team="equipa_fr") {
   const start = new Date(year, month, 1).toISOString();
   const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
   const teamObj = TEAMS.find(t=>t.key===team);
-  const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
+  const markets = teamObj?.dashboardMarkets || teamObj?.markets || ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
   const { count } = await supabase.from("partner_followup")
     .select("*", { count:"exact", head:true })
     .gte("original_created_at", start)
@@ -857,7 +863,7 @@ function buildDailyFirstRev(entries, totalDays, newStruct, team="equipa_fr") {
   if (team === "equipa_it") fields = ["first_rev_IT"];
   else if (team === "equipa_es") fields = ["first_rev_ES"];
   else if (team === "equipa_pt") fields = ["first_rev_PT","first_rev_OTHER"];
-  else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_CZ","first_rev_SK","first_rev_GR","first_rev_CY","first_rev_PL"];
+  else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_CZ"];
   else fields = newStruct ? ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT"] : ["first_rev_FR","first_rev_CH-BNL-DEAT"];
   const daily = []; let prevCumul = 0;
   const lastVals = {};
