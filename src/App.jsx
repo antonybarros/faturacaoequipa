@@ -2462,6 +2462,8 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
 function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const [periodo, setPeriodo] = useState("mes");
+  const defaultTeam = role?.followupTeam || (isAdmin ? "global" : "equipa_fr");
+  const [analiseTeam, setAnaliseTeam] = useState(defaultTeam);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
@@ -2486,13 +2488,13 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted");
-    // Filter by team markets for non-admin in 3 months view
-    if (!isAdmin && periodo==="3meses" && role?.followupTeam) {
-      const teamObj = TEAMS.find(t=>t.key===role?.followupTeam);
+    // Filter by selected team
+    if (analiseTeam !== "global") {
+      const teamObj = TEAMS.find(t=>t.key===analiseTeam);
       if (teamObj) q = q.in("market", teamObj.markets);
     }
     q.range(0, 4999).then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
-  },[year,month,periodo]);
+  },[year,month,periodo,analiseTeam]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
 
@@ -2518,9 +2520,18 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{...T.card,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{...T.card,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <p style={{...T.sectionTitle,margin:0,flex:1}}>Análise — {periodoLabel}</p>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {/* Team selector */}
+          {[{id:"global",l:"Geral"},...(isAdmin?TEAMS:[TEAMS.find(t=>t.key===(role?.followupTeam||"equipa_fr"))].filter(Boolean))].map(t=>(
+            <button key={t.id||t.key} onClick={()=>setAnaliseTeam(t.id||t.key)}
+              style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:analiseTeam===(t.id||t.key)?"#6366F1":"transparent",color:analiseTeam===(t.id||t.key)?"#fff":C.muted}}>
+              {t.l||t.label}
+            </button>
+          ))}
+          <div style={{width:1,height:16,background:C.border,alignSelf:"center"}} />
           {[{id:"mes",l:"Mês atual"},{id:"3meses",l:"Últimos 3 meses"}].map(p=>(
             <button key={p.id} onClick={()=>setPeriodo(p.id)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
