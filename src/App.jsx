@@ -1444,6 +1444,30 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         </div>
       )}
 
+
+      {currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>1ªS COMPRAS — MERCADOS SECUNDÁRIOS</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>{
+                const fkey = `first_rev_${mkt.key}`;
+                return (
+                  <div key={fkey}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                    <input type="number" value={goals[fkey]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Afiliação ── */}
       {subTab === "afiliacao" && (() => {
         const mktList = getTeamMarkets(currentTeam, newStruct);
@@ -1465,6 +1489,30 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   );
                 })}
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+
+      {currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>AFILIAÇÃO — MERCADOS SECUNDÁRIOS</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>{
+                const fkey = `afil_${mkt.key}`;
+                return (
+                  <div key={fkey}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                    <input type="number" value={goals[fkey]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -1500,6 +1548,30 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         );
       })()}
 
+
+      {currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>ENCOMENDAS — MERCADOS SECUNDÁRIOS</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>{
+                const fkey = `orders_total_${mkt.key}`;
+                return (
+                  <div key={fkey}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                    <input type="number" value={goals[fkey]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Parceiros / Leads ── */}
       {subTab === "parceiros" && (() => {
         const mktList = getTeamMarkets(currentTeam, newStruct);
@@ -1526,6 +1598,30 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         );
       })()}
 
+
+      {currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>{
+                const fkey = `leads_${mkt.key}`;
+                return (
+                  <div key={fkey}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                    <input type="number" value={goals[fkey]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Margem ── */}
       {subTab === "margem" && (() => {
         const mktList = getTeamMarkets(currentTeam, newStruct);
@@ -1547,6 +1643,30 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                 </div>
               </div>
             ))}
+          </div>
+        );
+      })()}
+
+
+      {currentTeam === "equipa_na" && (() => {
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
+        return (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>MARGEM — MERCADOS SECUNDÁRIOS</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {naMonthlyMkts.map(mkt=>{
+                const fkey = `margin_pct_${mkt.key}`;
+                return (
+                  <div key={fkey}>
+                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                    <input type="number" value={goals[fkey]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                      onBlur={saveAll}
+                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })()}
