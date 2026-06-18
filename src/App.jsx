@@ -1848,6 +1848,185 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
   );
 }
 
+// ── PerformanceTab ────────────────────────────────────────────────────────────
+function PerformanceTab({ year, month, isAdmin, currentTeam }) {
+  const [perfTab, setPerfTab] = useState("registo");
+  const [monthData, setMonthData] = useState({ team_goals:{} });
+  const [histData, setHistData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [perfTeam, setPerfTeam] = useState(currentTeam||"equipa_fr");
+
+  useEffect(()=>{ setPerfTeam(currentTeam||"equipa_fr"); },[currentTeam]);
+
+  useEffect(()=>{
+    setLoading(true);
+    // Load current month + last 12 months for YoY and trend
+    const keys = [];
+    for (let i=0;i<=12;i++){
+      const d = new Date(year, month-i, 1);
+      keys.push(monthKey(d.getFullYear(), d.getMonth()));
+    }
+    Promise.all([
+      supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
+      supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
+    ]).then(([curr, hist])=>{
+      setMonthData(curr.data || { team_goals:{} });
+      setHistData(hist.data || []);
+      setLoading(false);
+    });
+  },[year, month, perfTeam]);
+
+  const save = async (newGoals) => {
+    const key = monthKey(year, month);
+    const merged = { ...monthData.team_goals, ...newGoals };
+    await supabase.from("billing_months").upsert({ month_key:key, team:perfTeam, team_goals:merged }, { onConflict:"month_key,team" });
+    setMonthData(prev=>({...prev, team_goals:merged}));
+  };
+
+  const goals = monthData.team_goals || {};
+  const inp = (field, label) => (
+    <div>
+      <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
+      <input type="number" value={goals[field]??""} placeholder="0"
+        onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))}
+        onBlur={()=>save({[field]:goals[field]})}
+        style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+    </div>
+  );
+
+  const leads = Number(goals.perf_leads)||0;
+  const leadsAng = Number(goals.perf_leads_ang)||0;
+  const leadsSem = Number(goals.perf_leads_sem)||0;
+  const prospects = Number(goals.perf_prospects)||0;
+  const convRate = leads>0?(prospects/leads*100).toFixed(1):0;
+  const angPct = leads>0?(leadsAng/leads*100).toFixed(1):0;
+
+  // YoY comparison
+  const prevYearKey = monthKey(year-1, month);
+  const prevYearData = histData.find(d=>d.month_key===prevYearKey)?.team_goals||{};
+  const prevLeads = Number(prevYearData.perf_leads)||0;
+  const prevProspects = Number(prevYearData.perf_prospects)||0;
+  const leadsYoY = prevLeads>0?((leads-prevLeads)/prevLeads*100).toFixed(1):null;
+  const prospectsYoY = prevProspects>0?((prospects-prevProspects)/prevProspects*100).toFixed(1):null;
+
+  // Last 6 months trend
+  const trend = [];
+  for (let i=5;i>=0;i--){
+    const d = new Date(year, month-i, 1);
+    const k = monthKey(d.getFullYear(), d.getMonth());
+    const g = histData.find(h=>h.month_key===k)?.team_goals||{};
+    trend.push({
+      label: MONTH_NAMES[d.getMonth()].slice(0,3)+" "+d.getFullYear(),
+      leads: Number(g.perf_leads)||0,
+      prospects: Number(g.perf_prospects)||0,
+    });
+  }
+
+  if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Header */}
+      <div style={{...T.card,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <p style={{...T.sectionTitle,margin:0,flex:1}}>Performance — {MONTH_NAMES[month]} {year}</p>
+        <div style={{display:"flex",gap:6}}>
+          {TEAMS.map(t=>(
+            <button key={t.key} onClick={()=>setPerfTeam(t.key)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:perfTeam===t.key?C.green:"transparent",color:perfTeam===t.key?"#fff":C.muted}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {[{id:"registo",l:"Registo"},{id:"analise",l:"Análise"}].map(t=>(
+            <button key={t.id} onClick={()=>setPerfTab(t.id)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:perfTab===t.id?"#6366F1":"transparent",color:perfTab===t.id?"#fff":C.muted}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Registo */}
+      {perfTab==="registo"&&(
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:14}}>Registo — {MONTH_NAMES[month]} {year} · {TEAMS.find(t=>t.key===perfTeam)?.label}</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+            {inp("perf_leads","Leads recebidos")}
+            {inp("perf_leads_ang","Leads com angariador")}
+            {inp("perf_leads_sem","Leads sem angariador")}
+            {inp("perf_prospects","Prospects criados")}
+          </div>
+        </div>
+      )}
+
+      {/* Análise */}
+      {perfTab==="analise"&&<>
+        {/* KPI cards */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+          {[
+            {label:"Leads recebidos",value:leads,diff:leadsYoY,color:C.text},
+            {label:"Com angariador",value:leadsAng,sub:`${angPct}% do total`,color:C.text},
+            {label:"Sem angariador",value:leadsSem,sub:`${leads>0?((leadsSem/leads)*100).toFixed(1):0}% do total`,color:C.text},
+            {label:"Prospects criados",value:prospects,diff:prospectsYoY,color:C.green},
+          ].map((s,i)=>(
+            <div key={i} style={T.card}>
+              <p style={T.label}>{s.label}</p>
+              <p style={{fontSize:24,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.value}</p>
+              {s.diff!=null&&<p style={{fontSize:11,color:Number(s.diff)>=0?C.green:C.red,margin:0}}>{Number(s.diff)>=0?"+":""}{s.diff}% vs. ano anterior</p>}
+              {s.sub&&<p style={{fontSize:11,color:C.muted,margin:0}}>{s.sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* Conversion rate */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+          <div style={T.card}>
+            <p style={T.label}>Taxa de conversão leads → prospects</p>
+            <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{convRate}%</p>
+            <p style={{fontSize:12,color:C.muted,margin:0}}>{prospects} de {leads} leads convertidos</p>
+          </div>
+          <div style={T.card}>
+            <p style={T.label}>Qualidade dos leads</p>
+            <div style={{display:"flex",gap:4,margin:"12px 0 8px",height:12,borderRadius:6,overflow:"hidden"}}>
+              <div style={{flex:leadsAng||0,background:C.green,transition:"flex .3s"}} />
+              <div style={{flex:leadsSem||0,background:C.muted,transition:"flex .3s"}} />
+            </div>
+            <div style={{display:"flex",gap:16,fontSize:12}}>
+              <span style={{color:C.green}}>● Com angariador {angPct}%</span>
+              <span style={{color:C.muted}}>● Sem angariador {leads>0?((leadsSem/leads)*100).toFixed(1):0}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Trend table */}
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Evolução — últimos 6 meses</p>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+              {["Mês","Leads","Prospects","Taxa conv."].map((h,i)=>(
+                <th key={i} style={{padding:"7px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {trend.map((t,i)=>(
+                <tr key={i} style={{borderBottom:`0.5px solid ${C.card}`,fontWeight:i===trend.length-1?500:400}}>
+                  <td style={{padding:"8px 10px",color:C.text}}>{t.label}</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{t.leads||"—"}</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{t.prospects||"—"}</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",color:C.green}}>{t.leads>0?(t.prospects/t.leads*100).toFixed(1)+"%":"—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
+    </div>
+  );
+}
+
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
 function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const [periodo, setPeriodo] = useState("mes");
@@ -2573,7 +2752,7 @@ function MainApp({ role, onLogout }) {
           </div>
         </div>
         <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
-          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false}]
+          {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false},{id:"performance",l:"Performance",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
@@ -2611,7 +2790,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
-            </div> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
                 {TEAMS.map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
