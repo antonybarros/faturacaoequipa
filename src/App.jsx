@@ -1216,7 +1216,6 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [partnersCount, setPartnersCount] = useState(0);
   const [filter, setFilter] = useState("all");
   const [filterGestor, setFilterGestor] = useState("all");
   const [filterMkt, setFilterMkt] = useState("all");
@@ -1855,6 +1854,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   const [monthData, setMonthData] = useState({ team_goals:{} });
   const [histData, setHistData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [partnersCount, setPartnersCount] = useState(0);
   const [perfTeam, setPerfTeam] = useState(currentTeam||"equipa_fr");
 
   useEffect(()=>{ setPerfTeam(currentTeam||"equipa_fr"); },[currentTeam]);
