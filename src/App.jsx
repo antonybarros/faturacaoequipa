@@ -1919,7 +1919,31 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   const leadsYoY = prevLeads>0?((leads-prevLeads)/prevLeads*100).toFixed(1):null;
   const prospectsYoY = prevProspects>0?((prospects-prevProspects)/prevProspects*100).toFixed(1):null;
 
-  // Last 6 months trend
+  // Last 6 months trend with partners count
+  const [trendPartners, setTrendPartners] = useState({});
+  useEffect(()=>{
+    const teamObj = TEAMS.find(t=>t.key===perfTeam);
+    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
+    const promises = [];
+    for (let i=0;i<=5;i++){
+      const d = new Date(year, month-i, 1);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+      const end = new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59).toISOString();
+      const k = monthKey(d.getFullYear(), d.getMonth());
+      promises.push(
+        supabase.from("partner_followup").select("*",{count:"exact",head:true})
+          .gte("original_created_at", start).lte("original_created_at", end)
+          .neq("status","deleted").in("market", markets)
+          .then(({count})=>({key:k, count:count||0}))
+      );
+    }
+    Promise.all(promises).then(results=>{
+      const map = {};
+      results.forEach(r=>{ map[r.key]=r.count; });
+      setTrendPartners(map);
+    });
+  },[year, month, perfTeam]);
+
   const trend = [];
   for (let i=5;i>=0;i--){
     const d = new Date(year, month-i, 1);
@@ -1929,6 +1953,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       label: MONTH_NAMES[d.getMonth()].slice(0,3)+" "+d.getFullYear(),
       leads: Number(g.perf_leads)||0,
       prospects: Number(g.perf_prospects)||0,
+      partners: trendPartners[k]||0,
     });
   }
 
@@ -2016,7 +2041,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
           <p style={{...T.sectionTitle,marginBottom:10}}>Evolução — últimos 6 meses</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-              {["Mês","Leads","Prospects","Taxa conv."].map((h,i)=>(
+              {["Mês","Leads recebidos","Leads prospeção","Novos parceiros"].map((h,i)=>(
                 <th key={i} style={{padding:"7px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr></thead>
@@ -2026,7 +2051,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
                   <td style={{padding:"8px 10px",color:C.text}}>{t.label}</td>
                   <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{t.leads||"—"}</td>
                   <td style={{padding:"8px 10px",textAlign:"right",color:C.text}}>{t.prospects||"—"}</td>
-                  <td style={{padding:"8px 10px",textAlign:"right",color:C.green}}>{t.leads>0?(t.prospects/t.leads*100).toFixed(1)+"%":"—"}</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",color:C.green}}>{t.partners||"—"}</td>
                 </tr>
               ))}
             </tbody>
