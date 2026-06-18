@@ -1216,6 +1216,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [partnersCount, setPartnersCount] = useState(0);
   const [filter, setFilter] = useState("all");
   const [filterGestor, setFilterGestor] = useState("all");
   const [filterMkt, setFilterMkt] = useState("all");
@@ -1866,12 +1867,21 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       const d = new Date(year, month-i, 1);
       keys.push(monthKey(d.getFullYear(), d.getMonth()));
     }
+    const teamObj = TEAMS.find(t=>t.key===perfTeam);
+    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
     Promise.all([
       supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
       supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
-    ]).then(([curr, hist])=>{
+      // Load partners count for current month
+      supabase.from("partner_followup").select("*", {count:"exact",head:true})
+        .gte("original_created_at", new Date(year,month,1).toISOString())
+        .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
+        .neq("status","deleted")
+        .in("market", markets),
+    ]).then(([curr, hist, partners])=>{
       setMonthData(curr.data || { team_goals:{} });
       setHistData(hist.data || []);
+      setPartnersCount(partners.count || 0);
       setLoading(false);
     });
   },[year, month, perfTeam]);
@@ -1993,6 +2003,13 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
             <span style={{color:C.muted}}>● Sem angariador — {leadsSem} ({leads>0?((leadsSem/leads)*100).toFixed(1):0}%)</span>
           </div>
         </div>
+
+        {/* Conversion rate */}
+        {leads>0&&partnersCount>0&&<div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:8}}>Taxa de conversão — leads → novos parceiros</p>
+          <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{(partnersCount/leads*100).toFixed(1)}%</p>
+          <p style={{fontSize:12,color:C.muted,margin:0}}>{partnersCount} novos parceiros de {leads} leads recebidos</p>
+        </div>}
 
         {/* Trend table */}
         <div style={T.card}>
