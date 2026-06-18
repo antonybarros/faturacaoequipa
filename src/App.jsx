@@ -1970,7 +1970,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
             {label:"Leads recebidos",value:leads,diff:leadsYoY,color:C.text},
             {label:"Com angariador",value:leadsAng,sub:`${angPct}% do total`,color:C.text},
             {label:"Sem angariador",value:leadsSem,sub:`${leads>0?((leadsSem/leads)*100).toFixed(1):0}% do total`,color:C.text},
-            {label:"Prospects criados",value:prospects,diff:prospectsYoY,color:C.green},
+            {label:"Prospects (prospeção)",value:prospects,diff:prospectsYoY,color:C.green},
           ].map((s,i)=>(
             <div key={i} style={T.card}>
               <p style={T.label}>{s.label}</p>
@@ -1981,23 +1981,16 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
           ))}
         </div>
 
-        {/* Conversion rate */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-          <div style={T.card}>
-            <p style={T.label}>Taxa de conversão leads → prospects</p>
-            <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{convRate}%</p>
-            <p style={{fontSize:12,color:C.muted,margin:0}}>{prospects} de {leads} leads convertidos</p>
+        {/* Leads quality */}
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Origem dos leads recebidos</p>
+          <div style={{display:"flex",gap:4,margin:"8px 0",height:16,borderRadius:8,overflow:"hidden"}}>
+            <div style={{flex:leadsAng||0,background:C.green,transition:"flex .3s"}} />
+            <div style={{flex:leadsSem||0,background:C.muted,transition:"flex .3s"}} />
           </div>
-          <div style={T.card}>
-            <p style={T.label}>Qualidade dos leads</p>
-            <div style={{display:"flex",gap:4,margin:"12px 0 8px",height:12,borderRadius:6,overflow:"hidden"}}>
-              <div style={{flex:leadsAng||0,background:C.green,transition:"flex .3s"}} />
-              <div style={{flex:leadsSem||0,background:C.muted,transition:"flex .3s"}} />
-            </div>
-            <div style={{display:"flex",gap:16,fontSize:12}}>
-              <span style={{color:C.green}}>● Com angariador {angPct}%</span>
-              <span style={{color:C.muted}}>● Sem angariador {leads>0?((leadsSem/leads)*100).toFixed(1):0}%</span>
-            </div>
+          <div style={{display:"flex",gap:24,fontSize:13,marginTop:8}}>
+            <span style={{color:C.green}}>● Com angariador — {leadsAng} ({angPct}%)</span>
+            <span style={{color:C.muted}}>● Sem angariador — {leadsSem} ({leads>0?((leadsSem/leads)*100).toFixed(1):0}%)</span>
           </div>
         </div>
 
