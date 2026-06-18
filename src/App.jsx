@@ -1967,7 +1967,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
             {inp("perf_leads","Leads recebidos")}
             {inp("perf_leads_ang","Leads com angariador")}
             {inp("perf_leads_sem","Leads sem angariador")}
-            {inp("perf_prospects","Prospects criados")}
+            {inp("perf_prospects","Leads de prospeção (outbound)")}
           </div>
         </div>
       )}
@@ -1980,7 +1980,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
             {label:"Leads recebidos",value:leads,diff:leadsYoY,color:C.text},
             {label:"Com angariador",value:leadsAng,sub:`${angPct}% do total`,color:C.text},
             {label:"Sem angariador",value:leadsSem,sub:`${leads>0?((leadsSem/leads)*100).toFixed(1):0}% do total`,color:C.text},
-            {label:"Prospects (prospeção)",value:prospects,diff:prospectsYoY,color:C.green},
+            {label:"Leads prospeção (outbound)",value:prospects,diff:prospectsYoY,color:C.green},
           ].map((s,i)=>(
             <div key={i} style={T.card}>
               <p style={T.label}>{s.label}</p>
@@ -2005,10 +2005,10 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         </div>
 
         {/* Conversion rate */}
-        {leads>0&&partnersCount>0&&<div style={T.card}>
-          <p style={{...T.sectionTitle,marginBottom:8}}>Taxa de conversão — leads → novos parceiros</p>
-          <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{(partnersCount/leads*100).toFixed(1)}%</p>
-          <p style={{fontSize:12,color:C.muted,margin:0}}>{partnersCount} novos parceiros de {leads} leads recebidos</p>
+        {(leads+prospects)>0&&partnersCount>0&&<div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:8}}>Taxa de conversão — total leads → novos parceiros</p>
+          <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{(partnersCount/(leads+prospects)*100).toFixed(1)}%</p>
+          <p style={{fontSize:12,color:C.muted,margin:0}}>{partnersCount} novos parceiros de {leads+prospects} leads totais ({leads} recebidos + {prospects} prospeção)</p>
         </div>}
 
         {/* Trend table */}
