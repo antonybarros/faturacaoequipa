@@ -153,10 +153,12 @@ async function loadMonthData(year, month, team="equipa_fr") {
 function getEntryTotal(e, team) {
   if (!e) return 0;
   if (team === "global") {
-    // Sum all known market fields + monthly fat_ fields for NA secondary markets
-    const fields = ["FR","CH","BNL","DEAT","CH-BNL-DEAT","IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA","fat_SK","fat_GR","fat_CY","fat_PL"];
-    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
-    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
+    // For FR: use CH+BNL+DEAT if available (new structure), else CH-BNL-DEAT (legacy)
+    const frNew = (Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+    const frLeg = Number(e["CH-BNL-DEAT"])||0;
+    const fr = (Number(e.FR)||0) + (frNew > 0 ? frNew : frLeg);
+    const others = ["IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA","fat_SK","fat_GR","fat_CY","fat_PL"];
+    return fr + others.reduce((s,f)=>s+(Number(e[f])||0),0);
   }
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
