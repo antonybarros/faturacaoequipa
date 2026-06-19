@@ -743,21 +743,10 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   const toggleSS = async (day) => {
     const entries = { ...(monthData.entries || {}) };
-    const newVal = !entries[day]?.supersales;
-    entries[day] = { ...(entries[day] || {}), supersales: newVal };
+    entries[day] = { ...(entries[day] || {}), supersales: !entries[day]?.supersales };
     const updated = { ...monthData, entries };
     setMonthData(updated);
     await save({ entries: updated.entries, team_goals: updated.team_goals });
-    // Propagate SS to all other teams on the same day
-    const key = monthKey(year, month);
-    await Promise.all(TEAMS.filter(t=>t.key!==currentTeam).map(async t => {
-      const { data: other } = await supabase.from("billing_months").select("entries").eq("month_key", key).eq("team", t.key).maybeSingle();
-      if (other) {
-        const otherEntries = { ...(other.entries||{}) };
-        otherEntries[day] = { ...(otherEntries[day]||{}), supersales: newVal };
-        await supabase.from("billing_months").upsert({ month_key:key, team:t.key, entries:otherEntries }, { onConflict:"month_key,team" });
-      }
-    }));
   };
 
   const toggleCampanha = async (day) => {
