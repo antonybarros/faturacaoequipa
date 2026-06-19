@@ -1064,7 +1064,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {subTab==="parceiros"&&currentTeam === "equipa_na" && (() => {
         const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
-        return (
+        return (<>
           <div style={T.card}>
             <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
@@ -1091,7 +1091,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               {inpLead("perf_prospects","Leads de prospeção (outbound)")}
             </div>
           </div>
-        );
+        </>);
       })()}
 
       {/* ── Margem ── */}
