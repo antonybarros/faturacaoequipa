@@ -8,11 +8,11 @@ const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env
 const isNewStructure = (year, month) => year > 2026 || (year === 2026 && month >= 5);
 
 const TEAMS = [
-  { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"] },
-  { key:"equipa_it", label:"Equipa IT", markets:["IT"] },
-  { key:"equipa_es", label:"Equipa ES", markets:["ES"] },
-  { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","OTHER"] },
-  { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"], dashboardMarkets:["NA","CZ"] },
+  { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"], gestors:["Antony","Fabien","Mónica"] },
+  { key:"equipa_it", label:"Equipa IT", markets:["IT"], gestors:["Kamila Barros","Catarina Monteiro","Bruno Vieira","Vanessa Ferreirinha"] },
+  { key:"equipa_es", label:"Equipa ES", markets:["ES"], gestors:["Guilherme Mendes","Jose Castillo","Mariana Lopes"] },
+  { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","OTHER"], gestors:["Ines Anjo","Daniel Silva","Abilio Morais","Margarida Pinheiro"] },
+  { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"], dashboardMarkets:["NA","CZ"], gestors:["Pedro Oliveira","Telma Barroso","Beatriz Beato"] },
 ];
 
 // Returns the markets that count for dashboard/objectives (may differ from all markets)
@@ -209,7 +209,7 @@ async function loadPartnersByMktProg(year, month, team="equipa_fr") {
   const teamObj = TEAMS.find(t=>t.key===team);
   const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
   const { data } = await supabase.from("partner_followup")
-    .select("market,programme")
+    .select("market,programme,gestor")
     .gte("original_created_at", start)
     .lte("original_created_at", end)
     .neq("status", "deleted")
@@ -1109,7 +1109,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 }
 
 // ── Partner constants & mappings ──────────────────────────────────────────────
-const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira", "Jose Castillo", "Mariana Lopes", "Guilherme Mendes", "Ines Anjo", "Daniel Silva", "Margarida Pinheiro", "Abilio Morais", "Beatriz Beato", "Telma Barroso", "Pedro Oliveira"];
+const GESTORS = ["Antony", "Fabien", "Mónica", "Kamila Barros", "Catarina Monteiro", "Bruno Vieira", "Vanessa Ferreirinha", "Jose Castillo", "Mariana Lopes", "Guilherme Mendes", "Ines Anjo", "Daniel Silva", "Margarida Pinheiro", "Abilio Morais", "Beatriz Beato", "Telma Barroso", "Pedro Oliveira"];
 const ALL_MKTS = [
   {key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"},
   {key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}
@@ -1130,6 +1130,7 @@ const GESTOR_MAP = {
   "BEATRIZ BEATO":"Beatriz Beato","BEATRIZ":"Beatriz Beato",
   "TELMA BARROSO":"Telma Barroso","TELMA":"Telma Barroso",
   "PEDRO OLIVEIRA":"Pedro Oliveira","PEDRO":"Pedro Oliveira",
+  "VANESSA FERREIRINHA":"Vanessa Ferreirinha","VANESSA":"Vanessa Ferreirinha",
 };
 const MKT_MAP = {
   "França":"FR","FRANCA":"FR","FRANCE":"FR",
@@ -2041,6 +2042,35 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         </div>}
 
         {/* Por programa e por mercado */}
+        {/* Por gestor */}
+        {partnersData.length>0&&(()=>{
+          const teamGestors = TEAMS.find(t=>t.key===perfTeam)?.gestors||[];
+          if (!teamGestors.length) return null;
+          return <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(teamGestors.length,3)},minmax(0,1fr))`,gap:10}}>
+            {teamGestors.map(g=>{
+              const n = partnersData.filter(p=>p.gestor===g).length;
+              const byProg = {};
+              partnersData.filter(p=>p.gestor===g).forEach(p=>{ byProg[p.programme]=(byProg[p.programme]||0)+1; });
+              return <div key={g} style={T.card}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
+                  <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n} parceiros</span>
+                </div>
+                {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog=>{
+                  const pn=byProg[prog]||0;
+                  if(!pn) return null;
+                  return <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                    <span style={{fontSize:12,color:C.text,flex:1}}>{prog}</span>
+                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{pn}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{n>0?(pn/n*100).toFixed(0):0}%</span>
+                  </div>;
+                })}
+                {n===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+              </div>;
+            })}
+          </div>;
+        })()}
+
         {partnersData.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           <div style={T.card}>
             <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
