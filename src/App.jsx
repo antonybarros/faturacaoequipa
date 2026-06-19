@@ -2920,7 +2920,7 @@ function MainApp({ role, onLogout }) {
   return (
     <div style={{ minHeight:"100vh", background:C.bg }}>
       <div style={{ maxWidth:920, margin:"0 auto", padding:"1.25rem 1rem" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1.5rem" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
           <div>
             <p style={{ fontSize:20, fontWeight:500, margin:0, color:C.text }}>Resultados</p>
             <p style={{ fontSize:13, color:C.muted, margin:"3px 0 0" }}>Partners · {role.name}{isAdmin?" · Admin":""}</p>
