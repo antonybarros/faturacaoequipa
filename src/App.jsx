@@ -2384,8 +2384,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   useEffect(()=>{
     setLoading(true);
     Promise.all([
-      loadMonthData(year, month, currentTeam),
-      loadMonthData(prevYear, month, currentTeam),
+      currentTeam==="global" ? loadAllTeamsData(year,month) : loadMonthData(year, month, currentTeam),
+      currentTeam==="global" ? loadAllTeamsData(prevYear,month) : loadMonthData(prevYear, month, currentTeam),
       loadPartnersCount(prevYear, month, currentTeam),
       loadPartnersByMktProg(year, month, currentTeam),
     ]).then(([c,p,pp,pc])=>{
