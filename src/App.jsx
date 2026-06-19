@@ -2945,7 +2945,7 @@ function MainApp({ role, onLogout }) {
             </button>
           </div>
         </div>
-        <div style={{ display:"flex", borderBottom:`0.5px solid ${C.border}`, marginBottom:"1.5rem" }}>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:"1.5rem" }}>
           {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false},{id:"performance",l:"Performance",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
@@ -2960,7 +2960,7 @@ function MainApp({ role, onLogout }) {
           <div style={{ textAlign:"center", padding:"4rem 0", color:C.muted, fontSize:14 }}>A carregar…</div>
         ):tab==="analise"?(
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+            <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
               {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                 <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                   style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
@@ -2974,22 +2974,22 @@ function MainApp({ role, onLogout }) {
         ):(
           <div>
             {tab==="registo" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+              <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
                 {TEAMS.filter(t=>!role.registoTeam||t.key===role.registoTeam).map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
-                    style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
-                      background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                    style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
+                      background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
                     {t.label}
                   </button>
                 ))}
               </div>
               <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
             </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
+              <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
                 {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
-                    style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
-                      background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                    style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
+                      background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
                     {t.label}
                   </button>
                 ))}
