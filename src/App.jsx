@@ -2936,7 +2936,7 @@ function MainApp({ role, onLogout }) {
             </button>
           </div>
         </div>
-        <div style={{...T.card, display:"flex", gap:6, flexWrap:"wrap", padding:"10px 14px", marginBottom:"1.5rem" }}>
+        <div style={{...T.card, display:"flex", gap:6, flexWrap:"wrap", padding:"10px 14px", marginBottom:14 }}>
           {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false},{id:"performance",l:"Performance",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
