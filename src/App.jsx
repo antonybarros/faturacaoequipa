@@ -292,6 +292,18 @@ function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
         if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
       }
       cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
+    } else if (team === "global") {
+      // For merged entries, sum all market fields avoiding CH-BNL-DEAT double count
+      const frNew = (Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
+      const frLeg = Number(e["CH-BNL-DEAT"])||0;
+      const val = (Number(e.FR)||0) + (frNew > 0 ? frNew : frLeg)
+        + (Number(e.IT)||0) + (Number(e.ES)||0)
+        + (Number(e.PT)||0) + (Number(e.OTHER)||0)
+        + (Number(e.NA)||0) + (Number(e.CZ)||0)
+        + (Number(e.SK)||0) + (Number(e.GR)||0) + (Number(e.CY)||0) + (Number(e.PL)||0)
+        + (Number(e.OTHER_NA)||0)
+        + (Number(e.fat_SK)||0) + (Number(e.fat_GR)||0) + (Number(e.fat_CY)||0) + (Number(e.fat_PL)||0);
+      cumul = val > 0 ? val : prevCumul;
     } else {
       const val = getEntryTotal(e, team);
       cumul = val > 0 ? val : prevCumul;
