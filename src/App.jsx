@@ -21,6 +21,39 @@ function getDashboardMarkets(team) {
   return t?.dashboardMarkets || t?.markets || [];
 }
 
+// Load and merge data from all teams for a given month
+async function loadAllTeamsData(year, month) {
+  const { data } = await supabase.from("billing_months")
+    .select("entries,team_goals,team")
+    .eq("month_key", monthKey(year, month));
+  if (!data || !data.length) return { entries:{}, team_goals:{} };
+  // Merge all entries day by day
+  const mergedEntries = {};
+  const mergedGoals = {};
+  data.forEach(row => {
+    const e = row.entries || {};
+    const g = row.team_goals || {};
+    // Merge team_goals
+    Object.entries(g).forEach(([k,v]) => {
+      if (typeof v === "number" || (typeof v === "string" && !isNaN(v))) {
+        mergedGoals[k] = (Number(mergedGoals[k])||0) + (Number(v)||0);
+      }
+    });
+    // Merge entries by day — sum all market fields
+    Object.entries(e).forEach(([day, dayData]) => {
+      if (!mergedEntries[day]) mergedEntries[day] = {};
+      Object.entries(dayData).forEach(([field, val]) => {
+        if (field === "supersales" || field === "campanha") {
+          mergedEntries[day][field] = mergedEntries[day][field] || val;
+        } else if (typeof val === "number" || (typeof val === "string" && !isNaN(val))) {
+          mergedEntries[day][field] = (Number(mergedEntries[day][field])||0) + (Number(val)||0);
+        }
+      });
+    });
+  });
+  return { entries: mergedEntries, team_goals: mergedGoals };
+}
+
 // Returns market list for a given team and structure
 function getTeamMarkets(team, newStruct) {
   if (team === "equipa_it") return [{key:"IT", label:"Itália"}];
@@ -108,6 +141,11 @@ async function loadMonthData(year, month, team="equipa_fr") {
 // Returns total value from an entry object for a given team
 function getEntryTotal(e, team) {
   if (!e) return 0;
+  if (team === "global") {
+    // Sum all known market fields
+    const fields = ["FR","CH","BNL","DEAT","CH-BNL-DEAT","IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA"];
+    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
+  }
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
   if (team === "equipa_pt") return (Number(e.PT)||0)+(Number(e.OTHER)||0);
@@ -117,6 +155,7 @@ function getEntryTotal(e, team) {
 }
 
 async function loadHistoricalSSAvg(year, month, team="equipa_fr") {
+  if (team==="global") team="equipa_fr"; // fallback for global
   // Load previous months, find months that had a SS day, sum their SS day values, divide by count
   const keys = [];
   for (let i = 1; i <= 12; i++) {
@@ -153,6 +192,7 @@ async function loadHistoricalSSAvg(year, month, team="equipa_fr") {
 }
 
 async function loadHistoricalDowAvg(year, month, team="equipa_fr") {
+  if (team==="global") team="equipa_fr"; // fallback for global
   // Load last 3 months and compute average day value per day of week
   const keys = [];
   for (let i = 1; i <= 3; i++) {
@@ -2838,9 +2878,21 @@ function MainApp({ role, onLogout }) {
   const isPast = new Date(year,month+1,0)<new Date(today.getFullYear(),today.getMonth(),1);
   const closedDay = isPast?totalDays:isCurrentMonth?Math.max(0,today.getDate()-1):0;
   const [currentTeam, setCurrentTeam] = useState(role.registoTeam||"equipa_fr");
-  useEffect(()=>{ setLoading(true); loadMonthData(year,month,currentTeam).then(d=>{ setMonthData(d); setLoading(false); }); },[year,month,currentTeam]);
+  useEffect(()=>{
+    setLoading(true);
+    const loader = currentTeam==="global" ? loadAllTeamsData(year,month) : loadMonthData(year,month,currentTeam);
+    loader.then(d=>{ setMonthData(d); setLoading(false); });
+  },[year,month,currentTeam]);
   const [partnersCount, setPartnersCount] = useState(null);
-  useEffect(()=>{ loadPartnersCount(year,month,currentTeam).then(setPartnersCount); },[year,month,currentTeam]);
+  useEffect(()=>{
+    if (currentTeam==="global") {
+      // Sum all teams
+      Promise.all(TEAMS.map(t=>loadPartnersCount(year,month,t.key)))
+        .then(counts=>setPartnersCount(counts.reduce((s,c)=>s+c,0)));
+    } else {
+      loadPartnersCount(year,month,currentTeam).then(setPartnersCount);
+    }
+  },[year,month,currentTeam]);
   const monthCount = (today.getFullYear()-2025)*12 + today.getMonth() + 1;
   const monthOptions = Array.from({length:monthCount},(_,i)=>{ const d=new Date(today.getFullYear(),today.getMonth()-i,1); return { value:monthKey(d.getFullYear(),d.getMonth()), label:`${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}` }; });
   return (
@@ -2878,7 +2930,7 @@ function MainApp({ role, onLogout }) {
         ):tab==="analise"?(
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
-              {TEAMS.map(t=>(
+              {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                 <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                   style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
                     background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
@@ -2903,7 +2955,7 @@ function MainApp({ role, onLogout }) {
               <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
             </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
-                {TEAMS.map(t=>(
+                {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                     style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
                       background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
