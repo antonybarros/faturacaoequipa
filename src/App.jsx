@@ -156,6 +156,7 @@ function getEntryTotal(e, team) {
     // Sum all known market fields + monthly fat_ fields for NA secondary markets
     const fields = ["FR","CH","BNL","DEAT","CH-BNL-DEAT","IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA","fat_SK","fat_GR","fat_CY","fat_PL"];
     return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
+    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
   }
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
