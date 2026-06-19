@@ -1875,7 +1875,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
       supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
       // Load partners detail for current month
-      supabase.from("partner_followup").select("market,programme")
+      supabase.from("partner_followup").select("market,programme,gestor")
         .gte("original_created_at", new Date(year,month,1).toISOString())
         .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
         .neq("status","deleted")
