@@ -1855,6 +1855,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   const [histData, setHistData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [partnersCount, setPartnersCount] = useState(0);
+  const [partnersData, setPartnersData] = useState([]);
   const [perfTeam, setPerfTeam] = useState(currentTeam||"equipa_fr");
 
   useEffect(()=>{ setPerfTeam(currentTeam||"equipa_fr"); },[currentTeam]);
@@ -1872,16 +1873,19 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
     Promise.all([
       supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
       supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
-      // Load partners count for current month
-      supabase.from("partner_followup").select("*", {count:"exact",head:true})
+      // Load partners detail for current month
+      supabase.from("partner_followup").select("market,programme")
         .gte("original_created_at", new Date(year,month,1).toISOString())
         .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
         .neq("status","deleted")
-        .in("market", markets),
+        .in("market", markets)
+        .limit(5000),
     ]).then(([curr, hist, partners])=>{
       setMonthData(curr.data || { team_goals:{} });
       setHistData(hist.data || []);
-      setPartnersCount(partners.count || 0);
+      const pd = partners.data || [];
+      setPartnersCount(pd.length);
+      setPartnersData(pd);
       setLoading(false);
     });
   },[year, month, perfTeam]);
@@ -2034,6 +2038,35 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
           <p style={{...T.sectionTitle,marginBottom:8}}>Taxa de conversão — total leads → novos parceiros</p>
           <p style={{fontSize:32,fontWeight:500,color:C.green,margin:"8px 0 4px"}}>{(partnersCount/(leads+prospects)*100).toFixed(1)}%</p>
           <p style={{fontSize:12,color:C.muted,margin:0}}>{partnersCount} novos parceiros de {leads+prospects} leads totais ({leads} recebidos + {prospects} prospeção)</p>
+        </div>}
+
+        {/* Por programa e por mercado */}
+        {partnersData.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
+            {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog=>{
+              const n = partnersData.filter(p=>p.programme===prog).length;
+              if (!n) return null;
+              const pct = (n/partnersCount*100).toFixed(1);
+              return <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+                <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
+              </div>;
+            })}
+          </div>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
+            {Object.entries(partnersData.reduce((acc,p)=>{ acc[p.market]=(acc[p.market]||0)+1; return acc; },{}))
+              .sort((a,b)=>b[1]-a[1]).map(([mkt,n])=>{
+              const pct = (n/partnersCount*100).toFixed(1);
+              return <div key={mkt} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+                <span style={{fontSize:13,color:C.text,flex:1}}>{MKT_LABELS[mkt]||mkt}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>
+              </div>;
+            })}
+          </div>
         </div>}
 
         {/* Trend table */}
