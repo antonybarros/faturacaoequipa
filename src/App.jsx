@@ -722,6 +722,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     { id:"margem",      label:"Margem" },
     { id:"fat_programa", label:"Fat. Programa" },
     { id:"objetivos",   label:"Objetivos" },
+    { id:"leads",        label:"Leads / Prospeção" },
   ];
 
   const save = async (newData) => {
@@ -738,10 +739,21 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   const toggleSS = async (day) => {
     const entries = { ...(monthData.entries || {}) };
-    entries[day] = { ...(entries[day] || {}), supersales: !entries[day]?.supersales };
+    const newVal = !entries[day]?.supersales;
+    entries[day] = { ...(entries[day] || {}), supersales: newVal };
     const updated = { ...monthData, entries };
     setMonthData(updated);
     await save({ entries: updated.entries, team_goals: updated.team_goals });
+    // Propagate SS to all other teams on the same day
+    const key = monthKey(year, month);
+    await Promise.all(TEAMS.filter(t=>t.key!==currentTeam).map(async t => {
+      const { data: other } = await supabase.from("billing_months").select("entries").eq("month_key", key).eq("team", t.key).maybeSingle();
+      if (other) {
+        const otherEntries = { ...(other.entries||{}) };
+        otherEntries[day] = { ...(otherEntries[day]||{}), supersales: newVal };
+        await supabase.from("billing_months").upsert({ month_key:key, team:t.key, entries:otherEntries }, { onConflict:"month_key,team" });
+      }
+    }));
   };
 
   const toggleCampanha = async (day) => {
@@ -764,8 +776,8 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       <div style={{ display:"flex", gap:0, borderBottom:`0.5px solid ${C.border}`, overflowX:"auto" }}>
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
-            style={{ padding:"8px 16px", border:"none", borderBottom:subTab===t.id?`2px solid ${C.green}`:"2px solid transparent",
-              background:"transparent", color:subTab===t.id?C.green:C.muted, fontWeight:subTab===t.id?500:400, fontSize:13, cursor:"pointer", whiteSpace:"nowrap" }}>
+            style={{ padding:"6px 14px", border:`0.5px solid ${subTab===t.id?C.green:C.border}`, borderRadius:20,
+              background:subTab===t.id?C.green:"transparent", color:subTab===t.id?"#fff":C.muted, fontWeight:subTab===t.id?500:400, fontSize:12, cursor:"pointer", whiteSpace:"nowrap" }}>
             {t.label}
           </button>
         ))}
@@ -1109,6 +1121,32 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   </div>
                 );
               })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Leads / Prospeção ── */}
+      {subTab === "leads" && (() => {
+        const inp2 = (field, label) => (
+          <div>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
+            <input type="number" value={goals[field]??""} placeholder="0"
+              onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))}
+              onBlur={saveAll}
+              style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+          </div>
+        );
+        return (
+          <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:14}}>LEADS — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                {inp2("perf_leads","Leads recebidos (inbound)")}
+                {inp2("perf_leads_ang","Leads com angariador")}
+                {inp2("perf_leads_sem","Leads sem angariador")}
+                {inp2("perf_prospects","Leads de prospeção (outbound)")}
+              </div>
             </div>
           </div>
         );
@@ -1484,8 +1522,8 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
       <div style={{ display:"flex", alignItems:"center", gap:8, borderBottom:`0.5px solid ${C.border}`, paddingBottom:8 }}>
         {["acompanhamento","analise"].map(t=>(
           <button key={t} onClick={()=>setFollowTab(t)}
-            style={{ padding:"6px 16px", border:"none", borderBottom:followTab===t?`2px solid ${C.green}`:"2px solid transparent",
-              background:"transparent", color:followTab===t?C.green:C.muted, fontWeight:followTab===t?500:400, fontSize:13, cursor:"pointer" }}>
+            style={{ padding:"6px 14px", border:`0.5px solid ${followTab===t?C.green:C.border}`, borderRadius:20,
+              background:followTab===t?C.green:"transparent", color:followTab===t?"#fff":C.muted, fontWeight:followTab===t?500:400, fontSize:12, cursor:"pointer" }}>
             {t==="acompanhamento"?"Acompanhamento":"Análise"}
           </button>
         ))}
@@ -2030,32 +2068,13 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
             </button>
           ))}
         </div>
-        <div style={{display:"flex",gap:6}}>
-          {[{id:"registo",l:"Registo"},{id:"analise",l:"Análise"}].map(t=>(
-            <button key={t.id} onClick={()=>setPerfTab(t.id)}
-              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                background:perfTab===t.id?"#6366F1":"transparent",color:perfTab===t.id?"#fff":C.muted}}>
-              {t.l}
-            </button>
-          ))}
-        </div>
+
       </div>
 
-      {/* Registo */}
-      {perfTab==="registo"&&(
-        <div style={T.card}>
-          <p style={{...T.sectionTitle,marginBottom:14}}>Registo — {MONTH_NAMES[month]} {year} · {TEAMS.find(t=>t.key===perfTeam)?.label}</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-            {inp("perf_leads","Leads recebidos")}
-            {inp("perf_leads_ang","Leads com angariador")}
-            {inp("perf_leads_sem","Leads sem angariador")}
-            {inp("perf_prospects","Leads de prospeção (outbound)")}
-          </div>
-        </div>
-      )}
+{/* Registo moved to Registo tab */}
 
       {/* Análise */}
-      {perfTab==="analise"&&<>
+      {true&&<>
         {/* KPI cards */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
           {[
@@ -2931,8 +2950,8 @@ function MainApp({ role, onLogout }) {
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)}
-              style={{ padding:"9px 20px", border:"none", borderBottom:tab===t.id?`2px solid ${C.green}`:"2px solid transparent",
-                background:"transparent", color:tab===t.id?C.green:C.muted, fontWeight:tab===t.id?500:400, fontSize:14, cursor:"pointer" }}>
+              style={{ padding:"7px 18px", border:`0.5px solid ${tab===t.id?C.green:C.border}`, borderRadius:20,
+                background:tab===t.id?C.green:"transparent", color:tab===t.id?"#fff":C.muted, fontWeight:tab===t.id?500:400, fontSize:13, cursor:"pointer" }}>
               {t.l}
             </button>
           ))}
@@ -2944,8 +2963,8 @@ function MainApp({ role, onLogout }) {
             <div style={{display:"flex",gap:0,borderBottom:`0.5px solid ${C.border}`}}>
               {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                 <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
-                  style={{padding:"7px 16px",border:"none",borderBottom:currentTeam===t.key?`2px solid ${C.green}`:"2px solid transparent",
-                    background:"transparent",color:currentTeam===t.key?C.green:C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:13,cursor:"pointer"}}>
+                  style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
+                    background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
                   {t.label}
                 </button>
               ))}
