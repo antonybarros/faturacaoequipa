@@ -39,17 +39,7 @@ async function loadAllTeamsData(year, month) {
         mergedGoals[k] = (Number(mergedGoals[k])||0) + (Number(v)||0);
       }
     });
-    // Add monthly fat_ fields (SK, GR, CY, PL) to last day entries
-    const naMonthlyFields = ["fat_SK","fat_GR","fat_CY","fat_PL"];
-    const lastDay = Math.max(0, ...Object.keys(e).map(Number));
-    if (lastDay > 0) {
-      naMonthlyFields.forEach(f => {
-        if (g[f] && Number(g[f]) > 0) {
-          if (!mergedEntries[lastDay]) mergedEntries[lastDay] = {};
-          mergedEntries[lastDay][f] = (Number(mergedEntries[lastDay][f])||0) + (Number(g[f])||0);
-        }
-      });
-    }
+    // Store fat_ fields in mergedGoals only (not in entries to avoid double counting)
     // Merge entries by day — sum all market fields
     Object.entries(e).forEach(([day, dayData]) => {
       if (!mergedEntries[day]) mergedEntries[day] = {};
@@ -302,7 +292,7 @@ function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
         + (Number(e.NA)||0) + (Number(e.CZ)||0)
         + (Number(e.SK)||0) + (Number(e.GR)||0) + (Number(e.CY)||0) + (Number(e.PL)||0)
         + (Number(e.OTHER_NA)||0)
-        + (Number(e.fat_SK)||0) + (Number(e.fat_GR)||0) + (Number(e.fat_CY)||0) + (Number(e.fat_PL)||0);
+;
       cumul = val > 0 ? val : prevCumul;
     } else {
       const val = getEntryTotal(e, team);
@@ -2454,8 +2444,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const naSecondaryMkts = ["SK","GR","CY","PL"];
   const fatCurrBase = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
   const fatPrevBase = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
-  const fatCurrSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(cg["fat_"+mk])||0),0) : 0;
-  const fatPrevSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(pg["fat_"+mk])||0),0) : 0;
+  const fatCurrSecondary = (currentTeam==="equipa_na"||currentTeam==="global") ? naSecondaryMkts.reduce((s,mk)=>s+(Number(cg["fat_"+mk])||0),0) : 0;
+  const fatPrevSecondary = (currentTeam==="equipa_na"||currentTeam==="global") ? naSecondaryMkts.reduce((s,mk)=>s+(Number(pg["fat_"+mk])||0),0) : 0;
   const fatCurr = fatCurrBase + fatCurrSecondary;
   const fatPrev = fatPrevBase + fatPrevSecondary;
 
