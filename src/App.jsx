@@ -39,7 +39,17 @@ async function loadAllTeamsData(year, month) {
         mergedGoals[k] = (Number(mergedGoals[k])||0) + (Number(v)||0);
       }
     });
-    // Store fat_ fields in mergedGoals only (not in entries to avoid double counting)
+    // Add monthly fat_ fields (SK, GR, CY, PL) to last day entries
+    const naMonthlyFields = ["fat_SK","fat_GR","fat_CY","fat_PL"];
+    const lastDay = Math.max(0, ...Object.keys(e).map(Number));
+    if (lastDay > 0) {
+      naMonthlyFields.forEach(f => {
+        if (g[f] && Number(g[f]) > 0) {
+          if (!mergedEntries[lastDay]) mergedEntries[lastDay] = {};
+          mergedEntries[lastDay][f] = (Number(mergedEntries[lastDay][f])||0) + (Number(g[f])||0);
+        }
+      });
+    }
     // Merge entries by day — sum all market fields
     Object.entries(e).forEach(([day, dayData]) => {
       if (!mergedEntries[day]) mergedEntries[day] = {};
@@ -143,12 +153,10 @@ async function loadMonthData(year, month, team="equipa_fr") {
 function getEntryTotal(e, team) {
   if (!e) return 0;
   if (team === "global") {
-    // For FR: use CH+BNL+DEAT if available (new structure), else CH-BNL-DEAT (legacy)
-    const frNew = (Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
-    const frLeg = Number(e["CH-BNL-DEAT"])||0;
-    const fr = (Number(e.FR)||0) + (frNew > 0 ? frNew : frLeg);
-    const others = ["IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA","fat_SK","fat_GR","fat_CY","fat_PL"];
-    return fr + others.reduce((s,f)=>s+(Number(e[f])||0),0);
+    // Sum all known market fields + monthly fat_ fields for NA secondary markets
+    const fields = ["FR","CH","BNL","DEAT","CH-BNL-DEAT","IT","ES","PT","OTHER","NA","CZ","SK","GR","CY","PL","OTHER_NA","fat_SK","fat_GR","fat_CY","fat_PL"];
+    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
+    return fields.reduce((s,f)=>s+(Number(e[f])||0),0);
   }
   if (team === "equipa_it") return Number(e.IT)||0;
   if (team === "equipa_es") return Number(e.ES)||0;
@@ -282,18 +290,6 @@ function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
         if (e["CH-BNL-DEAT"] !== undefined) lastCH = Number(e["CH-BNL-DEAT"])||0;
       }
       cumul = newStruct ? lastFR+lastCH+lastBNL+lastDEAT : lastFR+lastCH;
-    } else if (team === "global") {
-      // For merged entries, sum all market fields avoiding CH-BNL-DEAT double count
-      const frNew = (Number(e.CH)||0)+(Number(e.BNL)||0)+(Number(e.DEAT)||0);
-      const frLeg = Number(e["CH-BNL-DEAT"])||0;
-      const val = (Number(e.FR)||0) + (frNew > 0 ? frNew : frLeg)
-        + (Number(e.IT)||0) + (Number(e.ES)||0)
-        + (Number(e.PT)||0) + (Number(e.OTHER)||0)
-        + (Number(e.NA)||0) + (Number(e.CZ)||0)
-        + (Number(e.SK)||0) + (Number(e.GR)||0) + (Number(e.CY)||0) + (Number(e.PL)||0)
-        + (Number(e.OTHER_NA)||0)
-;
-      cumul = val > 0 ? val : prevCumul;
     } else {
       const val = getEntryTotal(e, team);
       cumul = val > 0 ? val : prevCumul;
@@ -743,10 +739,21 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   const toggleSS = async (day) => {
     const entries = { ...(monthData.entries || {}) };
-    entries[day] = { ...(entries[day] || {}), supersales: !entries[day]?.supersales };
+    const newVal = !entries[day]?.supersales;
+    entries[day] = { ...(entries[day] || {}), supersales: newVal };
     const updated = { ...monthData, entries };
     setMonthData(updated);
     await save({ entries: updated.entries, team_goals: updated.team_goals });
+    // Propagate SS to all other teams on the same day
+    const key = monthKey(year, month);
+    await Promise.all(TEAMS.filter(t=>t.key!==currentTeam).map(async t => {
+      const { data: other } = await supabase.from("billing_months").select("entries").eq("month_key", key).eq("team", t.key).maybeSingle();
+      if (other) {
+        const otherEntries = { ...(other.entries||{}) };
+        otherEntries[day] = { ...(otherEntries[day]||{}), supersales: newVal };
+        await supabase.from("billing_months").upsert({ month_key:key, team:t.key, entries:otherEntries }, { onConflict:"month_key,team" });
+      }
+    }));
   };
 
   const toggleCampanha = async (day) => {
@@ -2433,8 +2440,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const naSecondaryMkts = ["SK","GR","CY","PL"];
   const fatCurrBase = dailyCurr.length>0 ? dailyCurr[totalDaysCurr-1]?.cumul||0 : 0;
   const fatPrevBase = dailyPrev.length>0 ? dailyPrev[totalDaysPrev-1]?.cumul||0 : 0;
-  const fatCurrSecondary = (currentTeam==="equipa_na"||currentTeam==="global") ? naSecondaryMkts.reduce((s,mk)=>s+(Number(cg["fat_"+mk])||0),0) : 0;
-  const fatPrevSecondary = (currentTeam==="equipa_na"||currentTeam==="global") ? naSecondaryMkts.reduce((s,mk)=>s+(Number(pg["fat_"+mk])||0),0) : 0;
+  const fatCurrSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(cg["fat_"+mk])||0),0) : 0;
+  const fatPrevSecondary = currentTeam==="equipa_na" ? naSecondaryMkts.reduce((s,mk)=>s+(Number(pg["fat_"+mk])||0),0) : 0;
   const fatCurr = fatCurrBase + fatCurrSecondary;
   const fatPrev = fatPrevBase + fatPrevSecondary;
 
