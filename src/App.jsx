@@ -302,7 +302,8 @@ function buildDaily(entries, totalDays, year, month, team="equipa_fr") {
 
 function buildDailyFirstRev(entries, totalDays, newStruct, team="equipa_fr") {
   let fields;
-  if (team === "equipa_it") fields = ["first_rev_IT"];
+  if (team === "global") fields = ["first_rev_FR","first_rev_CH","first_rev_BNL","first_rev_DEAT","first_rev_CH-BNL-DEAT","first_rev_IT","first_rev_ES","first_rev_PT","first_rev_OTHER","first_rev_NA","first_rev_CZ","first_rev_OTHER_NA"];
+  else if (team === "equipa_it") fields = ["first_rev_IT"];
   else if (team === "equipa_es") fields = ["first_rev_ES"];
   else if (team === "equipa_pt") fields = ["first_rev_PT","first_rev_OTHER"];
   else if (team === "equipa_na") fields = ["first_rev_NA","first_rev_CZ"];
