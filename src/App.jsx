@@ -722,7 +722,6 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     { id:"margem",      label:"Margem" },
     { id:"fat_programa", label:"Fat. Programa" },
     { id:"objetivos",   label:"Objetivos" },
-    { id:"leads",        label:"Leads / Prospeção" },
   ];
 
   const save = async (newData) => {
@@ -773,7 +772,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
 
       {/* Sub-tabs */}
-      <div style={{ display:"flex", gap:0, borderBottom:`0.5px solid ${C.border}`, overflowX:"auto" }}>
+      <div style={{...T.card, display:"flex", gap:6, flexWrap:"wrap", padding:"10px 14px" }}>
         {SUB_TABS.map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
             style={{ padding:"6px 14px", border:`0.5px solid ${subTab===t.id?C.green:C.border}`, borderRadius:20,
@@ -1030,6 +1029,15 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       {/* ── Parceiros / Leads ── */}
       {subTab === "parceiros" && (() => {
         const mktList = getTeamMarkets(currentTeam, newStruct);
+        const inpLead = (field, label) => (
+          <div>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
+            <input type="number" value={goals[field]??""} placeholder="0"
+              onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))}
+              onBlur={saveAll}
+              style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+          </div>
+        );
         return (
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={T.card}>
@@ -1072,6 +1080,15 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   </div>
                 );
               })}
+            </div>
+          </div>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {inpLead("perf_leads","Leads recebidos (inbound)")}
+              {inpLead("perf_leads_ang","Leads com angariador")}
+              {inpLead("perf_leads_sem","Leads sem angariador")}
+              {inpLead("perf_prospects","Leads de prospeção (outbound)")}
             </div>
           </div>
         );
@@ -1121,32 +1138,6 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
                   </div>
                 );
               })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Leads / Prospeção ── */}
-      {subTab === "leads" && (() => {
-        const inp2 = (field, label) => (
-          <div>
-            <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
-            <input type="number" value={goals[field]??""} placeholder="0"
-              onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))}
-              onBlur={saveAll}
-              style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-          </div>
-        );
-        return (
-          <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:14}}>LEADS — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-                {inp2("perf_leads","Leads recebidos (inbound)")}
-                {inp2("perf_leads_ang","Leads com angariador")}
-                {inp2("perf_leads_sem","Leads sem angariador")}
-                {inp2("perf_prospects","Leads de prospeção (outbound)")}
-              </div>
             </div>
           </div>
         );
@@ -1519,7 +1510,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:"1rem" }}>
       {/* Sub-tab buttons */}
-      <div style={{ display:"flex", alignItems:"center", gap:8, borderBottom:`0.5px solid ${C.border}`, paddingBottom:8 }}>
+      <div style={{...T.card, display:"flex", alignItems:"center", gap:6, padding:"10px 14px", flexWrap:"wrap" }}>
         {["acompanhamento","analise"].map(t=>(
           <button key={t} onClick={()=>setFollowTab(t)}
             style={{ padding:"6px 14px", border:`0.5px solid ${followTab===t?C.green:C.border}`, borderRadius:20,
@@ -2945,7 +2936,7 @@ function MainApp({ role, onLogout }) {
             </button>
           </div>
         </div>
-        <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:"1.5rem" }}>
+        <div style={{...T.card, display:"flex", gap:6, flexWrap:"wrap", padding:"10px 14px", marginBottom:"1.5rem" }}>
           {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false},{id:"performance",l:"Performance",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
