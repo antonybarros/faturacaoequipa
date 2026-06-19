@@ -2046,27 +2046,40 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         {partnersData.length>0&&(()=>{
           const teamGestors = TEAMS.find(t=>t.key===perfTeam)?.gestors||[];
           if (!teamGestors.length) return null;
+          const byGestorPerf = {};
+          teamGestors.forEach(g=>{ byGestorPerf[g]={total:0,progs:{}}; });
+          partnersData.forEach(r=>{
+            const g=r.gestor||"—";
+            if(!byGestorPerf[g]) return;
+            byGestorPerf[g].total++;
+            const p=r.programme||"—";
+            byGestorPerf[g].progs[p]=(byGestorPerf[g].progs[p]||0)+1;
+          });
+          const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
           return <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(teamGestors.length,3)},minmax(0,1fr))`,gap:10}}>
             {teamGestors.map(g=>{
-              const n = partnersData.filter(p=>p.gestor===g).length;
-              const byProg = {};
-              partnersData.filter(p=>p.gestor===g).forEach(p=>{ byProg[p.programme]=(byProg[p.programme]||0)+1; });
-              return <div key={g} style={T.card}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                  <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
-                  <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n} parceiros</span>
+              const gd=byGestorPerf[g]||{total:0,progs:{}};
+              return (
+                <div key={g} style={T.card}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                    <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
+                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
+                  </div>
+                  {progs.map(p=>{
+                    const n=gd.progs[p]||0;
+                    if(n===0) return null;
+                    const pct=gd.total>0?(n/gd.total*100).toFixed(0):0;
+                    return (
+                      <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                        <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
+                        <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n}</span>
+                        <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{pct}%</span>
+                      </div>
+                    );
+                  })}
+                  {gd.total===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
                 </div>
-                {["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"].map(prog=>{
-                  const pn=byProg[prog]||0;
-                  if(!pn) return null;
-                  return <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
-                    <span style={{fontSize:12,color:C.text,flex:1}}>{prog}</span>
-                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{pn}</span>
-                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{n>0?(pn/n*100).toFixed(0):0}%</span>
-                  </div>;
-                })}
-                {n===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
-              </div>;
+              );
             })}
           </div>;
         })()}
