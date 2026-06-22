@@ -1964,10 +1964,17 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       keys.push(monthKey(d.getFullYear(), d.getMonth()));
     }
     const teamObj = TEAMS.find(t=>t.key===perfTeam);
-    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
+    const markets = perfTeam==="global"
+      ? TEAMS.flatMap(t=>t.markets)
+      : (teamObj?.dashboardMarkets || teamObj?.markets || []);
+    const goalsQuery = perfTeam==="global"
+      ? supabase.from("billing_months").select("team_goals").in("month_key",[monthKey(year,month)])
+      : supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle();
     Promise.all([
-      supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
-      supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
+      goalsQuery,
+      perfTeam==="global"
+        ? supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys)
+        : supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
       // Load partners detail for current month
       supabase.from("partner_followup").select("market,programme,gestor")
         .gte("original_created_at", new Date(year,month,1).toISOString())
@@ -1976,7 +1983,18 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         .in("market", markets)
         .limit(5000),
     ]).then(([curr, hist, partners])=>{
-      setMonthData(curr.data || { team_goals:{} });
+      // For global, merge team_goals from all teams
+      if (perfTeam==="global" && curr.data) {
+        const merged = {};
+        curr.data.forEach(row=>{
+          Object.entries(row.team_goals||{}).forEach(([k,v])=>{
+            if (!isNaN(Number(v))) merged[k]=(Number(merged[k])||0)+(Number(v)||0);
+          });
+        });
+        setMonthData({ team_goals: merged });
+      } else {
+        setMonthData(curr.data || { team_goals:{} });
+      }
       setHistData(hist.data || []);
       const pd = partners.data || [];
       setPartnersCount(pd.length);
@@ -2021,8 +2039,10 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   // Last 6 months trend with partners count
   const [trendPartners, setTrendPartners] = useState({});
   useEffect(()=>{
-    const teamObj = TEAMS.find(t=>t.key===perfTeam);
-    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
+    const teamObj2 = TEAMS.find(t=>t.key===perfTeam);
+    const markets = perfTeam==="global"
+      ? TEAMS.flatMap(t=>t.markets)
+      : (teamObj2?.dashboardMarkets || teamObj2?.markets || []);
     const promises = [];
     for (let i=0;i<=5;i++){
       const d = new Date(year, month-i, 1);
@@ -2064,7 +2084,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       <div style={{...T.card,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <p style={{...T.sectionTitle,margin:0,flex:1}}>Performance — {MONTH_NAMES[month]} {year}</p>
         <div style={{display:"flex",gap:6}}>
-          {TEAMS.map(t=>(
+          {[{key:"global",label:"Global"},...TEAMS].map(t=>(
             <button key={t.key} onClick={()=>setPerfTeam(t.key)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
                 background:perfTeam===t.key?C.green:"transparent",color:perfTeam===t.key?"#fff":C.muted}}>
@@ -2119,7 +2139,9 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         {/* Por programa e por mercado */}
         {/* Por gestor */}
         {partnersData.length>0&&(()=>{
-          const teamGestors = TEAMS.find(t=>t.key===perfTeam)?.gestors||[];
+          const teamGestors = perfTeam==="global"
+          ? TEAMS.flatMap(t=>t.gestors||[])
+          : (TEAMS.find(t=>t.key===perfTeam)?.gestors||[]);
           if (!teamGestors.length) return null;
           const byGestorPerf = {};
           teamGestors.forEach(g=>{ byGestorPerf[g]={total:0,progs:{}}; });
