@@ -1311,7 +1311,6 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [yearData, setYearData] = useState([]);
   const [filter, setFilter] = useState("all");
   const [filterGestor, setFilterGestor] = useState("all");
   const [filterMkt, setFilterMkt] = useState("all");
@@ -2243,6 +2242,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const [analiseTeam, setAnaliseTeam] = useState(defaultTeam);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [yearData, setYearData] = useState([]);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes","Ines Anjo","Daniel Silva","Margarida Pinheiro","Abilio Morais","Beatriz Beato","Telma Barroso","Pedro Oliveira"];
 
