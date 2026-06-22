@@ -2293,15 +2293,12 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const verifiedNotBought = verified.filter(r=>r.status!=="bought").length;
   const stillInS30 = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
 
-  // S30/S60/S90 progression — did they advance within the period?
-  const s30Done = data.filter(r=>r.stage==="s60"||r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
-  const s30NotDone = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
-  const s60Done = data.filter(r=>r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
-  const s60Total = data.filter(r=>r.stage==="s60"||r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
-  const s60NotDone = s60Total - s60Done;
-  const s90Done = data.filter(r=>r.status==="bought").length;
-  const s90Total = data.filter(r=>r.stage==="s90"||r.status==="bought").length;
-  const s90NotDone = s90Total - s90Done;
+  // S30/S60/S90 — bought at each stage
+  const boughtS30 = data.filter(r=>r.status==="bought"&&r.stage==="s30").length;
+  const boughtS60 = data.filter(r=>r.status==="bought"&&r.stage==="s60").length;
+  const boughtS90 = data.filter(r=>r.status==="bought"&&r.stage==="s90").length;
+  const totalBought = boughtS30 + boughtS60 + boughtS90;
+  const notBought = data.filter(r=>r.status!=="bought").length;
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
   return (
@@ -2375,22 +2372,21 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
         })}
         {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
       </div>
-      {/* S30/S60/S90 progression */}
+      {/* S30/S60/S90 — 1ª compra por fase */}
       <div style={T.card}>
-        <p style={{...T.sectionTitle,marginBottom:14}}>Progressão — S30 · S60 · S90</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+        <p style={{...T.sectionTitle,marginBottom:4}}>1ª compra por fase</p>
+        <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>De {totalAll} novos parceiros, {totalBought} fizeram a 1ª compra</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {[
-            {label:"S30 — Fez", n:s30Done, total:totalAll, color:C.green},
-            {label:"S30 — Não fez", n:s30NotDone, total:totalAll, color:C.red},
-            {label:"S60 — Fez", n:s60Done, total:s60Total||1, color:C.green},
-            {label:"S60 — Não fez", n:s60NotDone, total:s60Total||1, color:C.red},
-            {label:"S90 — Fez (comprou)", n:s90Done, total:s90Total||1, color:C.green},
-            {label:"S90 — Não fez", n:s90NotDone, total:s90Total||1, color:C.red},
+            {label:"Fez na fase S30", n:boughtS30, total:totalAll, color:C.green},
+            {label:"Fez na fase S60", n:boughtS60, total:totalAll, color:C.green},
+            {label:"Fez na fase S90", n:boughtS90, total:totalAll, color:C.green},
+            {label:"Ainda não fez", n:notBought, total:totalAll, color:C.muted},
           ].map((s,i)=>(
             <div key={i} style={{...T.card,background:C.bg}}>
               <p style={T.label}>{s.label}</p>
               <p style={{fontSize:22,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.n}</p>
-              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.total>0?(s.n/s.total*100).toFixed(1):0}%</p>
+              <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(s.n/totalAll*100).toFixed(1):0}% do total</p>
             </div>
           ))}
         </div>
