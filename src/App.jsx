@@ -1311,6 +1311,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   const [followTab, setFollowTab] = useState("acompanhamento");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [yearData, setYearData] = useState([]);
   const [filter, setFilter] = useState("all");
   const [filterGestor, setFilterGestor] = useState("all");
   const [filterMkt, setFilterMkt] = useState("all");
@@ -2270,6 +2271,20 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       if (teamObj) q = q.in("market", teamObj.markets);
     }
     q.range(0, 4999).then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
+
+    // Load full year data for S30/S60/S90 yearly cards
+    const yearStart = new Date(year, 0, 1).toISOString();
+    const yearEnd = new Date(year, month+1, 0, 23, 59, 59).toISOString();
+    let yq = supabase.from("partner_followup")
+      .select("status,stage", { count:"exact" })
+      .gte("original_created_at", yearStart)
+      .lte("original_created_at", yearEnd)
+      .neq("status","deleted");
+    if (analiseTeam !== "global") {
+      const teamObj = TEAMS.find(t=>t.key===analiseTeam);
+      if (teamObj) yq = yq.in("market", teamObj.markets);
+    }
+    yq.range(0, 4999).then(({data:rows})=>{ setYearData(rows||[]); });
   },[year,month,periodo,analiseTeam]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
@@ -2311,7 +2326,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
           {[{id:"global",l:"Geral"},...(isAdmin?TEAMS:[TEAMS.find(t=>t.key===(role?.followupTeam||"equipa_fr"))].filter(Boolean))].map(t=>(
             <button key={t.id||t.key} onClick={()=>setAnaliseTeam(t.id||t.key)}
               style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                background:analiseTeam===(t.id||t.key)?"#6366F1":"transparent",color:analiseTeam===(t.id||t.key)?"#fff":C.muted}}>
+                background:analiseTeam===(t.id||t.key)?C.green:"transparent",color:analiseTeam===(t.id||t.key)?"#fff":C.muted}}>
               {t.l||t.label}
             </button>
           ))}
@@ -2393,6 +2408,27 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
           ))}
         </div>
       </div>
+      {/* Ano completo */}
+      {yearData.length>0&&<div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:4}}>1ª compra — ano {year}</p>
+        <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Histórico de Janeiro a {MONTH_NAMES[month]} {year}</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+          {[
+            {label:"Comprou em S30", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s30").length, color:C.green},
+            {label:"Comprou em S60", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s60").length, color:C.green},
+            {label:"Comprou em S90", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s90").length, color:C.green},
+            {label:"Não fez nos 90 dias", n:yearData.filter(r=>r.status==="closed"&&r.stage==="s90").length, color:C.red},
+            {label:"Ainda em processo", n:yearData.filter(r=>r.status==="pending").length, color:C.muted},
+          ].map((s,i)=>{
+            const total = yearData.length;
+            return <div key={i} style={{...T.card,background:C.bg}}>
+              <p style={T.label}>{s.label}</p>
+              <p style={{fontSize:22,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.n}</p>
+              <p style={{fontSize:11,color:C.muted,margin:0}}>{total>0?(s.n/total*100).toFixed(1):0}% do total</p>
+            </div>;
+          })}
+        </div>
+      </div>}
     </div>
   );
 }
