@@ -2237,7 +2237,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
 
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
 function AnaliseFollowup({ year, month, isAdmin, role=null }) {
-  const [periodo, setPeriodo] = useState("mes");
+  const periodo = "3meses"; // Always show 3 months
   const defaultTeam = role?.followupTeam || (isAdmin ? "global" : "equipa_fr");
   const [analiseTeam, setAnaliseTeam] = useState(defaultTeam);
   const [data, setData] = useState([]);
@@ -2260,7 +2260,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     let q = supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,market,original_created_at", { count:"exact" })
+      .select("gestor,programme,status,stage,stage_started_at,market,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted");
@@ -2292,6 +2292,16 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const verifiedBought = verified.filter(r=>r.status==="bought").length;
   const verifiedNotBought = verified.filter(r=>r.status!=="bought").length;
   const stillInS30 = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
+
+  // S30/S60/S90 progression — did they advance within the period?
+  const s30Done = data.filter(r=>r.stage==="s60"||r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
+  const s30NotDone = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
+  const s60Done = data.filter(r=>r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
+  const s60Total = data.filter(r=>r.stage==="s60"||r.stage==="s90"||r.status==="bought"||r.status==="closed").length;
+  const s60NotDone = s60Total - s60Done;
+  const s90Done = data.filter(r=>r.status==="bought").length;
+  const s90Total = data.filter(r=>r.stage==="s90"||r.status==="bought").length;
+  const s90NotDone = s90Total - s90Done;
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
   return (
@@ -2307,14 +2317,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
               {t.l||t.label}
             </button>
           ))}
-          <div style={{width:1,height:16,background:C.border,alignSelf:"center"}} />
-          {[{id:"mes",l:"Mês atual"},{id:"3meses",l:"Últimos 3 meses"}].map(p=>(
-            <button key={p.id} onClick={()=>setPeriodo(p.id)}
-              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                background:periodo===p.id?C.green:"transparent",color:periodo===p.id?"#fff":C.muted}}>
-              {p.l}
-            </button>
-          ))}
+
         </div>
       </div>
 
@@ -2372,40 +2375,26 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
         })}
         {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
       </div>
-
-      {(()=>{
-        // Show gestor cards: admin sees all, Pedro sees his team, others see none
-        const naGestors = ["Pedro Oliveira","Telma Barroso","Beatriz Beato"];
-        const showGestorCards = isAdmin || (role?.followupTeam==="equipa_na");
-        const visibleGestors = isAdmin ? gestors : naGestors;
-        if (!showGestorCards || periodo!=="mes") return null;
-        return <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
-          {visibleGestors.map(g=>{
-          const gd=byGestor[g]||{total:0,progs:{}};
-          return (
-            <div key={g} style={T.card}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
-                <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
-              </div>
-              {progs.map(p=>{
-                const n=gd.progs[p]||0;
-                if(n===0) return null;
-                const pct=gd.total>0?(n/gd.total*100).toFixed(0):0;
-                return (
-                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
-                    <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
-                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n}</span>
-                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{pct}%</span>
-                  </div>
-                );
-              })}
-              {gd.total===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
+      {/* S30/S60/S90 progression */}
+      <div style={T.card}>
+        <p style={{...T.sectionTitle,marginBottom:14}}>Progressão — S30 · S60 · S90</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+          {[
+            {label:"S30 — Fez", n:s30Done, total:totalAll, color:C.green},
+            {label:"S30 — Não fez", n:s30NotDone, total:totalAll, color:C.red},
+            {label:"S60 — Fez", n:s60Done, total:s60Total||1, color:C.green},
+            {label:"S60 — Não fez", n:s60NotDone, total:s60Total||1, color:C.red},
+            {label:"S90 — Fez (comprou)", n:s90Done, total:s90Total||1, color:C.green},
+            {label:"S90 — Não fez", n:s90NotDone, total:s90Total||1, color:C.red},
+          ].map((s,i)=>(
+            <div key={i} style={{...T.card,background:C.bg}}>
+              <p style={T.label}>{s.label}</p>
+              <p style={{fontSize:22,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.n}</p>
+              <p style={{fontSize:11,color:C.muted,margin:0}}>{s.total>0?(s.n/s.total*100).toFixed(1):0}%</p>
             </div>
-          );
-        })}
-      </div>;
-      })()}
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
