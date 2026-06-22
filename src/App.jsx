@@ -2355,19 +2355,21 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
 
       <div style={T.card}>
         <p style={{...T.sectionTitle,marginBottom:10}}>Por programa</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 100px",gap:4,marginBottom:6}}>
+          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em"}}>Programa</span>
+          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em",textAlign:"right"}}>Novos</span>
+          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em",textAlign:"right"}}>Compraram</span>
+        </div>
         {progs.map(p=>{
           const n=byProg[p]||0;
           if(n===0) return null;
-          const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
-          const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
-          const verifiedProg=periodo==="3meses"?verified.filter(r=>r.programme===p).length:0;
-          const convPct=verifiedProg>0?(bought/verifiedProg*100).toFixed(0):null;
+          const bought=verified.filter(r=>r.programme===p&&r.status==="bought").length;
+          const convPct=n>0?(bought/n*100).toFixed(0):0;
           return (
-            <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-              <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
-              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-              {periodo==="3meses"?<span style={{fontSize:11,color:C.green,minWidth:80,textAlign:"right"}}>{bought} compraram ({convPct}%)</span>
-              :<span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>}
+            <div key={p} style={{display:"grid",gridTemplateColumns:"1fr 100px 100px",gap:4,padding:"6px 0",borderBottom:"0.5px solid "+C.border,alignItems:"center"}}>
+              <span style={{fontSize:13,color:C.text}}>{p}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text,textAlign:"right"}}>{n}</span>
+              <span style={{fontSize:13,color:C.green,textAlign:"right"}}>{bought} <span style={{fontSize:11,color:C.muted}}>({convPct}%)</span></span>
             </div>
           );
         })}
@@ -2414,6 +2416,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
         <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Histórico de Janeiro a {MONTH_NAMES[month]} {year}</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
           {[
+            {label:"Total novos parceiros", n:yearData.length, total:yearData.length, color:C.text},
             {label:"Comprou em S30", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s30").length, color:C.green},
             {label:"Comprou em S60", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s60").length, color:C.green},
             {label:"Comprou em S90", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s90").length, color:C.green},
