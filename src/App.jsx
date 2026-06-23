@@ -2313,7 +2313,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const boughtS60 = data.filter(r=>r.status==="bought"&&r.stage==="s60").length;
   const boughtS90 = data.filter(r=>r.status==="bought"&&r.stage==="s90").length;
   const totalBought = boughtS30 + boughtS60 + boughtS90;
-  const closedS90 = data.filter(r=>r.status==="closed"&&r.stage==="s90").length;
+  const closedS90 = data.filter(r=>r.status==="closed").length; // all stages
   const stillPending = data.filter(r=>r.status==="pending").length;
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
@@ -2400,7 +2400,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
             {label:"Fez na fase S30", n:boughtS30, total:totalAll, color:C.green},
             {label:"Fez na fase S60", n:boughtS60, total:totalAll, color:C.green},
             {label:"Fez na fase S90", n:boughtS90, total:totalAll, color:C.green},
-            {label:"Não fez nos 90 dias", n:closedS90, total:totalAll, color:C.red},
+            {label:"Não fez (todas as fases)", n:closedS90, total:totalAll, color:C.red},
             {label:"Ainda em processo", n:stillPending, total:totalAll, color:C.muted},
           ].map((s,i)=>(
             <div key={i} style={{...T.card,background:C.bg}}>
@@ -2421,7 +2421,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
             {label:"Comprou em S30", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s30").length, color:C.green},
             {label:"Comprou em S60", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s60").length, color:C.green},
             {label:"Comprou em S90", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s90").length, color:C.green},
-            {label:"Não fez nos 90 dias", n:yearData.filter(r=>r.status==="closed"&&r.stage==="s90").length, color:C.red},
+            {label:"Não fez (todas as fases)", n:yearData.filter(r=>r.status==="closed").length, color:C.red},
             {label:"Ainda em processo", n:yearData.filter(r=>r.status==="pending").length, color:C.muted},
           ].map((s,i)=>{
             const total = yearData.length;
