@@ -2399,7 +2399,6 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
             {label:"Total novos parceiros", n:totalAll, total:totalAll, color:C.text},
             {label:"Fez na fase S30", n:boughtS30, total:totalAll, color:C.green},
             {label:"Fez na fase S60", n:boughtS60, total:totalAll, color:C.green},
-            {label:"Fez na fase S90", n:boughtS90, total:totalAll, color:C.green},
             {label:"Não fez (todas as fases)", n:closedS90, total:totalAll, color:C.red},
             {label:"Ainda em processo", n:stillPending, total:totalAll, color:C.muted},
           ].map((s,i)=>(
