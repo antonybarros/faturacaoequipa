@@ -2396,6 +2396,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
         <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>De {totalAll} novos parceiros, {totalBought} fizeram a 1ª compra</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
           {[
+            {label:"Total novos parceiros", n:totalAll, total:totalAll, color:C.text},
             {label:"Fez na fase S30", n:boughtS30, total:totalAll, color:C.green},
             {label:"Fez na fase S60", n:boughtS60, total:totalAll, color:C.green},
             {label:"Fez na fase S90", n:boughtS90, total:totalAll, color:C.green},
