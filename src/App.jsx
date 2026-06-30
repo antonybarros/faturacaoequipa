@@ -27,13 +27,6 @@ async function loadAllTeamsData(year, month) {
     .select("entries,team_goals,team")
     .eq("month_key", monthKey(year, month));
   if (!data || !data.length) return { entries:{}, team_goals:{} };
-  // Determine the last day across ALL teams combined, so NA secondary markets
-  // (fat_SK/GR/CY/PL) always land on the same day as everyone else's totals,
-  // regardless of whether equipa_na itself has fewer days filled in.
-  const globalLastDay = Math.max(0, ...data.map(row => {
-    const e = row.entries || {};
-    return Math.max(0, ...Object.keys(e).map(Number));
-  }));
   // Merge all entries day by day
   const mergedEntries = {};
   const mergedGoals = {};
@@ -46,14 +39,14 @@ async function loadAllTeamsData(year, month) {
         mergedGoals[k] = (Number(mergedGoals[k])||0) + (Number(v)||0);
       }
     });
-    // Add monthly fat_ fields (SK, GR, CY, PL) to the global last day —
-    // these count toward the Global total but not toward equipa_na's own total.
+    // Add monthly fat_ fields (SK, GR, CY, PL) to last day entries
     const naMonthlyFields = ["fat_SK","fat_GR","fat_CY","fat_PL"];
-    if (globalLastDay > 0) {
+    const lastDay = Math.max(0, ...Object.keys(e).map(Number));
+    if (lastDay > 0) {
       naMonthlyFields.forEach(f => {
         if (g[f] && Number(g[f]) > 0) {
-          if (!mergedEntries[globalLastDay]) mergedEntries[globalLastDay] = {};
-          mergedEntries[globalLastDay][f] = (Number(mergedEntries[globalLastDay][f])||0) + (Number(g[f])||0);
+          if (!mergedEntries[lastDay]) mergedEntries[lastDay] = {};
+          mergedEntries[lastDay][f] = (Number(mergedEntries[lastDay][f])||0) + (Number(g[f])||0);
         }
       });
     }
