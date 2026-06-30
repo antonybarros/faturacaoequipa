@@ -39,9 +39,14 @@ async function loadAllTeamsData(year, month) {
         mergedGoals[k] = (Number(mergedGoals[k])||0) + (Number(v)||0);
       }
     });
-    // Add monthly fat_ fields (SK, GR, CY, PL) to last day entries
+    // Add monthly fat_ fields (SK, GR, CY, PL) to last day with real data —
+    // ignore days that only have campanha/supersales flags with no actual value.
     const naMonthlyFields = ["fat_SK","fat_GR","fat_CY","fat_PL"];
-    const lastDay = Math.max(0, ...Object.keys(e).map(Number));
+    const daysWithRealData = Object.keys(e).filter(day => {
+      const dd = e[day] || {};
+      return Object.entries(dd).some(([f,v]) => f!=="campanha" && f!=="supersales" && Number(v)>0);
+    });
+    const lastDay = Math.max(0, ...daysWithRealData.map(Number));
     if (lastDay > 0) {
       naMonthlyFields.forEach(f => {
         if (g[f] && Number(g[f]) > 0) {
