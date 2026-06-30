@@ -714,6 +714,16 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   const [subTab, setSubTab] = useState("faturacao");
   const newStruct = isNewStructure(year, month);
 
+  // Safety net: the Registo tab can never operate on "global" — it is a computed
+  // aggregate, not a real team, and must never be written to Supabase.
+  // If the user arrives here with currentTeam still set to "global" (e.g. left over
+  // from the Dashboard's team selector), immediately fall back to a real team.
+  useEffect(() => {
+    if (currentTeam === "global") {
+      setCurrentTeam(TEAMS[0].key);
+    }
+  }, [currentTeam, setCurrentTeam]);
+
   const SUB_TABS = [
     { id:"faturacao",   label:"Faturação diária" },
     { id:"primeiras",   label:"1ªs Compras" },
@@ -726,6 +736,12 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   ];
 
   const save = async (newData) => {
+    if (currentTeam === "global") {
+      // Safety net: the Registo tab must never write a "global" row to Supabase.
+      // "global" is a computed aggregate (sum of all teams) and must never be persisted.
+      console.error("Blocked attempt to save Registo data with team='global'. No write performed.");
+      return;
+    }
     const key = monthKey(year, month);
     await supabase.from("billing_months").upsert({ month_key: key, team: currentTeam, ...newData }, { onConflict:"month_key,team" });
     setMonthData(prev => ({ ...prev, ...newData }));
@@ -1083,28 +1099,16 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               })}
             </div>
           </div>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+              {inpLead("perf_leads","Leads recebidos (inbound)")}
+              {inpLead("perf_leads_ang","Leads com angariador")}
+              {inpLead("perf_leads_sem","Leads sem angariador")}
+              {inpLead("perf_prospects","Leads de prospeção (outbound)")}
+            </div>
+          </div>
         </>);
-      })()}
-
-      {subTab==="parceiros"&&(()=>{
-        const inpL = (field, label) => (
-          <div>
-            <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
-            <input type="number" value={goals[field]??""} placeholder="0"
-              onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[field]:e.target.value}}))}
-              onBlur={saveAll}
-              style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-          </div>
-        );
-        return <div style={T.card}>
-          <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-            {inpL("perf_leads","Leads recebidos (inbound)")}
-            {inpL("perf_leads_ang","Leads com angariador")}
-            {inpL("perf_leads_sem","Leads sem angariador")}
-            {inpL("perf_prospects","Leads de prospeção (outbound)")}
-          </div>
-        </div>;
       })()}
 
       {/* ── Margem ── */}
@@ -1878,7 +1882,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
           <div key={g}>
             {isAdmin&&<p style={{...T.sectionTitle,marginBottom:10,color:C.muted,fontSize:12,textTransform:"uppercase",letterSpacing:".08em"}}>{g}</p>}
 
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
               {/* Follow-up pendente */}
               <div style={T.card}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
@@ -1951,9 +1955,9 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   const [loading, setLoading] = useState(true);
   const [partnersCount, setPartnersCount] = useState(0);
   const [partnersData, setPartnersData] = useState([]);
-  const [perfTeam, setPerfTeam] = useState(currentTeam||"equipa_fr");
+  const [perfTeam, setPerfTeam] = useState((currentTeam&&currentTeam!=="global")?currentTeam:TEAMS[0].key);
 
-  useEffect(()=>{ setPerfTeam(currentTeam||"equipa_fr"); },[currentTeam]);
+  useEffect(()=>{ if (currentTeam && currentTeam !== "global") setPerfTeam(currentTeam); },[currentTeam]);
 
   useEffect(()=>{
     setLoading(true);
@@ -1964,17 +1968,10 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       keys.push(monthKey(d.getFullYear(), d.getMonth()));
     }
     const teamObj = TEAMS.find(t=>t.key===perfTeam);
-    const markets = perfTeam==="global"
-      ? TEAMS.flatMap(t=>t.markets)
-      : (teamObj?.dashboardMarkets || teamObj?.markets || []);
-    const goalsQuery = perfTeam==="global"
-      ? supabase.from("billing_months").select("team_goals").in("month_key",[monthKey(year,month)])
-      : supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle();
+    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
     Promise.all([
-      goalsQuery,
-      perfTeam==="global"
-        ? supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys)
-        : supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
+      supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
+      supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
       // Load partners detail for current month
       supabase.from("partner_followup").select("market,programme,gestor")
         .gte("original_created_at", new Date(year,month,1).toISOString())
@@ -1983,18 +1980,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         .in("market", markets)
         .limit(5000),
     ]).then(([curr, hist, partners])=>{
-      // For global, merge team_goals from all teams
-      if (perfTeam==="global" && curr.data) {
-        const merged = {};
-        curr.data.forEach(row=>{
-          Object.entries(row.team_goals||{}).forEach(([k,v])=>{
-            if (!isNaN(Number(v))) merged[k]=(Number(merged[k])||0)+(Number(v)||0);
-          });
-        });
-        setMonthData({ team_goals: merged });
-      } else {
-        setMonthData(curr.data || { team_goals:{} });
-      }
+      setMonthData(curr.data || { team_goals:{} });
       setHistData(hist.data || []);
       const pd = partners.data || [];
       setPartnersCount(pd.length);
@@ -2004,6 +1990,11 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   },[year, month, perfTeam]);
 
   const save = async (newGoals) => {
+    if (perfTeam === "global") {
+      // Safety net: never persist a row with team='global' — it's a computed aggregate.
+      console.error("Blocked attempt to save Performance goals with team='global'. No write performed.");
+      return;
+    }
     const key = monthKey(year, month);
     const merged = { ...monthData.team_goals, ...newGoals };
     await supabase.from("billing_months").upsert({ month_key:key, team:perfTeam, team_goals:merged }, { onConflict:"month_key,team" });
@@ -2039,10 +2030,8 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
   // Last 6 months trend with partners count
   const [trendPartners, setTrendPartners] = useState({});
   useEffect(()=>{
-    const teamObj2 = TEAMS.find(t=>t.key===perfTeam);
-    const markets = perfTeam==="global"
-      ? TEAMS.flatMap(t=>t.markets)
-      : (teamObj2?.dashboardMarkets || teamObj2?.markets || []);
+    const teamObj = TEAMS.find(t=>t.key===perfTeam);
+    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
     const promises = [];
     for (let i=0;i<=5;i++){
       const d = new Date(year, month-i, 1);
@@ -2084,7 +2073,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       <div style={{...T.card,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <p style={{...T.sectionTitle,margin:0,flex:1}}>Performance — {MONTH_NAMES[month]} {year}</p>
         <div style={{display:"flex",gap:6}}>
-          {[{key:"global",label:"Global"},...TEAMS].map(t=>(
+          {TEAMS.map(t=>(
             <button key={t.key} onClick={()=>setPerfTeam(t.key)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
                 background:perfTeam===t.key?C.green:"transparent",color:perfTeam===t.key?"#fff":C.muted}}>
@@ -2139,9 +2128,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
         {/* Por programa e por mercado */}
         {/* Por gestor */}
         {partnersData.length>0&&(()=>{
-          const teamGestors = perfTeam==="global"
-          ? TEAMS.flatMap(t=>t.gestors||[])
-          : (TEAMS.find(t=>t.key===perfTeam)?.gestors||[]);
+          const teamGestors = TEAMS.find(t=>t.key===perfTeam)?.gestors||[];
           if (!teamGestors.length) return null;
           const byGestorPerf = {};
           teamGestors.forEach(g=>{ byGestorPerf[g]={total:0,progs:{}}; });
@@ -2237,12 +2224,11 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
 
 // ── AnaliseFollowup (embedded in Follow-up tab) ────────────────────────────────
 function AnaliseFollowup({ year, month, isAdmin, role=null }) {
-  const periodo = "3meses"; // Always show 3 months
+  const [periodo, setPeriodo] = useState("mes");
   const defaultTeam = role?.followupTeam || (isAdmin ? "global" : "equipa_fr");
   const [analiseTeam, setAnaliseTeam] = useState(defaultTeam);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [yearData, setYearData] = useState([]);
   const progs = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const gestors = ["Antony","Fabien","Mónica","Kamila Barros","Catarina Monteiro","Bruno Vieira","Jose Castillo","Mariana Lopes","Guilherme Mendes","Ines Anjo","Daniel Silva","Margarida Pinheiro","Abilio Morais","Beatriz Beato","Telma Barroso","Pedro Oliveira"];
 
@@ -2261,7 +2247,7 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
     }
     let q = supabase.from("partner_followup")
-      .select("gestor,programme,status,stage,stage_started_at,market,original_created_at", { count:"exact" })
+      .select("gestor,programme,status,stage,market,original_created_at", { count:"exact" })
       .gte("original_created_at", start)
       .lte("original_created_at", end)
       .neq("status","deleted");
@@ -2271,20 +2257,6 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
       if (teamObj) q = q.in("market", teamObj.markets);
     }
     q.range(0, 4999).then(({data:rows})=>{ setData(rows||[]); setLoading(false); });
-
-    // Load full year data for S30/S60/S90 yearly cards
-    const yearStart = new Date(year, 0, 1).toISOString();
-    const yearEnd = new Date(year, month+1, 0, 23, 59, 59).toISOString();
-    let yq = supabase.from("partner_followup")
-      .select("status,stage", { count:"exact" })
-      .gte("original_created_at", yearStart)
-      .lte("original_created_at", yearEnd)
-      .neq("status","deleted");
-    if (analiseTeam !== "global") {
-      const teamObj = TEAMS.find(t=>t.key===analiseTeam);
-      if (teamObj) yq = yq.in("market", teamObj.markets);
-    }
-    yq.range(0, 4999).then(({data:rows})=>{ setYearData(rows||[]); });
   },[year,month,periodo,analiseTeam]);
 
   if (loading) return <div style={{padding:"2rem",color:C.muted,fontSize:13}}>A carregar...</div>;
@@ -2307,14 +2279,6 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
   const verifiedBought = verified.filter(r=>r.status==="bought").length;
   const verifiedNotBought = verified.filter(r=>r.status!=="bought").length;
   const stillInS30 = data.filter(r=>r.stage==="s30"&&r.status==="pending").length;
-
-  // S30/S60/S90 — bought at each stage
-  const boughtS30 = data.filter(r=>r.status==="bought"&&r.stage==="s30").length;
-  const boughtS60 = data.filter(r=>r.status==="bought"&&r.stage==="s60").length;
-  const boughtS90 = data.filter(r=>r.status==="bought"&&r.stage==="s90").length;
-  const totalBought = boughtS30 + boughtS60 + boughtS90;
-  const closedS90 = data.filter(r=>r.status==="closed").length; // all stages
-  const stillPending = data.filter(r=>r.status==="pending").length;
   const periodoLabel = periodo==="mes" ? `${MONTH_NAMES[month]} ${year}` : `${MONTH_NAMES[(month-2+12)%12]} — ${MONTH_NAMES[month]} ${year}`;
 
   return (
@@ -2326,11 +2290,18 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
           {[{id:"global",l:"Geral"},...(isAdmin?TEAMS:[TEAMS.find(t=>t.key===(role?.followupTeam||"equipa_fr"))].filter(Boolean))].map(t=>(
             <button key={t.id||t.key} onClick={()=>setAnaliseTeam(t.id||t.key)}
               style={{padding:"4px 10px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
-                background:analiseTeam===(t.id||t.key)?C.green:"transparent",color:analiseTeam===(t.id||t.key)?"#fff":C.muted}}>
+                background:analiseTeam===(t.id||t.key)?"#6366F1":"transparent",color:analiseTeam===(t.id||t.key)?"#fff":C.muted}}>
               {t.l||t.label}
             </button>
           ))}
-
+          <div style={{width:1,height:16,background:C.border,alignSelf:"center"}} />
+          {[{id:"mes",l:"Mês atual"},{id:"3meses",l:"Últimos 3 meses"}].map(p=>(
+            <button key={p.id} onClick={()=>setPeriodo(p.id)}
+              style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
+                background:periodo===p.id?C.green:"transparent",color:periodo===p.id?"#fff":C.muted}}>
+              {p.l}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -2355,21 +2326,19 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
 
       <div style={T.card}>
         <p style={{...T.sectionTitle,marginBottom:10}}>Por programa</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 100px",gap:4,marginBottom:6}}>
-          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em"}}>Programa</span>
-          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em",textAlign:"right"}}>Novos</span>
-          <span style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:".05em",textAlign:"right"}}>Compraram</span>
-        </div>
         {progs.map(p=>{
           const n=byProg[p]||0;
           if(n===0) return null;
-          const bought=verified.filter(r=>r.programme===p&&r.status==="bought").length;
-          const convPct=n>0?(bought/n*100).toFixed(0):0;
+          const pct=totalAll>0?(n/totalAll*100).toFixed(1):0;
+          const bought=periodo==="3meses"?verified.filter(r=>r.programme===p&&r.status==="bought").length:null;
+          const verifiedProg=periodo==="3meses"?verified.filter(r=>r.programme===p).length:0;
+          const convPct=verifiedProg>0?(bought/verifiedProg*100).toFixed(0):null;
           return (
-            <div key={p} style={{display:"grid",gridTemplateColumns:"1fr 100px 100px",gap:4,padding:"6px 0",borderBottom:"0.5px solid "+C.border,alignItems:"center"}}>
-              <span style={{fontSize:13,color:C.text}}>{p}</span>
-              <span style={{fontSize:13,fontWeight:500,color:C.text,textAlign:"right"}}>{n}</span>
-              <span style={{fontSize:13,color:C.green,textAlign:"right"}}>{bought} <span style={{fontSize:11,color:C.muted}}>({convPct}%)</span></span>
+            <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+              <span style={{fontSize:13,color:C.text,flex:1}}>{p}</span>
+              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+              {periodo==="3meses"?<span style={{fontSize:11,color:C.green,minWidth:80,textAlign:"right"}}>{bought} compraram ({convPct}%)</span>
+              :<span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{pct}%</span>}
             </div>
           );
         })}
@@ -2390,48 +2359,40 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
         })}
         {totalAll===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
       </div>
-      {/* S30/S60/S90 — 1ª compra por fase */}
-      <div style={T.card}>
-        <p style={{...T.sectionTitle,marginBottom:4}}>1ª compra por fase</p>
-        <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>De {totalAll} novos parceiros, {totalBought} fizeram a 1ª compra</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-          {[
-            {label:"Total novos parceiros", n:totalAll, total:totalAll, color:C.text},
-            {label:"Fez na fase S30", n:boughtS30, total:totalAll, color:C.green},
-            {label:"Fez na fase S60", n:boughtS60, total:totalAll, color:C.green},
-            {label:"Não fez (todas as fases)", n:closedS90, total:totalAll, color:C.red},
-            {label:"Ainda em processo", n:stillPending, total:totalAll, color:C.muted},
-          ].map((s,i)=>(
-            <div key={i} style={{...T.card,background:C.bg}}>
-              <p style={T.label}>{s.label}</p>
-              <p style={{fontSize:22,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.n}</p>
-              <p style={{fontSize:11,color:C.muted,margin:0}}>{totalAll>0?(s.n/totalAll*100).toFixed(1):0}% do total</p>
+
+      {(()=>{
+        // Show gestor cards: admin sees all, Pedro sees his team, others see none
+        const naGestors = ["Pedro Oliveira","Telma Barroso","Beatriz Beato"];
+        const showGestorCards = isAdmin || (role?.followupTeam==="equipa_na");
+        const visibleGestors = isAdmin ? gestors : naGestors;
+        if (!showGestorCards || periodo!=="mes") return null;
+        return <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
+          {visibleGestors.map(g=>{
+          const gd=byGestor[g]||{total:0,progs:{}};
+          return (
+            <div key={g} style={T.card}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <p style={{...T.sectionTitle,margin:0,flex:1}}>{g}</p>
+                <span style={{fontSize:12,fontWeight:500,color:C.text}}>{gd.total} parceiros</span>
+              </div>
+              {progs.map(p=>{
+                const n=gd.progs[p]||0;
+                if(n===0) return null;
+                const pct=gd.total>0?(n/gd.total*100).toFixed(0):0;
+                return (
+                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                    <span style={{fontSize:12,color:C.text,flex:1}}>{p}</span>
+                    <span style={{fontSize:12,fontWeight:500,color:C.text}}>{n}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:36,textAlign:"right"}}>{pct}%</span>
+                  </div>
+                );
+              })}
+              {gd.total===0&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem 0"}}>Sem registos</p>}
             </div>
-          ))}
-        </div>
-      </div>
-      {/* Ano completo */}
-      {yearData.length>0&&<div style={T.card}>
-        <p style={{...T.sectionTitle,marginBottom:4}}>1ª compra — ano {year}</p>
-        <p style={{fontSize:12,color:C.muted,margin:"0 0 14px"}}>Histórico de Janeiro a {MONTH_NAMES[month]} {year}</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
-          {[
-            {label:"Total novos parceiros", n:yearData.length, total:yearData.length, color:C.text},
-            {label:"Comprou em S30", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s30").length, color:C.green},
-            {label:"Comprou em S60", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s60").length, color:C.green},
-            {label:"Comprou em S90", n:yearData.filter(r=>r.status==="bought"&&r.stage==="s90").length, color:C.green},
-            {label:"Não fez (todas as fases)", n:yearData.filter(r=>r.status==="closed").length, color:C.red},
-            {label:"Ainda em processo", n:yearData.filter(r=>r.status==="pending").length, color:C.muted},
-          ].map((s,i)=>{
-            const total = yearData.length;
-            return <div key={i} style={{...T.card,background:C.bg}}>
-              <p style={T.label}>{s.label}</p>
-              <p style={{fontSize:22,fontWeight:500,color:s.color,margin:"4px 0"}}>{s.n}</p>
-              <p style={{fontSize:11,color:C.muted,margin:0}}>{total>0?(s.n/total*100).toFixed(1):0}% do total</p>
-            </div>;
-          })}
-        </div>
-      </div>}
+          );
+        })}
+      </div>;
+      })()}
     </div>
   );
 }
