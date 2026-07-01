@@ -722,13 +722,6 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   // Safety net: the Registo tab can never operate on "global" — it is a computed
   // aggregate, not a real team, and must never be written to Supabase.
-  // If the user arrives here with currentTeam still set to "global" (e.g. left over
-  // from the Dashboard's team selector), immediately fall back to a real team.
-  useEffect(() => {
-    if (currentTeam === "global") {
-      setCurrentTeam(TEAMS[0].key);
-    }
-  }, [currentTeam, setCurrentTeam]);
 
   const SUB_TABS = [
     { id:"faturacao",   label:"Faturação diária" },
