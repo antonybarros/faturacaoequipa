@@ -2791,7 +2791,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           v:Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0
         })).filter(r=>r.v>0).sort((a,b)=>b.v-a.v);
 
-        const renderKpiCard = ({title, curr, prev, goal, acimaObj, pctObj, evolVs, ganhoAbs, overGoal, barGoalPct, barCurrPct}) => (
+        const renderKpiCard = ({title, curr, prev, goal, acimaObj, pctObj, evolVs, ganhoAbs, overGoal, barGoalPct, barCurrPct, extraMetrics=[]}) => (
           <div style={T.card}>
             <p style={{...T.sectionTitle,fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>{title}</p>
             <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — em comparação ao ano anterior</p>
@@ -2813,12 +2813,13 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             </div>
             <div style={{border:`0.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px",marginBottom:12}}>
               <p style={{fontSize:11,color:C.muted,margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".05em"}}>Detalhe do resultado</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:0}}>
+              <div style={{display:"grid",gridTemplateColumns:`repeat(${4+extraMetrics.length},minmax(0,1fr))`,gap:0}}>
                 {[
                   {label:"Evolução vs "+prevYear, value:evolVs!=null?(Number(evolVs)>0?"+":"")+evolVs+"%":"—", color:C.green},
                   {label:"Ganho absoluto", value:ganhoAbs>=0?"+"+fmtEur(ganhoAbs):"-"+fmtEur(Math.abs(ganhoAbs)), color:C.text, bold:true},
                   {label:"Acima do objetivo", value:goal>0?fmtEur(acimaObj):"—", color:acimaObj>=0?C.green:C.red},
                   {label:"% do objetivo", value:pctObj!=null?pctObj+"%":"—", color:C.green},
+                  ...extraMetrics,
                 ].map((m,i)=>(
                   <div key={i} style={{padding:"0 16px",borderLeft:i>0?`0.5px solid ${C.border}`:"none"}}>
                     <p style={{fontSize:11,color:C.muted,margin:"0 0 4px"}}>{m.label}</p>
@@ -2870,6 +2871,63 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             barGoalPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,(Number(cg?.afil_goal)||0)/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
             barCurrPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,afilCurr/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
           })}
+
+          {/* Card Afiliação por mercado */}
+          {afilCurr>0&&(()=>{
+            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
+            const seen = new Set();
+            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
+              .map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
+              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
+            const total = rows.reduce((s,r)=>s+r.v,0);
+            if (!total) return null;
+            return <div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:4}}>Afiliação por mercado</p>
+              <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year}</p>
+              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:200}}>
+                  {rows.map(({key,label,v})=>(
+                    <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                      <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
+                      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
+                      <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+                    <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
+                    <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
+                  </div>
+                </div>
+                <PieChart data={rows.map(({label,v})=>({label,v}))} title="" />
+              </div>
+            </div>;
+          })()}
+
+          {/* Card Revenda + Afiliação */}
+          {(fatCurr>0||afilCurr>0)&&(()=>{
+            const raCurr = revendaAfilCurr;
+            const raPrev = revendaAfilPrev;
+            const raGoal = fatGoal + (Number(cg?.afil_goal)||0);
+            const raAcima = raCurr - raGoal;
+            const raPct = raGoal>0 ? (raCurr/raGoal*100).toFixed(2) : null;
+            const raEvolVs = raPrev>0 ? ((raCurr-raPrev)/raPrev*100).toFixed(2) : null;
+            const raGanho = raCurr - raPrev;
+            const raOver = raCurr > raGoal;
+            const raBarGoal = raGoal>0 ? Math.min(100, raGoal/Math.max(raCurr,raGoal)*100) : 100;
+            const raBarCurr = raGoal>0 ? Math.min(100, raCurr/Math.max(raCurr,raGoal)*100) : 100;
+            const pctFat = raCurr>0 ? (fatCurr/raCurr*100).toFixed(1) : null;
+            const pctAfil = raCurr>0 ? (afilCurr/raCurr*100).toFixed(1) : null;
+            return renderKpiCard({
+              title:"Revenda + Afiliação",
+              curr:raCurr, prev:raPrev, goal:raGoal,
+              acimaObj:raAcima, pctObj:raPct, evolVs:raEvolVs, ganhoAbs:raGanho,
+              overGoal:raOver, barGoalPct:raBarGoal, barCurrPct:raBarCurr,
+              extraMetrics:[
+                {label:"% Faturação s/ total", value:pctFat!=null?pctFat+"%":"—", color:C.muted},
+                {label:"% Afiliação s/ total", value:pctAfil!=null?pctAfil+"%":"—", color:C.muted},
+              ],
+            });
+          })()}
 
           {/* Card Encomendas */}
           <div style={T.card}>
