@@ -1967,7 +1967,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   const [loading, setLoading] = useState(true);
   const [partnersCount, setPartnersCount] = useState(0);
   const [partnersData, setPartnersData] = useState([]);
-  const [perfTeam, setPerfTeam] = useState((currentTeam&&currentTeam!=="global")?currentTeam:TEAMS[0].key);
+  const [perTeamData, setPerTeamData] = useState([]);
 
   useEffect(()=>{ if (currentTeam && currentTeam !== "global") setPerfTeam(currentTeam); },[currentTeam]);
 
@@ -1999,6 +1999,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
           });
         });
         setMonthData({ team_goals: merged });
+        setPerTeamData(curr.data||[]);
         setHistData(hist.data||[]);
         const pd = partners.data||[];
         setPartnersCount(pd.length);
@@ -2144,10 +2145,10 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
         {/* KPI cards */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
           {[
-            {label:"Leads recebidos",value:leads,diff:leadsYoY,color:C.text},
+            {label:perfTeam==="partners"?"Leads Be a Partner":"Leads recebidos",value:leads,diff:leadsYoY,color:C.text},
             {label:"Com angariador",value:leadsAng,sub:`${angPct}% do total`,color:C.text},
             {label:"Sem angariador",value:leadsSem,sub:`${leads>0?((leadsSem/leads)*100).toFixed(1):0}% do total`,color:C.text},
-            {label:"Leads prospeção (outbound)",value:prospects,diff:prospectsYoY,color:C.green},
+            {label:"Leads prospeção",value:prospects,diff:prospectsYoY,color:C.green},
           ].map((s,i)=>(
             <div key={i} style={T.card}>
               <p style={T.label}>{s.label}</p>
@@ -2157,6 +2158,36 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
             </div>
           ))}
         </div>
+
+        {/* Partners: Leads by team/market */}
+        {perfTeam==="partners"&&perTeamData.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:10}}>Leads Be a Partner — por equipa</p>
+            {TEAMS.map(t=>{
+              const g = perTeamData.find(r=>r.team===t.key)?.team_goals||{};
+              const n = Number(g.perf_leads)||0;
+              const total = leads||1;
+              return <div key={t.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                <span style={{fontSize:13,color:C.text,flex:1}}>{t.label}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(n/total*100).toFixed(1):0}%</span>
+              </div>;
+            })}
+          </div>
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:10}}>Leads prospeção — por equipa</p>
+            {TEAMS.map(t=>{
+              const g = perTeamData.find(r=>r.team===t.key)?.team_goals||{};
+              const n = Number(g.perf_prospects)||0;
+              const total = prospects||1;
+              return <div key={t.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                <span style={{fontSize:13,color:C.text,flex:1}}>{t.label}</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(n/total*100).toFixed(1):0}%</span>
+              </div>;
+            })}
+          </div>
+        </div>}
 
         {/* Leads quality */}
         <div style={T.card}>
@@ -2254,7 +2285,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
           <p style={{...T.sectionTitle,marginBottom:10}}>Evolução — últimos 6 meses</p>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
-              {["Mês","Leads recebidos","Leads prospeção","Novos parceiros"].map((h,i)=>(
+              {["Mês", perfTeam==="partners"?"Leads Be a Partner":"Leads recebidos","Leads prospeção","Novos parceiros"].map((h,i)=>(
                 <th key={i} style={{padding:"7px 10px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr></thead>
