@@ -2645,6 +2645,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
               <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
             </>:<>
               <Row label="Faturação 1ªs compras" c={md.fat1C||null} p={md.fat1P||null} />
+              <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
+              <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
               <Row label="Novos parceiros" c={md.partnersMktC||null} p={md.histMktP||null} f={fmt} />
             </>}
             <Row label="Afiliação" c={md.afilC||null} p={md.afilP||null} />
