@@ -1226,7 +1226,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
       {subTab === "partners_hist" && (
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {[2024, 2025].map(y => (
+          {[2024, 2025, 2026].map(y => (
             <div key={y} style={T.card}>
               <p style={{...T.sectionTitle, marginBottom:14}}>Faturação {y} — valores mensais (€)</p>
               <div style={{display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:12}}>
@@ -2900,25 +2900,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             // Build data: 2024 and 2025 from hist_fat fields, 2026 from real monthly data (need to load)
             const hist2024 = months12.map(m=>Number(cg[`hist_fat_2024_${String(m+1).padStart(2,"0")}`])||0);
             const hist2025 = months12.map(m=>Number(cg[`hist_fat_2025_${String(m+1).padStart(2,"0")}`])||0);
-            // 2026: compute real faturação from hist2026Data for each month
-            const hist2026 = months12.map(mIdx=>{
-              const mk = monthKey(year, mIdx);
-              const rows = hist2026Data.filter(r=>r.month_key===mk);
-              if (!rows.length) return 0;
-              // Merge entries and sum using getEntryTotal for global
-              let total = 0;
-              rows.forEach(row=>{
-                const e = row.entries||{};
-                const td = daysInMonth(year, mIdx);
-                for(let d=td;d>=1;d--){
-                  if(e[d]!==undefined){ total+=getEntryTotal(e[d],"global"); break; }
-                }
-                // Add fat_ fields from team_goals for NA secondary markets
-                const g = row.team_goals||{};
-                ["fat_SK","fat_GR","fat_CY","fat_PL"].forEach(f=>{ total+=Number(g[f])||0; });
-              });
-              return total;
-            });
+            const hist2026 = months12.map(m=>Number(cg[`hist_fat_2026_${String(m+1).padStart(2,"0")}`])||0);
             const allVals = [...hist2024,...hist2025,...hist2026].filter(v=>v>0);
             if (!allVals.length) return null;
             const maxVal = Math.max(...allVals);
