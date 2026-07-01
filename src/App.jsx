@@ -11,7 +11,7 @@ const TEAMS = [
   { key:"equipa_fr", label:"Equipa FR", markets:["FR","CH","BNL","DEAT","CH-BNL-DEAT"], gestors:["Antony","Fabien","Mónica"] },
   { key:"equipa_it", label:"Equipa IT", markets:["IT"], gestors:["Kamila Barros","Catarina Monteiro","Bruno Vieira","Vanessa Ferreirinha"] },
   { key:"equipa_es", label:"Equipa ES", markets:["ES"], gestors:["Guilherme Mendes","Jose Castillo","Mariana Lopes"] },
-  { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","OTHER"], gestors:["Ines Anjo","Daniel Silva","Abilio Morais","Margarida Pinheiro"] },
+  { key:"equipa_pt", label:"Equipa PT", markets:["PT","IE","WW","SE","GB","EU","RO","DK","FI","CA","HU","OTHER"], gestors:["Ines Anjo","Daniel Silva","Abilio Morais","Margarida Pinheiro"] },
   { key:"equipa_na", label:"Equipa NA", markets:["NA","CZ","SK","GR","CY","PL"], dashboardMarkets:["NA","CZ"], gestors:["Pedro Oliveira","Telma Barroso","Beatriz Beato"] },
 ];
 
@@ -115,7 +115,7 @@ const MKT_LABELS = {
   "FR":"França","CH":"Suíça","BNL":"Benelux","DEAT":"Alemanha e Áustria","CH-BNL-DEAT":"CH-BNL-DEAT",
   "IT":"Itália","ES":"Espanha","PT":"Portugal","OTHER":"Outros",
   "IE":"Irlanda","WW":"Worldwide","SE":"Suécia","GB":"Reino Unido","EU":"EU",
-  "RO":"Roménia","DK":"Dinamarca","FI":"Finlândia","CA":"Canadá",
+  "RO":"Roménia","DK":"Dinamarca","FI":"Finlândia","CA":"Canadá","HU":"Hungria",
   "NA":"USA","CZ":"República Checa","SK":"Eslováquia","GR":"Grécia","CY":"Chipre","PL":"Polónia",
 };
 
@@ -1260,6 +1260,7 @@ const MKT_MAP = {
   "DK":"DK","DENMARK":"DK","DINAMARCA":"DK",
   "FI":"FI","FINLAND":"FI","FINLÂNDIA":"FI",
   "CA":"CA","CANADA":"CA","CANADÁ":"CA",
+  "HU":"HU","HUNGARY":"HU","HUNGRIA":"HU",
 };
 
 const GESTOR_MAP_IT = {
@@ -1691,6 +1692,7 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
           <option value="DK">Dinamarca</option>
           <option value="FI">Finlândia</option>
           <option value="CA">Canadá</option>
+          <option value="HU">Hungria</option>
           <option value="NA">NA</option>
           <option value="CZ">República Checa</option>
           <option value="SK">Eslováquia</option>
