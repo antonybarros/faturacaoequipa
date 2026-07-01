@@ -2697,6 +2697,186 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {currentTeam==="global" ? (() => {
+        const fatGoal = Number(cg?.equipa_fr)||0;
+        const acimaObj = fatCurr - fatGoal;
+        const pctObj = fatGoal>0 ? (fatCurr/fatGoal*100).toFixed(2) : null;
+        const evolVs = fatPrev>0 ? ((fatCurr-fatPrev)/fatPrev*100).toFixed(2) : null;
+        const ganhoAbs = fatCurr - fatPrev;
+        // Bar chart data
+        const barPct = fatGoal>0 ? Math.min(fatCurr/fatGoal, 1.5) : 0;
+        const overGoal = fatCurr > fatGoal;
+        const barGoalPct = fatGoal>0 ? Math.min(100, (fatGoal/Math.max(fatCurr,fatGoal))*100) : 100;
+        const barCurrPct = fatGoal>0 ? Math.min(100, (fatCurr/Math.max(fatCurr,fatGoal))*100) : 100;
+        // Pie chart colors
+        const PIE_COLORS = ["#2d6a4f","#40916c","#52b788","#74c69d","#95d5b2","#b7e4c7","#d8f3dc","#1b4332","#081c15","#a8dadc","#457b9d","#1d3557"];
+
+        const PieChart = ({data, title}) => {
+          const total = data.reduce((s,d)=>s+d.v,0);
+          if (!total) return null;
+          let cumAngle = 0;
+          const slices = data.map((d,i)=>{
+            const pct = d.v/total;
+            const start = cumAngle;
+            cumAngle += pct * 360;
+            return {...d, pct, startAngle: start, endAngle: cumAngle, color: PIE_COLORS[i%PIE_COLORS.length]};
+          });
+          const toRad = a => (a-90)*Math.PI/180;
+          const cx=100,cy=100,r=80;
+          return (
+            <div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:12}}>{title}</p>
+              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+                <svg width="200" height="200" viewBox="0 0 200 200">
+                  {slices.map((s,i)=>{
+                    const x1=cx+r*Math.cos(toRad(s.startAngle)), y1=cy+r*Math.sin(toRad(s.startAngle));
+                    const x2=cx+r*Math.cos(toRad(s.endAngle)), y2=cy+r*Math.sin(toRad(s.endAngle));
+                    const large = (s.endAngle-s.startAngle)>180?1:0;
+                    return <path key={i} d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`}
+                      fill={s.color} stroke="#fff" strokeWidth="1.5"/>;
+                  })}
+                </svg>
+                <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
+                  {slices.map((s,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
+                      <span style={{fontSize:12,color:C.text,flex:1}}>{s.label}</span>
+                      <span style={{fontSize:12,fontWeight:500,color:C.text}}>{fmtEur(s.v)}</span>
+                      <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{(s.pct*100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // Data for pie charts
+        const fatMktData = (() => {
+          const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
+          const seen = new Set();
+          const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
+            .map(({key,label})=>{
+              let v=0;
+              for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[key]!==undefined){ v=Number(e[key])||0; break; } }
+              return {label,v};
+            });
+          [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}].forEach(({key,label})=>{
+            const v=Number(cg[`fat_${key}`])||0;
+            if(v>0) rows.push({label,v});
+          });
+          return rows.filter(r=>r.v>0).sort((a,b)=>b.v-a.v);
+        })();
+
+        const fatProgData = PROGS_RES.map(prog=>({
+          label:prog,
+          v:Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0
+        })).filter(r=>r.v>0).sort((a,b)=>b.v-a.v);
+
+        return <>
+          {/* Card Revenda */}
+          <div style={T.card}>
+            <p style={{fontSize:18,fontWeight:700,color:C.text,margin:"0 0 4px",textTransform:"uppercase",letterSpacing:".05em"}}>Revenda</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — em comparação ao ano anterior</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,marginBottom:20}}>
+              {/* Resultado ano anterior */}
+              <div style={{background:"#e9f5ee",borderRadius:12,padding:"16px"}}>
+                <p style={{fontSize:11,color:"#2d6a4f",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Resultado {MONTH_NAMES[month]} {prevYear}</p>
+                <p style={{fontSize:26,fontWeight:700,color:C.text,margin:0}}>{fmtEur(fatPrev)}</p>
+              </div>
+              {/* Objetivo */}
+              <div style={{background:"#e9f5ee",borderRadius:12,padding:"16px"}}>
+                <p style={{fontSize:11,color:"#2d6a4f",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Objetivo {MONTH_NAMES[month]} {year}</p>
+                <p style={{fontSize:26,fontWeight:700,color:"#2d6a4f",margin:"0 0 6px"}}>{fmtEur(fatGoal)}</p>
+                {evolVs&&<p style={{fontSize:12,color:C.muted,margin:0}}>{evolVs>0?"+":""}{((fatGoal-fatPrev)/fatPrev*100).toFixed(2)}% vs resultado {MONTH_NAMES[month].toLowerCase()} {prevYear}</p>}
+              </div>
+              {/* Resultado atual */}
+              <div style={{background:"#e9f5ee",borderRadius:12,padding:"16px",border:`2px solid #2d6a4f`}}>
+                <p style={{fontSize:11,color:"#2d6a4f",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Resultado {MONTH_NAMES[month]} {year}</p>
+                <p style={{fontSize:26,fontWeight:700,color:C.text,margin:"0 0 6px"}}>{fmtEur(fatCurr)}</p>
+                {evolVs&&<p style={{fontSize:12,color:"#2d6a4f",fontWeight:500,margin:0}}>{evolVs>0?"+":""}{evolVs}% vs {prevYear}</p>}
+              </div>
+            </div>
+
+            {/* Detalhe do resultado */}
+            <div style={{background:C.bg,border:`0.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".05em"}}>Detalhe do resultado</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:0}}>
+                {[
+                  {label:"Evolução vs "+prevYear, value:evolVs!=null?(evolVs>0?"+":"")+evolVs+"%":"—", color:"#2d6a4f"},
+                  {label:"Ganho absoluto", value:ganhoAbs>=0?"+"+fmtEur(ganhoAbs):"-"+fmtEur(Math.abs(ganhoAbs)), color:C.text, bold:true},
+                  {label:"Acima do objetivo", value:fatGoal>0?fmtEur(acimaObj):"—", color:acimaObj>=0?"#2d6a4f":C.red},
+                  {label:"% do objetivo", value:pctObj!=null?pctObj+"%":"—", color:"#2d6a4f"},
+                ].map((m,i)=>(
+                  <div key={i} style={{padding:"0 16px",borderLeft:i>0?`0.5px solid ${C.border}`:"none"}}>
+                    <p style={{fontSize:11,color:C.muted,margin:"0 0 4px"}}>{m.label}</p>
+                    <p style={{fontSize:20,fontWeight:m.bold?700:500,color:m.color,margin:0}}>{m.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Barra de concretização */}
+            {fatGoal>0&&<div style={{background:C.bg,border:`0.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px"}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".05em"}}>Concretização do objetivo</p>
+              <div style={{position:"relative",height:28,borderRadius:6,background:"#e9f5ee",overflow:"visible",marginBottom:24}}>
+                {/* Barra realizado até objetivo */}
+                <div style={{position:"absolute",left:0,top:0,height:"100%",width:barCurrPct+"%",background:"#2d6a4f",borderRadius:6,transition:"width .5s"}}/>
+                {/* Excedente */}
+                {overGoal&&<div style={{position:"absolute",left:barGoalPct+"%",top:0,height:"100%",width:(barCurrPct-barGoalPct)+"%",background:"#95d5b2",borderRadius:"0 6px 6px 0"}}/>}
+                {/* Linha objetivo */}
+                {fatGoal>0&&<div style={{position:"absolute",left:barGoalPct+"%",top:"-4px",height:"36px",width:"2px",background:C.text,zIndex:2}}>
+                  <span style={{position:"absolute",top:"-18px",left:"4px",fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>Objetivo {fmtEur(fatGoal)}</span>
+                </div>}
+                {/* Badge excedente */}
+                {overGoal&&<div style={{position:"absolute",right:0,top:"36px",background:"#2d6a4f",color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,whiteSpace:"nowrap"}}>
+                  ✓ {fmtEur(acimaObj)} acima do objetivo
+                </div>}
+              </div>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap",marginTop:8}}>
+                <p style={{fontSize:22,fontWeight:700,color:"#2d6a4f",margin:0}}>% do objetivo: {pctObj}%</p>
+              </div>
+              <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap"}}>
+                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:12,height:12,borderRadius:2,background:"#2d6a4f",display:"inline-block"}}/> Realizado até objetivo ({fmtEur(Math.min(fatCurr,fatGoal))})</span>
+                {overGoal&&<span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:12,height:12,borderRadius:2,background:"#95d5b2",display:"inline-block"}}/> Excedente (+{fmtEur(acimaObj)})</span>}
+                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:2,height:12,background:C.text,display:"inline-block"}}/> Linha de objetivo</span>
+              </div>
+            </div>}
+          </div>
+
+          {/* Tabela existente */}
+          <div style={T.card}>
+            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,fontWeight:500,color:C.green}}>Partners</span>
+            </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr style={{borderBottom:"0.5px solid "+C.border}}>
+                {["Métrica",MONTH_NAMES[month]+" "+year,MONTH_NAMES[month]+" "+prevYear,"Var. YoY"].map((h,i)=>(
+                  <th key={i} style={{padding:"8px 12px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                <Row label="Faturação total" c={fatCurr||null} p={fatPrev||null} />
+                <Row label="Margem" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
+                <Row label="Nº encomendas" c={encCurr||null} p={encPrev||null} f={fmt} />
+                <Row label="Ticket médio" c={ticketCurr} p={ticketPrev} />
+                <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
+                <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
+                <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
+                <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
+                <Row label="Afiliação" c={afilCurr||null} p={afilPrev||null} />
+                <Row label="Revenda + Afiliação" c={revendaAfilCurr||null} p={revendaAfilPrev||null} />
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pie charts */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+            <PieChart data={fatMktData} title="Faturação por mercado" />
+            <PieChart data={fatProgData} title="Faturação por programa" />
+          </div>
+        </>;
+      })() : <>
       <div style={T.card}>
         <p style={T.sectionTitle}>Resultados — {MONTH_NAMES[month]} {year} vs. {MONTH_NAMES[month]} {prevYear}</p>
       </div>
@@ -2885,11 +3065,10 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           </Modal>}
         </>;
       })()}
+      </>}
     </div>
   );
 }
-
-// ── TestesTab ─────────────────────────────────────────────────────────────────
 function TestesTab({ year, month }) {
   const [periodo, setPeriodo] = useState("mes");
   const [data, setData] = useState([]);
