@@ -724,7 +724,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   // aggregate, not a real team, and must never be written to Supabase.
 
   const SUB_TABS = currentTeam === "global"
-    ? [{ id:"partners_goals", label:"Partners" }]
+    ? [{ id:"partners_goals", label:"Partners" }, { id:"partners_hist", label:"Histórico" }]
     : [
         { id:"faturacao",   label:"Faturação diária" },
         { id:"primeiras",   label:"1ªs Compras" },
@@ -1221,6 +1221,31 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {subTab === "partners_hist" && (
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {[2024, 2025].map(y => (
+            <div key={y} style={T.card}>
+              <p style={{...T.sectionTitle, marginBottom:14}}>Faturação {y} — valores mensais (€)</p>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(3, minmax(0,1fr))", gap:12}}>
+                {MONTH_NAMES.map((mName, mIdx) => {
+                  const field = `hist_fat_${y}_${String(mIdx+1).padStart(2,"0")}`;
+                  return (
+                    <div key={field}>
+                      <p style={{fontSize:12, color:C.muted, margin:"0 0 6px"}}>{mName}</p>
+                      <input type="number" value={goals[field] ?? ""}
+                        onChange={e => setMonthData(prev => ({...prev, team_goals:{...prev.team_goals, [field]:e.target.value}}))}
+                        onBlur={saveAll}
+                        placeholder="0"
+                        style={{width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none"}} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -2555,6 +2580,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const [partnersPrev, setPartnersPrev] = useState(0);
   const [partnersCurrData, setPartnersCurrData] = useState([]);
   const [perTeamData, setPerTeamData] = useState([]);
+  const [hist2026Data, setHist2026Data] = useState([]);
   const [loading, setLoading] = useState(true);
   const [prevNextData, setPrevNextData] = useState(null);
   const [explModal, setExplModal] = useState(null);
@@ -2565,17 +2591,21 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
 
   useEffect(()=>{
     setLoading(true);
+    // Load all 12 months of current year for global historical chart
+    const monthKeys2026 = Array.from({length:12},(_,i)=>monthKey(year,i));
     Promise.all([
       currentTeam==="global" ? loadAllTeamsData(year,month) : loadMonthData(year, month, currentTeam),
       currentTeam==="global" ? loadAllTeamsData(prevYear,month) : loadMonthData(prevYear, month, currentTeam),
       loadPartnersCount(prevYear, month, currentTeam),
       loadPartnersByMktProg(year, month, currentTeam),
       currentTeam==="global" ? supabase.from("billing_months").select("team,team_goals").eq("month_key",monthKey(year,month)).in("team",TEAMS.map(t=>t.key)).then(({data})=>data||[]) : Promise.resolve([]),
-    ]).then(([c,p,pp,pc,ptd])=>{
+      currentTeam==="global" ? supabase.from("billing_months").select("month_key,entries,team_goals,team").in("month_key",monthKeys2026).then(({data})=>data||[]) : Promise.resolve([]),
+    ]).then(([c,p,pp,pc,ptd,h26])=>{
       setCurr(c); setPrev(p);
       setPartnersPrev(pp||0);
       setPartnersCurrData(pc||[]);
       setPerTeamData(ptd);
+      setHist2026Data(h26);
       setLoading(false);
     });
   },[year,month,currentTeam]);
@@ -2861,6 +2891,86 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             acimaObj, pctObj, evolVs, ganhoAbs,
             overGoal, barGoalPct, barCurrPct,
           })}
+
+          {/* 1b. Gráfico histórico */}
+          {(()=>{
+            const BAR_COLORS = {2024:"#d4a87a", 2025:"#e8c4a0", 2026:"#2d6a4f"};
+            const years = [2024, 2025, 2026];
+            const months12 = Array.from({length:12},(_,i)=>i);
+            // Build data: 2024 and 2025 from hist_fat fields, 2026 from real monthly data (need to load)
+            const hist2024 = months12.map(m=>Number(cg[`hist_fat_2024_${String(m+1).padStart(2,"0")}`])||0);
+            const hist2025 = months12.map(m=>Number(cg[`hist_fat_2025_${String(m+1).padStart(2,"0")}`])||0);
+            // 2026: compute real faturação from hist2026Data for each month
+            const hist2026 = months12.map(mIdx=>{
+              const mk = monthKey(year, mIdx);
+              const rows = hist2026Data.filter(r=>r.month_key===mk);
+              if (!rows.length) return 0;
+              // Merge entries and sum using getEntryTotal for global
+              let total = 0;
+              rows.forEach(row=>{
+                const e = row.entries||{};
+                const td = daysInMonth(year, mIdx);
+                for(let d=td;d>=1;d--){
+                  if(e[d]!==undefined){ total+=getEntryTotal(e[d],"global"); break; }
+                }
+                // Add fat_ fields from team_goals for NA secondary markets
+                const g = row.team_goals||{};
+                ["fat_SK","fat_GR","fat_CY","fat_PL"].forEach(f=>{ total+=Number(g[f])||0; });
+              });
+              return total;
+            });
+            const allVals = [...hist2024,...hist2025,...hist2026].filter(v=>v>0);
+            if (!allVals.length) return null;
+            const maxVal = Math.max(...allVals);
+            const barW = 18, gap = 4, groupGap = 12;
+            const groupW = 3*barW + 2*gap + groupGap;
+            const svgW = 12*groupW + 40;
+            const svgH = 220;
+            const chartH = 160;
+            const fmt = v => v>=1000000?(v/1000000).toFixed(1)+"M":v>=1000?(v/1000).toFixed(0)+"K":String(v);
+            return <div style={T.card}>
+              <p style={{fontSize:16,fontWeight:700,color:C.text,margin:"0 0 2px",textTransform:"uppercase",letterSpacing:".05em"}}>Revenda mensal</p>
+              <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{year} — 2024 vs 2025 vs 2026</p>
+              <div style={{overflowX:"auto"}}>
+                <svg width={svgW} height={svgH} style={{display:"block"}}>
+                  {/* Y axis lines */}
+                  {[0,0.25,0.5,0.75,1].map((pct,i)=>(
+                    <g key={i}>
+                      <line x1={30} y1={20+chartH*(1-pct)} x2={svgW-10} y2={20+chartH*(1-pct)} stroke={C.border} strokeWidth="0.5"/>
+                      <text x={28} y={24+chartH*(1-pct)} textAnchor="end" fontSize="9" fill={C.muted}>{fmt(maxVal*pct)}</text>
+                    </g>
+                  ))}
+                  {months12.map((mIdx)=>{
+                    const x = 35 + mIdx*groupW;
+                    const vals = [hist2024[mIdx], hist2025[mIdx], hist2026[mIdx]];
+                    return (
+                      <g key={mIdx}>
+                        {vals.map((v,yi)=>{
+                          const h = maxVal>0 ? (v/maxVal)*chartH : 0;
+                          const bx = x + yi*(barW+gap);
+                          return (
+                            <g key={yi}>
+                              <rect x={bx} y={20+chartH-h} width={barW} height={h} fill={BAR_COLORS[years[yi]]} rx="2"/>
+                              {v>0&&h>14&&<text x={bx+barW/2} y={20+chartH-h-3} textAnchor="middle" fontSize="8" fill={C.muted}>{fmt(v)}</text>}
+                            </g>
+                          );
+                        })}
+                        <text x={x+(3*barW+2*gap)/2} y={20+chartH+14} textAnchor="middle" fontSize="9" fill={C.muted}>{MONTH_NAMES[mIdx].slice(0,3).toUpperCase()}</text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+              <div style={{display:"flex",gap:20,marginTop:8,flexWrap:"wrap"}}>
+                {years.map(y=>(
+                  <span key={y} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
+                    <span style={{width:12,height:12,borderRadius:2,background:BAR_COLORS[y],display:"inline-block"}}/>
+                    {y}
+                  </span>
+                ))}
+              </div>
+            </div>;
+          })()}
 
           {/* 2. Faturação por mercado + Faturação por programa */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
