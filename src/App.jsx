@@ -263,8 +263,9 @@ async function loadPartnersByMktProg(year, month, team="equipa_fr") {
   const lastDay = new Date(year,month+1,0).getDate();
   const start = `${year}-${pad(month+1)}-01T00:00:00.000Z`;
   const end = `${year}-${pad(month+1)}-${pad(lastDay)}T23:59:59.999Z`;
-  const teamObj = TEAMS.find(t=>t.key===team);
-  const markets = teamObj ? teamObj.markets : ["FR","CH","BNL","DEAT","CH-BNL-DEAT"];
+  const markets = team === "global"
+    ? TEAMS.flatMap(t => t.markets)
+    : (TEAMS.find(t=>t.key===team)?.markets || ["FR","CH","BNL","DEAT","CH-BNL-DEAT"]);
   const { data } = await supabase.from("partner_followup")
     .select("market,programme,gestor")
     .gte("original_created_at", start)
@@ -2621,9 +2622,9 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       </div>
       <div style={T.card}>
         <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-          {isSingleMarket ? (
-            <span style={{fontSize:13,fontWeight:500,color:C.green}}>{teamMarkets[0].label}</span>
-          ) : [{key:"global",label:"Global"},...mktList].map(m=>(
+          {isSingleMarket || currentTeam==="global" ? (
+            <span style={{fontSize:13,fontWeight:500,color:C.green}}>{currentTeam==="global" ? "Partners" : teamMarkets[0].label}</span>
+          ) : [{key:"global",label:"Partners"},...mktList].map(m=>(
             <button key={m.key} onClick={()=>setMktTab(m.key)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:"0.5px solid "+C.border,cursor:"pointer",
                 background:mktTab===m.key?C.green:"transparent",color:mktTab===m.key?"#fff":C.muted}}>
@@ -2677,12 +2678,14 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
           {getTeamMarkets(currentTeam, isNewStructure(year,month)).map(({key,label})=>{
             const n=byMkt[key]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
-            return <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+            return {key,label,n,p};
+          }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
+            <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
               <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>;
-          })}
+            </div>
+          ))}
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
             <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
             <span style={{fontSize:13,fontWeight:500,color:C.text}}>{totalPC}</span>
@@ -2692,12 +2695,14 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
           {PROGS_RES.map(prog=>{
             const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
-            return <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+            return {prog,n,p};
+          }).sort((a,b)=>b.n-a.n).map(({prog,n,p})=>(
+            <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
               <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>;
-          })}
+            </div>
+          ))}
         </div>
       </div>}
       {mktTab==="global"&&totalFatProg>0&&<div style={T.card}>
@@ -2706,12 +2711,14 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           {PROGS_RES.map(prog=>{
             const v=Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0;
             const p=totalFatProg>0?(v/totalFatProg*100).toFixed(1):0;
-            return v>0?<div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+            return {prog,v,p};
+          }).filter(({v})=>v>0).sort((a,b)=>b.v-a.v).map(({prog,v,p})=>(
+            <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
               <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>:null;
-          })}
+            </div>
+          ))}
         </div>
       </div>}
       {mktTab==="global"&&(()=>{
@@ -2735,25 +2742,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
               {explanations[explModal].body}
             </div>
           </Modal>}
-          <div style={T.card}>
-            <p style={{...T.sectionTitle,marginBottom:12}}>Sugestão objetivo — {MONTH_NAMES[nextMonth]} {nextYear2}</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10}}>
-              {[
-                {id:"season",label:"Sazonalidade",value:suggestSeason,sub:seasonPct!=null?`${MONTH_NAMES[nextMonth]}/${MONTH_NAMES[month]} ${prevYear}: ${seasonPct}%`:"introduz dados de "+MONTH_NAMES[nextMonth]+" "+prevYear},
-                {id:"yoy",label:"Base YoY",value:suggestYoY,sub:MONTH_NAMES[month]+" "+prevYear+" × variação atual (+"+((growthYoY||0)*100).toFixed(1)+"%)"},
-                {id:"dow",label:"Média dia da semana",value:suggestDow>0?suggestDow:null,sub:tdNext+" dias em "+MONTH_NAMES[nextMonth]},
-              ].map((s,i)=>(
-                <div key={i} onClick={()=>setExplModal(s.id)}
-                  style={{...T.card,background:C.bg,cursor:"pointer",transition:"opacity .15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-                  <p style={{fontSize:11,color:C.muted,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
-                  <p style={{fontSize:20,fontWeight:500,color:C.text,margin:"0 0 4px"}}>{s.value?fmtEur(s.value):"—"}</p>
-                  <p style={{fontSize:11,color:C.muted,margin:"0 0 4px"}}>{s.sub}</p>
-                  <p style={{fontSize:10,color:C.green,margin:0}}>ℹ ver explicação</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </>;
       })()}
     </div>
@@ -2997,7 +2985,7 @@ function MainApp({ role, onLogout }) {
         ):tab==="analise"?(
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
-              {[{key:"global",label:"Global"},...TEAMS].map(t=>(
+              {[{key:"global",label:"Partners"},...TEAMS].map(t=>(
                 <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                   style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
                     background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
@@ -3022,7 +3010,7 @@ function MainApp({ role, onLogout }) {
               <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
             </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} refreshKey={perfRefreshKey} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
-                {[{key:"global",label:"Global"},...TEAMS].map(t=>(
+                {[{key:"global",label:"Partners"},...TEAMS].map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                     style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
                       background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
