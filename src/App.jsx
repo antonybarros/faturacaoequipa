@@ -1080,35 +1080,33 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               </div>
             </div>
             {isNA && (
-              <>
-                <div style={T.card}>
-                  <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-                    {naMonthlyMkts.map(mkt=>{
-                      const fkey = `leads_${mkt.key}`;
-                      return (
-                        <div key={fkey}>
-                          <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
-                          <input type="number" value={goals[fkey]??""} placeholder="0"
-                            onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
-                            onBlur={saveAll}
-                            style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-                        </div>
-                      );
-                    })}
-                  </div>
+              <div style={T.card}>
+                <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                  {naMonthlyMkts.map(mkt=>{
+                    const fkey = `leads_${mkt.key}`;
+                    return (
+                      <div key={fkey}>
+                        <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                        <input type="number" value={goals[fkey]??""} placeholder="0"
+                          onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                          onBlur={saveAll}
+                          style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={T.card}>
-                  <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-                    {inpLead("perf_leads","Leads recebidos (inbound)")}
-                    {inpLead("perf_leads_ang","Leads com angariador")}
-                    {inpLead("perf_leads_sem","Leads sem angariador")}
-                    {inpLead("perf_prospects","Leads de prospeção (outbound)")}
-                  </div>
-                </div>
-              </>
+              </div>
             )}
+            <div style={T.card}>
+              <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                {inpLead("perf_leads","Leads recebidos (inbound)")}
+                {inpLead("perf_leads_ang","Leads com angariador")}
+                {inpLead("perf_leads_sem","Leads sem angariador")}
+                {inpLead("perf_prospects","Leads de prospeção (outbound)")}
+              </div>
+            </div>
           </div>
         );
       })()}
@@ -2930,6 +2928,7 @@ function MainApp({ role, onLogout }) {
     if (t === "performance") setPerfRefreshKey(k => k + 1);
     setTab(t);
   };
+  const [perfTeamOverride, setPerfTeamOverride] = useState(null);
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
   const [monthData, setMonthData] = useState({ entries:{}, team_goals:{} });
   const [loading, setLoading] = useState(true);
