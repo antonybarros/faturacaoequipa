@@ -2677,7 +2677,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
         {!isSingleMarket&&<div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
           {Object.entries(byMkt).map(([key,n])=>{
-            const label = MARKET_LABELS[key]||key;
+            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, true));
+            const label = allMkts.find(m=>m.key===key)?.label || key;
             const p = totalPC>0?(n/totalPC*100).toFixed(1):0;
             return {key,label,n,p};
           }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
