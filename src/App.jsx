@@ -736,14 +736,14 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   ];
 
   const save = async (newData) => {
-    if (currentTeam === "global") {
-      // Safety net: the Registo tab must never write a "global" row to Supabase.
-      // "global" is a computed aggregate (sum of all teams) and must never be persisted.
+    // Partners sub-tab saves objectives to equipa_fr (admin's team) so loadAllTeamsData can read them via mergedGoals
+    const teamToSave = (currentTeam === "global" && subTab === "partners_goals") ? "equipa_fr" : currentTeam;
+    if (teamToSave === "global") {
       console.error("Blocked attempt to save Registo data with team='global'. No write performed.");
       return;
     }
     const key = monthKey(year, month);
-    await supabase.from("billing_months").upsert({ month_key: key, team: currentTeam, ...newData }, { onConflict:"month_key,team" });
+    await supabase.from("billing_months").upsert({ month_key: key, team: teamToSave, ...newData }, { onConflict:"month_key,team" });
     setMonthData(prev => ({ ...prev, ...newData }));
   };
 
@@ -1209,6 +1209,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
             {[
               {field:"afil_goal", label:"Objetivo de afiliação (€)"},
               {field:"margem_goal", label:"Objetivo de margem (%)"},
+              {field:"partners_fat_goal", label:"Objetivo de faturação Partners (€)"},
             ].map(({field,label}) => (
               <div key={field}>
                 <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
@@ -2712,7 +2713,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {currentTeam==="global" ? (() => {
-        const fatGoal = Number(cg?.equipa_fr)||0;
+        // Partners goal: use dedicated field if set, otherwise subtract equipa_na contribution from merged sum
+        const fatGoal = Number(cg?.partners_fat_goal)||Math.max(0,(Number(cg?.equipa_fr)||0)-8500);
         const acimaObj = fatCurr - fatGoal;
         const pctObj = fatGoal>0 ? (fatCurr/fatGoal*100).toFixed(2) : null;
         const evolVs = fatPrev>0 ? ((fatCurr-fatPrev)/fatPrev*100).toFixed(2) : null;
@@ -2907,6 +2909,49 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
               </table>
             </div>
           </div>
+
+          {/* Card Novos Parceiros */}
+          {totalPC>0&&<div style={T.card}>
+            <p style={{...T.sectionTitle,fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Novos Parceiros</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px",fontWeight:600}}>{MONTH_NAMES[month]} {year} — {totalPC} novos parceiros</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:16}}>
+              {/* Por programa — lista + pie */}
+              <div>
+                <p style={{...T.sectionTitle,marginBottom:10}}>Por programa</p>
+                {PROGS_RES.map(prog=>{
+                  const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
+                  return {prog,n,p};
+                }).filter(r=>r.n>0).sort((a,b)=>b.n-a.n).map(({prog,n,p})=>(
+                  <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                    <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
+                    <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
+                  </div>
+                ))}
+                <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
+              </div>
+              {/* Por mercado — lista + pie */}
+              <div>
+                <p style={{...T.sectionTitle,marginBottom:10}}>Por mercado</p>
+                {Object.entries(byMkt).map(([key,n])=>{
+                  const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
+                  const label=allMkts.find(m=>m.key===key)?.label||key;
+                  const p=totalPC>0?(n/totalPC*100).toFixed(1):0;
+                  return {key,label,n,p};
+                }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
+                  <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                    <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
+                    <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
+                    <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
+                  </div>
+                ))}
+                <PieChart data={Object.entries(byMkt).map(([key,n])=>{
+                  const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
+                  return {label:allMkts.find(m=>m.key===key)?.label||key,v:n};
+                }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
+              </div>
+            </div>
+          </div>}
 
           {/* Tabela existente */}
           <div style={T.card}>
