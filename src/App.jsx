@@ -1309,8 +1309,17 @@ function PartnerFollowup({ year, month, gestor: gestorFilter, isAdmin=false, fol
   const PROGS = ["Professionals","Elite","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
   const MKT_OLD = [{key:"FR",label:"França"},{key:"CH-BNL-DEAT",label:"CH-BNL-DEAT"}];
   const MKT_NEW = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"}];
+  const MKT_ALL = [
+    {key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"Alemanha e Áustria"},
+    {key:"IT",label:"Itália"},{key:"ES",label:"Espanha"},
+    {key:"PT",label:"Portugal"},{key:"IE",label:"Irlanda"},{key:"WW",label:"Worldwide"},{key:"SE",label:"Suécia"},
+    {key:"GB",label:"Reino Unido"},{key:"EU",label:"EU"},{key:"RO",label:"Roménia"},{key:"DK",label:"Dinamarca"},
+    {key:"FI",label:"Finlândia"},{key:"CA",label:"Canadá"},{key:"HU",label:"Hungria"},{key:"OTHER",label:"Outros"},
+    {key:"NA",label:"NA"},{key:"CZ",label:"República Checa"},{key:"SK",label:"Eslováquia"},
+    {key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"},
+  ];
   const isNew = isNewStructure(year, month);
-  const mktList = isNew ? MKT_NEW : MKT_OLD;
+  const mktList = isAdmin ? MKT_ALL : (isNew ? MKT_NEW : MKT_OLD);
 
   const STAGES = [
     { key:"s30", days:30, label:"30 dias" },
