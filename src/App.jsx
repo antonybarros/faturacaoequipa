@@ -3187,19 +3187,21 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por mercado</p>
           {(()=>{
-            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
-            const seen = new Set();
-            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
-              .map(({key,label})=>{
+            const teamMkts = currentTeam==="global"
+              ? (() => { const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month))); const seen = new Set(); return allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; }); })()
+              : getTeamMarkets(currentTeam, isNewStructure(year,month));
+            const rows = teamMkts.map(({key,label})=>{
                 let v=0;
                 for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[key]!==undefined){ v=Number(e[key])||0; break; } }
                 return {key,label,v};
               });
-            // Add NA secondary markets from team_goals (fat_SK, fat_GR, fat_CY, fat_PL)
-            [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}].forEach(({key,label})=>{
-              const v = Number(cg[`fat_${key}`])||0;
-              if (v>0) rows.push({key,label,v});
-            });
+            // Add NA secondary markets from team_goals (fat_SK, fat_GR, fat_CY, fat_PL) — only for global
+            if (currentTeam==="global") {
+              [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}].forEach(({key,label})=>{
+                const v = Number(cg[`fat_${key}`])||0;
+                if (v>0) rows.push({key,label,v});
+              });
+            }
             const filtered = rows.filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
             const total = filtered.reduce((s,r)=>s+r.v,0);
             return <>
