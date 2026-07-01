@@ -2561,7 +2561,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
     if (team === "equipa_it") return ["IT"];
     if (team === "equipa_es") return ["ES"];
     if (team === "equipa_pt") return ["PT","OTHER"];
-    if (team === "equipa_na") return ["NA","CZ"];
+    if (team === "equipa_na") return ["NA","CZ","SK","GR","CY","PL"];
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
   const currMkts = getMkts(year,month);
