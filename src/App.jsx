@@ -3249,6 +3249,47 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           })()}
         </div>
       </div>}
+      {currentTeam!=="global"&&(()=>{
+        const leads = Number(cg?.perf_leads)||0;
+        const leadsAng = Number(cg?.perf_leads_ang)||0;
+        const leadsSem = Number(cg?.perf_leads_sem)||0;
+        const prospects = Number(cg?.perf_prospects)||0;
+        const angPct = leads>0?(leadsAng/leads*100).toFixed(1):0;
+        const semPct = leads>0?(leadsSem/leads*100).toFixed(1):0;
+        if (!leads && !prospects) return null;
+        return <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+            {[
+              {label:"Leads Be a Partner", value:leads, sub:null, color:C.text},
+              {label:"Com angariador", value:leadsAng, sub:`${angPct}% do total`, color:C.text},
+              {label:"Sem angariador", value:leadsSem, sub:`${semPct}% do total`, color:C.text},
+              {label:"Leads prospeção", value:prospects, sub:null, color:C.green},
+            ].map((s,i)=>(
+              <div key={i} style={T.card}>
+                <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
+                <p style={{fontSize:28,fontWeight:500,color:s.color,margin:"0 0 4px"}}>{s.value}</p>
+                {s.sub&&<p style={{fontSize:12,color:C.muted,margin:0}}>{s.sub}</p>}
+              </div>
+            ))}
+          </div>
+          {leads>0&&<div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:12}}>Origem dos leads recebidos</p>
+            <div style={{position:"relative",height:20,borderRadius:10,overflow:"hidden",background:C.border,marginBottom:12}}>
+              <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${angPct}%`,background:C.green,borderRadius:"10px 0 0 10px"}}/>
+            </div>
+            <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.green,fontWeight:500}}>
+                <span style={{width:10,height:10,borderRadius:"50%",background:C.green,display:"inline-block"}}/>
+                Com angariador — {leadsAng} ({angPct}%)
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
+                <span style={{width:10,height:10,borderRadius:"50%",background:C.border,display:"inline-block"}}/>
+                Sem angariador — {leadsSem} ({semPct}%)
+              </span>
+            </div>
+          </div>}
+        </>;
+      })()}
       {mktTab==="global"&&(()=>{
         const explanations = {
           season: {
