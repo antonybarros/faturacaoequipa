@@ -2989,10 +2989,11 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                   <p style={{...T.sectionTitle,marginBottom:10}}>Leads Be a Partner — por equipa</p>
                   {TEAMS.map(t=>{
                     const g=perTeamData.find(r=>r.team===t.key)?.team_goals||{};
-                    const n=Number(g.perf_leads)||0;
+                    return {label:t.label, n:Number(g.perf_leads)||0};
+                  }).sort((a,b)=>b.n-a.n).map(({label,n})=>{
                     const p=leads>0?(n/leads*100).toFixed(1):0;
-                    return <div key={t.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                      <span style={{fontSize:13,color:C.text,flex:1}}>{t.label}</span>
+                    return <div key={label} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                      <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
                       <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
                       <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
                     </div>;
@@ -3002,10 +3003,11 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                   <p style={{...T.sectionTitle,marginBottom:10}}>Leads prospeção — por equipa</p>
                   {TEAMS.map(t=>{
                     const g=perTeamData.find(r=>r.team===t.key)?.team_goals||{};
-                    const n=Number(g.perf_prospects)||0;
+                    return {label:t.label, n:Number(g.perf_prospects)||0};
+                  }).sort((a,b)=>b.n-a.n).map(({label,n})=>{
                     const p=prospects>0?(n/prospects*100).toFixed(1):0;
-                    return <div key={t.key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                      <span style={{fontSize:13,color:C.text,flex:1}}>{t.label}</span>
+                    return <div key={label} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
+                      <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
                       <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
                       <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
                     </div>;
