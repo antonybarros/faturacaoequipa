@@ -3388,7 +3388,7 @@ function MainApp({ role, onLogout }) {
           <div>
             {tab==="registo" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
-                {TEAMS.filter(t=>!role.registoTeam||t.key===role.registoTeam).map(t=>(
+                {(isAdmin ? [{key:"global",label:"Partners"},...TEAMS] : TEAMS.filter(t=>!role.registoTeam||t.key===role.registoTeam)).map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
                     style={{padding:"6px 14px",border:`0.5px solid ${currentTeam===t.key?C.green:C.border}`,borderRadius:20,
                       background:currentTeam===t.key?C.green:"transparent",color:currentTeam===t.key?"#fff":C.muted,fontWeight:currentTeam===t.key?500:400,fontSize:12,cursor:"pointer"}}>
