@@ -716,7 +716,7 @@ function AnaliseTab({ year, month, totalDays, closedDay, entries, teamGoals, par
   );
 }
 // ── Registo Tab ────────────────────────────────────────────────────────────────
-function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData, currentTeam, setCurrentTeam }) {
+function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData, currentTeam, setCurrentTeam, isAdmin=false }) {
   const [subTab, setSubTab] = useState("faturacao");
   const newStruct = isNewStructure(year, month);
 
@@ -739,6 +739,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
     { id:"margem",      label:"Margem" },
     { id:"fat_programa", label:"Fat. Programa" },
     { id:"objetivos",   label:"Objetivos" },
+    ...(isAdmin && currentTeam==="global" ? [{ id:"partners_goals", label:"Partners" }] : []),
   ];
 
   const save = async (newData) => {
@@ -1195,6 +1196,26 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
               {field:"equipa_fr",           label:"Objetivo de faturação (€)"},
               {field:"equipa_fr_partners",   label:"Objetivo de novos parceiros"},
               {field:"equipa_fr_first_rev",  label:"Objetivo fat. primeiras compras (€)"},
+            ].map(({field,label}) => (
+              <div key={field}>
+                <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
+                <input type="number" value={goals[field] ?? ""}
+                  onChange={e => setMonthData(prev => ({ ...prev, team_goals:{ ...prev.team_goals, [field]:e.target.value } }))} onBlur={saveAll}
+                  placeholder="0"
+                  style={{ width:"100%", boxSizing:"border-box", padding:"9px 12px", border:`0.5px solid ${C.border}`, borderRadius:8, fontSize:14, background:C.bg, color:C.text, outline:"none" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {subTab === "partners_goals" && (
+        <div style={T.card}>
+          <p style={T.sectionTitle}>Partners — Objetivos {MONTH_NAMES[month]} {year}</p>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:16 }}>
+            {[
+              {field:"afil_goal", label:"Objetivo de afiliação (€)"},
+              {field:"margem_goal", label:"Objetivo de margem (%)"},
             ].map(({field,label}) => (
               <div key={field}>
                 <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>{label}</p>
@@ -2853,6 +2874,47 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             barCurrPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,afilCurr/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
           })}
 
+          {/* Card Encomendas */}
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Encomendas</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px",fontWeight:600}}>{MONTH_NAMES[month]} {year}</p>
+            <div style={{border:`0.5px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+              <p style={{fontSize:11,color:C.muted,margin:"12px 16px",textTransform:"uppercase",letterSpacing:".05em",fontWeight:500}}>Detalhe por métrica</p>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr style={{borderBottom:`0.5px solid ${C.border}`}}>
+                  {["",...[MONTH_NAMES[month].toUpperCase()+" "+prevYear, MONTH_NAMES[month].toUpperCase()+" "+year,"EVOLUÇÃO"]].map((h,i)=>(
+                    <th key={i} style={{padding:"8px 16px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,letterSpacing:".05em"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {[
+                    {label:"Encomendas totais", c:encCurr, p:encPrev, f:fmt},
+                    {label:"Ticket médio", c:ticketCurr, p:ticketPrev, f:v=>v?v.toFixed(2):null},
+                    {label:"Primeiras encomendas (clientes virgens)", c:enc1Curr, p:enc1Prev, f:fmt},
+                    {label:"Faturação 1ªs compras", c:fat1Curr, p:fat1Prev},
+                    {label:"Ticket médio das primeiras compras", c:ticket1Curr, p:ticket1Prev, f:v=>v?v.toFixed(2):null},
+                  ].map(({label,c,p,f},i)=>{
+                    const evol = p>0&&c!=null ? ((c-p)/p*100) : null;
+                    const up = evol!=null && evol>=0;
+                    const fmtVal = (v) => v==null ? "—" : f ? f(v) : fmtEur(v);
+                    return (
+                      <tr key={i} style={{borderBottom:`0.5px solid ${C.border}`}}>
+                        <td style={{padding:"10px 16px",fontSize:12,color:C.text,textTransform:"uppercase",letterSpacing:".03em"}}>{label}</td>
+                        <td style={{padding:"10px 16px",fontSize:12,color:C.muted,textAlign:"right"}}>{fmtVal(p)}</td>
+                        <td style={{padding:"10px 16px",fontSize:12,fontWeight:500,color:C.text,textAlign:"right"}}>{fmtVal(c)}</td>
+                        <td style={{padding:"10px 16px",fontSize:12,fontWeight:500,textAlign:"right",
+                          background:evol!=null?(up?"rgba(52,168,83,.1)":"rgba(220,53,69,.1)"):"transparent",
+                          color:evol!=null?(up?C.green:C.red):C.muted}}>
+                          {evol!=null?(up?"+":"")+evol.toFixed(2)+"%":"—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Tabela existente */}
           <div style={T.card}>
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
@@ -3341,7 +3403,7 @@ function MainApp({ role, onLogout }) {
                   </button>
                 ))}
               </div>
-              <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
+              <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} isAdmin={isAdmin} />
             </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} refreshKey={perfRefreshKey} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
                 {[{key:"global",label:"Partners"},...TEAMS].map(t=>(
