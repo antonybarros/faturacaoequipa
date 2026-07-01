@@ -1051,6 +1051,8 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       {/* ── Parceiros / Leads ── */}
       {subTab === "parceiros" && (() => {
         const mktList = getTeamMarkets(currentTeam, newStruct);
+        const isNA = currentTeam === "equipa_na";
+        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
         const inpLead = (field, label) => (
           <div>
             <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{label}</p>
@@ -1062,58 +1064,53 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
         );
         return (
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div style={T.card}>
-            <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
-            <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Os novos parceiros são registados automaticamente no separador Parceiros.</p>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
-              {mktList.map(mkt => (
-                <div key={mkt.key}>
-                  <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Leads — {mkt.label}</p>
-                  <input type="number" value={goals[`leads_d_${mkt.key}`]??""} placeholder="0"
-                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`leads_d_${mkt.key}`]:e.target.value}}))}
-                    onBlur={saveAll}
-                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-
-          </div>
-        );
-      })()}
-
-
-      {subTab==="parceiros"&&currentTeam === "equipa_na" && (() => {
-        const naMonthlyMkts = [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}];
-        return (<>
-          <div style={T.card}>
-            <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-              {naMonthlyMkts.map(mkt=>{
-                const fkey = `leads_${mkt.key}`;
-                return (
-                  <div key={fkey}>
-                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
-                    <input type="number" value={goals[fkey]??""} placeholder="0"
-                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+            <div style={T.card}>
+              <p style={T.sectionTitle}>Leads — {MONTH_NAMES[month]} {year}</p>
+              <p style={{ fontSize:12, color:C.muted, margin:"0 0 14px" }}>Os novos parceiros são registados automaticamente no separador Parceiros.</p>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0,1fr))", gap:12 }}>
+                {mktList.map(mkt => (
+                  <div key={mkt.key}>
+                    <p style={{ fontSize:12, color:C.muted, margin:"0 0 6px" }}>Leads — {mkt.label}</p>
+                    <input type="number" value={goals[`leads_d_${mkt.key}`]??""} placeholder="0"
+                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`leads_d_${mkt.key}`]:e.target.value}}))}
                       onBlur={saveAll}
                       style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
+            {isNA && (
+              <>
+                <div style={T.card}>
+                  <p style={{...T.sectionTitle,marginBottom:4}}>PARCEIROS/LEADS — MERCADOS SECUNDÁRIOS</p>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                    {naMonthlyMkts.map(mkt=>{
+                      const fkey = `leads_${mkt.key}`;
+                      return (
+                        <div key={fkey}>
+                          <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
+                          <input type="number" value={goals[fkey]??""} placeholder="0"
+                            onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
+                            onBlur={saveAll}
+                            style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={T.card}>
+                  <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
+                    {inpLead("perf_leads","Leads recebidos (inbound)")}
+                    {inpLead("perf_leads_ang","Leads com angariador")}
+                    {inpLead("perf_leads_sem","Leads sem angariador")}
+                    {inpLead("perf_prospects","Leads de prospeção (outbound)")}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-          <div style={T.card}>
-            <p style={{...T.sectionTitle,marginBottom:14}}>LEADS / PROSPEÇÃO — {MONTH_NAMES[month].toUpperCase()} {year}</p>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-              {inpLead("perf_leads","Leads recebidos (inbound)")}
-              {inpLead("perf_leads_ang","Leads com angariador")}
-              {inpLead("perf_leads_sem","Leads sem angariador")}
-              {inpLead("perf_prospects","Leads de prospeção (outbound)")}
-            </div>
-          </div>
-        </>);
+        );
       })()}
 
       {/* ── Margem ── */}
