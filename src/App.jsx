@@ -2723,6 +2723,60 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           ))}
         </div>
       </div>}
+      {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por mercado</p>
+          {(()=>{
+            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
+            const seen = new Set();
+            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
+              .map(({key,label})=>{
+                let v=0;
+                for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[key]!==undefined){ v=Number(e[key])||0; break; } }
+                return {key,label,v};
+              })
+              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
+            const total = rows.reduce((s,r)=>s+r.v,0);
+            return <>
+              {rows.map(({key,label,v})=>(
+                <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+                  <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
+                  <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
+                  <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
+                </div>
+              ))}
+              {total>0&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+                <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
+              </div>}
+            </>;
+          })()}
+        </div>
+        <div style={T.card}>
+          <p style={{...T.sectionTitle,marginBottom:10}}>Afiliação por mercado</p>
+          {(()=>{
+            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
+            const seen = new Set();
+            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
+              .map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
+              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
+            const total = rows.reduce((s,r)=>s+r.v,0);
+            return <>
+              {rows.map(({key,label,v})=>(
+                <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+                  <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
+                  <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
+                  <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
+                </div>
+              ))}
+              {total>0&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+                <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
+                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
+              </div>}
+            </>;
+          })()}
+        </div>
+      </div>}
       {mktTab==="global"&&(()=>{
         const explanations = {
           season: {
@@ -2943,9 +2997,14 @@ function MainApp({ role, onLogout }) {
   const [partnersCount, setPartnersCount] = useState(null);
   useEffect(()=>{
     if (currentTeam==="global") {
-      // Sum all teams
-      Promise.all(TEAMS.map(t=>loadPartnersCount(year,month,t.key)))
-        .then(counts=>setPartnersCount(counts.reduce((s,c)=>s+c,0)));
+      const start = new Date(year, month, 1).toISOString();
+      const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+      supabase.from("partner_followup")
+        .select("*", { count:"exact", head:true })
+        .gte("original_created_at", start)
+        .lte("original_created_at", end)
+        .neq("status", "deleted")
+        .then(({count})=>setPartnersCount(count||0));
     } else {
       loadPartnersCount(year,month,currentTeam).then(setPartnersCount);
     }
