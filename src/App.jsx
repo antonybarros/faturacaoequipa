@@ -2480,10 +2480,14 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const sumMkts = (prefix, g, mkts) => mkts.reduce((s,mk)=>s+(Number(g[prefix+"_"+mk])||0),0);
   const getMkts = (y,m) => {
     const team = currentTeam || "equipa_fr";
+    if (team === "global") return [
+      ...(isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"]),
+      "IT","ES","PT","OTHER","NA","CZ"
+    ];
     if (team === "equipa_it") return ["IT"];
     if (team === "equipa_es") return ["ES"];
     if (team === "equipa_pt") return ["PT","OTHER"];
-    if (team === "equipa_na") return ["NA","CZ"]; // SK,GR,CY,PL stored monthly in team_goals as fat_SK etc.
+    if (team === "equipa_na") return ["NA","CZ"];
     return isNewStructure(y,m) ? ["FR","CH","BNL","DEAT"] : ["FR","CH-BNL-DEAT"];
   };
   const currMkts = getMkts(year,month);
