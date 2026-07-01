@@ -1968,6 +1968,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   const [partnersCount, setPartnersCount] = useState(0);
   const [partnersData, setPartnersData] = useState([]);
   const [perTeamData, setPerTeamData] = useState([]);
+  const [perfTeam, setPerfTeam] = useState((currentTeam&&currentTeam!=="global")?currentTeam:TEAMS[0].key);
 
   useEffect(()=>{ if (currentTeam && currentTeam !== "global") setPerfTeam(currentTeam); },[currentTeam]);
 
