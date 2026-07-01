@@ -2506,6 +2506,49 @@ function AnaliseFollowup({ year, month, isAdmin, role=null }) {
 const PROGS_RES = ["Elite","Professionals","Pro Gym","Pro Box","Pro Teams","Performance","Horeca","Corporate"];
 const MKT_RES_LIST = [{key:"FR",label:"França"},{key:"CH",label:"Suíça"},{key:"BNL",label:"Benelux"},{key:"DEAT",label:"DE-AT"}];
 
+// ── PieChart ──────────────────────────────────────────────────────────────────
+const PIE_COLORS_GLOBAL = ["#2d6a4f","#40916c","#52b788","#74c69d","#95d5b2","#b7e4c7","#d8f3dc","#1b4332","#081c15","#a8dadc","#457b9d","#1d3557"];
+function PieChart({data, title, fmtFn}) {
+  const total = data.reduce((s,d)=>s+d.v,0);
+  if (!total) return null;
+  const formatVal = fmtFn || fmtEur;
+  let cumAngle = 0;
+  const slices = data.map((d,i)=>{
+    const pct = d.v/total;
+    const start = cumAngle;
+    cumAngle += pct * 360;
+    return {...d, pct, startAngle: start, endAngle: cumAngle, color: PIE_COLORS_GLOBAL[i%PIE_COLORS_GLOBAL.length]};
+  });
+  const toRad = a => (a-90)*Math.PI/180;
+  const cx=100,cy=100,r=80;
+  return (
+    <div style={title?T.card:{marginTop:12}}>
+      {title&&<p style={{...T.sectionTitle,marginBottom:12}}>{title}</p>}
+      <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+        <svg width="200" height="200" viewBox="0 0 200 200">
+          {slices.map((s,i)=>{
+            const x1=cx+r*Math.cos(toRad(s.startAngle)), y1=cy+r*Math.sin(toRad(s.startAngle));
+            const x2=cx+r*Math.cos(toRad(s.endAngle)), y2=cy+r*Math.sin(toRad(s.endAngle));
+            const large = (s.endAngle-s.startAngle)>180?1:0;
+            return <path key={i} d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`}
+              fill={s.color} stroke="#fff" strokeWidth="1.5"/>;
+          })}
+        </svg>
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
+          {slices.map((s,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
+              <span style={{fontSize:12,color:C.text,flex:1}}>{s.label}</span>
+              <span style={{fontSize:12,fontWeight:500,color:C.text}}>{formatVal(s.v)}</span>
+              <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{(s.pct*100).toFixed(1)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) {
   const [curr, setCurr] = useState(null);
   const [prev, setPrev] = useState(null);
@@ -2713,48 +2756,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       <td style={{padding:"10px 12px",textAlign:"right"}}>{varEl(c,p)}</td>
     </tr>
   );
-
-  const PIE_COLORS_RES = ["#2d6a4f","#40916c","#52b788","#74c69d","#95d5b2","#b7e4c7","#d8f3dc","#1b4332","#081c15","#a8dadc","#457b9d","#1d3557"];
-  const PieChart = ({data, title, fmtFn}) => {
-    const total = data.reduce((s,d)=>s+d.v,0);
-    if (!total) return null;
-    const formatVal = fmtFn || fmtEur;
-    let cumAngle = 0;
-    const slices = data.map((d,i)=>{
-      const pct = d.v/total;
-      const start = cumAngle;
-      cumAngle += pct * 360;
-      return {...d, pct, startAngle: start, endAngle: cumAngle, color: PIE_COLORS_RES[i%PIE_COLORS_RES.length]};
-    });
-    const toRad = a => (a-90)*Math.PI/180;
-    const cx=100,cy=100,r=80;
-    return (
-      <div style={title?T.card:{marginTop:12}}>
-        {title&&<p style={{...T.sectionTitle,marginBottom:12}}>{title}</p>}
-        <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
-          <svg width="200" height="200" viewBox="0 0 200 200">
-            {slices.map((s,i)=>{
-              const x1=cx+r*Math.cos(toRad(s.startAngle)), y1=cy+r*Math.sin(toRad(s.startAngle));
-              const x2=cx+r*Math.cos(toRad(s.endAngle)), y2=cy+r*Math.sin(toRad(s.endAngle));
-              const large = (s.endAngle-s.startAngle)>180?1:0;
-              return <path key={i} d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`}
-                fill={s.color} stroke="#fff" strokeWidth="1.5"/>;
-            })}
-          </svg>
-          <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
-            {slices.map((s,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
-                <span style={{fontSize:12,color:C.text,flex:1}}>{s.label}</span>
-                <span style={{fontSize:12,fontWeight:500,color:C.text}}>{formatVal(s.v)}</span>
-                <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{(s.pct*100).toFixed(1)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
