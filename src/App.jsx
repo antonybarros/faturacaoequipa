@@ -3077,6 +3077,80 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           </div>
         </>;
       })() : <>
+      {currentTeam==="equipa_it"&&(()=>{
+        const itGoal = Number(cg?.equipa_fr)||0;
+        const itAcima = fatCurr - itGoal;
+        const itPctObj = itGoal>0 ? (fatCurr/itGoal*100).toFixed(2) : null;
+        const itEvolVs = fatPrev>0 ? ((fatCurr-fatPrev)/fatPrev*100).toFixed(2) : null;
+        const itGanho = fatCurr - fatPrev;
+        const itOver = fatCurr > itGoal;
+        const itBarGoal = itGoal>0 ? Math.min(100, itGoal/Math.max(fatCurr,itGoal)*100) : 100;
+        const itBarCurr = itGoal>0 ? Math.min(100, fatCurr/Math.max(fatCurr,itGoal)*100) : 100;
+        const PIE_COLORS_IT = ["#2d6a4f","#40916c","#52b788","#74c69d","#95d5b2","#b7e4c7","#d8f3dc","#1b4332"];
+        const renderKpiCardIT = ({title, curr, prev, goal, acimaObj, pctObj, evolVs, ganhoAbs, overGoal, barGoalPct, barCurrPct}) => (
+          <div style={T.card}>
+            <p style={{...T.sectionTitle,fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>{title}</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — em comparação ao ano anterior</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,marginBottom:16}}>
+              <div style={{background:C.cardAlt||C.bg,border:`0.5px solid ${C.border}`,borderRadius:12,padding:"16px"}}>
+                <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Resultado {MONTH_NAMES[month]} {prevYear}</p>
+                <p style={{fontSize:26,fontWeight:700,color:C.text,margin:0}}>{fmtEur(prev)}</p>
+              </div>
+              <div style={{background:C.cardAlt||C.bg,border:`0.5px solid ${C.border}`,borderRadius:12,padding:"16px"}}>
+                <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Objetivo {MONTH_NAMES[month]} {year}</p>
+                <p style={{fontSize:26,fontWeight:700,color:C.green,margin:"0 0 6px"}}>{goal>0?fmtEur(goal):"—"}</p>
+                {goal>0&&prev>0&&<p style={{fontSize:12,color:C.muted,margin:0}}>{((goal-prev)/prev*100)>0?"+":""}{((goal-prev)/prev*100).toFixed(2)}% vs resultado {MONTH_NAMES[month].toLowerCase()} {prevYear}</p>}
+              </div>
+              <div style={{background:C.cardAlt||C.bg,border:`1.5px solid ${C.green}`,borderRadius:12,padding:"16px"}}>
+                <p style={{fontSize:11,color:C.green,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>Resultado {MONTH_NAMES[month]} {year}</p>
+                <p style={{fontSize:26,fontWeight:700,color:C.text,margin:"0 0 6px"}}>{fmtEur(curr)}</p>
+                {evolVs&&<p style={{fontSize:12,color:C.green,fontWeight:500,margin:0}}>{Number(evolVs)>0?"+":""}{evolVs}% vs {prevYear}</p>}
+              </div>
+            </div>
+            <div style={{border:`0.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 12px",textTransform:"uppercase",letterSpacing:".05em"}}>Detalhe do resultado</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:0}}>
+                {[
+                  {label:"Evolução vs "+prevYear, value:evolVs!=null?(Number(evolVs)>0?"+":"")+evolVs+"%":"—", color:C.green},
+                  {label:"Ganho absoluto", value:ganhoAbs>=0?"+"+fmtEur(ganhoAbs):"-"+fmtEur(Math.abs(ganhoAbs)), color:C.text, bold:true},
+                  {label:"Acima do objetivo", value:goal>0?fmtEur(acimaObj):"—", color:acimaObj>=0?C.green:C.red},
+                  {label:"% do objetivo", value:pctObj!=null?pctObj+"%":"—", color:C.green},
+                ].map((m,i)=>(
+                  <div key={i} style={{padding:"0 16px",borderLeft:i>0?`0.5px solid ${C.border}`:"none"}}>
+                    <p style={{fontSize:11,color:C.muted,margin:"0 0 4px"}}>{m.label}</p>
+                    <p style={{fontSize:20,fontWeight:m.bold?700:500,color:m.color,margin:0}}>{m.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {goal>0&&<div style={{border:`0.5px solid ${C.border}`,borderRadius:12,padding:"14px 16px"}}>
+              <p style={{fontSize:11,color:C.muted,margin:"0 0 16px",textTransform:"uppercase",letterSpacing:".05em"}}>Concretização do objetivo</p>
+              <div style={{position:"relative",height:28,borderRadius:6,background:C.border,marginBottom:40}}>
+                <div style={{position:"absolute",left:0,top:0,height:"100%",width:barCurrPct+"%",background:C.green,borderRadius:6,transition:"width .5s"}}/>
+                {overGoal&&<div style={{position:"absolute",left:barGoalPct+"%",top:0,height:"100%",width:(barCurrPct-barGoalPct)+"%",background:"#95d5b2",borderRadius:"0 6px 6px 0"}}/>}
+                <div style={{position:"absolute",left:barGoalPct+"%",top:0,height:"100%",width:"2px",background:C.text,zIndex:2}}>
+                  <span style={{position:"absolute",bottom:"-22px",left:"4px",fontSize:10,color:C.muted,whiteSpace:"nowrap"}}>Objetivo {fmtEur(goal)}</span>
+                </div>
+                {overGoal&&<div style={{position:"absolute",right:0,top:"36px",background:C.green,color:"#fff",borderRadius:20,padding:"3px 10px",fontSize:11,whiteSpace:"nowrap"}}>
+                  ✓ {fmtEur(acimaObj)} acima do objetivo
+                </div>}
+              </div>
+              <p style={{fontSize:20,fontWeight:700,color:C.green,margin:"0 0 8px"}}>% do objetivo: {pctObj}%</p>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:12,height:12,borderRadius:2,background:C.green,display:"inline-block"}}/> Realizado até objetivo ({fmtEur(Math.min(curr,goal))})</span>
+                {overGoal&&<span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:12,height:12,borderRadius:2,background:"#95d5b2",display:"inline-block"}}/> Excedente (+{fmtEur(acimaObj)})</span>}
+                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted}}><span style={{width:2,height:12,background:C.text,display:"inline-block"}}/> Linha de objetivo</span>
+              </div>
+            </div>}
+          </div>
+        );
+        return renderKpiCardIT({
+          title:"Revenda — Equipa IT",
+          curr:fatCurr, prev:fatPrev, goal:itGoal,
+          acimaObj:itAcima, pctObj:itPctObj, evolVs:itEvolVs, ganhoAbs:itGanho,
+          overGoal:itOver, barGoalPct:itBarGoal, barCurrPct:itBarCurr,
+        });
+      })()}
       <div style={T.card}>
         <p style={T.sectionTitle}>Resultados — {MONTH_NAMES[month]} {year} vs. {MONTH_NAMES[month]} {prevYear}</p>
       </div>
