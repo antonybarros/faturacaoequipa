@@ -3152,6 +3152,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
             <span style={{fontSize:13,fontWeight:500,color:C.text}}>{totalPC}</span>
           </div>
+          <PieChart data={Object.entries(byMkt).map(([key,n])=>({label:getTeamMarkets(currentTeam,true).find(m=>m.key===key)?.label||key,v:n})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
         </div>}
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
@@ -3159,12 +3160,13 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
             return {prog,n,p};
           }).sort((a,b)=>b.n-a.n).map(({prog,n,p})=>(
-            <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
+            n>0?<div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
               <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
               <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
               <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>
+            </div>:null
           ))}
+          <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
         </div>
       </div>}
       {mktTab==="global"&&totalFatProg>0&&<div style={T.card}>
@@ -3216,18 +3218,20 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                 <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
                 <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
               </div>}
+              {filtered.length>1&&<PieChart data={filtered.map(({label,v})=>({label,v}))} title="" />}
             </>;
           })()}
         </div>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Afiliação por mercado</p>
           {(()=>{
-            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
-            const seen = new Set();
-            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
-              .map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
+            const teamMkts = currentTeam==="global"
+              ? (() => { const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month))); const seen = new Set(); return allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; }); })()
+              : getTeamMarkets(currentTeam, isNewStructure(year,month));
+            const rows = teamMkts.map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
               .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
             const total = rows.reduce((s,r)=>s+r.v,0);
+            if (!total) return <p style={{fontSize:12,color:C.muted}}>Sem dados</p>;
             return <>
               {rows.map(({key,label,v})=>(
                 <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
@@ -3236,10 +3240,11 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                   <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
                 </div>
               ))}
-              {total>0&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
                 <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
                 <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
-              </div>}
+              </div>
+              <PieChart data={rows.map(({label,v})=>({label,v}))} title="" />
             </>;
           })()}
         </div>
