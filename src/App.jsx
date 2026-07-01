@@ -2851,7 +2851,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
         );
 
         return <>
-          {/* Card Revenda */}
+          {/* 1. Revenda */}
           {renderKpiCard({
             title:"Revenda",
             curr:fatCurr, prev:fatPrev, goal:fatGoal,
@@ -2859,77 +2859,13 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             overGoal, barGoalPct, barCurrPct,
           })}
 
-          {/* Card Afiliação */}
-          {afilCurr>0&&renderKpiCard({
-            title:"Afiliação",
-            curr:afilCurr, prev:afilPrev, goal:Number(cg?.afil_goal)||0,
-            acimaObj: afilCurr-(Number(cg?.afil_goal)||0),
-            pctObj: (Number(cg?.afil_goal)||0)>0?((afilCurr/(Number(cg?.afil_goal)||0))*100).toFixed(2):null,
-            evolVs: afilPrev>0?((afilCurr-afilPrev)/afilPrev*100).toFixed(2):null,
-            ganhoAbs: afilCurr-afilPrev,
-            overGoal: afilCurr>(Number(cg?.afil_goal)||0),
-            barGoalPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,(Number(cg?.afil_goal)||0)/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
-            barCurrPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,afilCurr/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
-          })}
+          {/* 2. Faturação por mercado + Faturação por programa */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+            <PieChart data={fatMktData} title="Faturação por mercado" />
+            <PieChart data={fatProgData} title="Faturação por programa" />
+          </div>
 
-          {/* Card Afiliação por mercado */}
-          {afilCurr>0&&(()=>{
-            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
-            const seen = new Set();
-            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
-              .map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
-              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
-            const total = rows.reduce((s,r)=>s+r.v,0);
-            if (!total) return null;
-            return <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>Afiliação por mercado</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year}</p>
-              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:200}}>
-                  {rows.map(({key,label,v})=>(
-                    <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                      <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
-                      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
-                      <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
-                    </div>
-                  ))}
-                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
-                    <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
-                    <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
-                  </div>
-                </div>
-                <PieChart data={rows.map(({label,v})=>({label,v}))} title="" />
-              </div>
-            </div>;
-          })()}
-
-          {/* Card Revenda + Afiliação */}
-          {(fatCurr>0||afilCurr>0)&&(()=>{
-            const raCurr = revendaAfilCurr;
-            const raPrev = revendaAfilPrev;
-            const raGoal = fatGoal + (Number(cg?.afil_goal)||0);
-            const raAcima = raCurr - raGoal;
-            const raPct = raGoal>0 ? (raCurr/raGoal*100).toFixed(2) : null;
-            const raEvolVs = raPrev>0 ? ((raCurr-raPrev)/raPrev*100).toFixed(2) : null;
-            const raGanho = raCurr - raPrev;
-            const raOver = raCurr > raGoal;
-            const raBarGoal = raGoal>0 ? Math.min(100, raGoal/Math.max(raCurr,raGoal)*100) : 100;
-            const raBarCurr = raGoal>0 ? Math.min(100, raCurr/Math.max(raCurr,raGoal)*100) : 100;
-            const pctFat = raCurr>0 ? (fatCurr/raCurr*100).toFixed(1) : null;
-            const pctAfil = raCurr>0 ? (afilCurr/raCurr*100).toFixed(1) : null;
-            return renderKpiCard({
-              title:"Revenda + Afiliação",
-              curr:raCurr, prev:raPrev, goal:raGoal,
-              acimaObj:raAcima, pctObj:raPct, evolVs:raEvolVs, ganhoAbs:raGanho,
-              overGoal:raOver, barGoalPct:raBarGoal, barCurrPct:raBarCurr,
-              extraMetrics:[
-                {label:"% Faturação s/ total", value:pctFat!=null?pctFat+"%":"—", color:C.muted},
-                {label:"% Afiliação s/ total", value:pctAfil!=null?pctAfil+"%":"—", color:C.muted},
-              ],
-            });
-          })()}
-
-          {/* Card Encomendas */}
+          {/* 3. Encomendas */}
           <div style={T.card}>
             <p style={{...T.sectionTitle,fontSize:18,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Encomendas</p>
             <p style={{fontSize:12,color:C.muted,margin:"0 0 16px",fontWeight:600}}>{MONTH_NAMES[month]} {year}</p>
@@ -2970,54 +2906,75 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             </div>
           </div>
 
-          {/* Card Novos Parceiros */}
-          {totalPC>0&&<>
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>Novos parceiros por programa</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — {totalPC} novos parceiros</p>
-              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:200}}>
-                  {PROGS_RES.map(prog=>{
-                    const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
-                    return {prog,n,p};
-                  }).filter(r=>r.n>0).sort((a,b)=>b.n-a.n).map(({prog,n,p})=>(
-                    <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                      <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
-                      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-                      <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-                    </div>
-                  ))}
-                </div>
-                <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
-              </div>
-            </div>
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:4}}>Novos parceiros por mercado</p>
-              <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — {totalPC} novos parceiros</p>
-              <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
-                <div style={{flex:1,minWidth:200}}>
-                  {Object.entries(byMkt).map(([key,n])=>{
-                    const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
-                    const label=allMkts.find(m=>m.key===key)?.label||key;
-                    const p=totalPC>0?(n/totalPC*100).toFixed(1):0;
-                    return {key,label,n,p};
-                  }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
-                    <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.border}`}}>
-                      <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
-                      <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-                      <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-                    </div>
-                  ))}
-                </div>
-                <PieChart data={Object.entries(byMkt).map(([key,n])=>{
-                  const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
-                  return {label:allMkts.find(m=>m.key===key)?.label||key,v:n};
-                }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
-              </div>
-            </div>
-          </>}
+          {/* 4. Afiliação */}
+          {afilCurr>0&&renderKpiCard({
+            title:"Afiliação",
+            curr:afilCurr, prev:afilPrev, goal:Number(cg?.afil_goal)||0,
+            acimaObj: afilCurr-(Number(cg?.afil_goal)||0),
+            pctObj: (Number(cg?.afil_goal)||0)>0?((afilCurr/(Number(cg?.afil_goal)||0))*100).toFixed(2):null,
+            evolVs: afilPrev>0?((afilCurr-afilPrev)/afilPrev*100).toFixed(2):null,
+            ganhoAbs: afilCurr-afilPrev,
+            overGoal: afilCurr>(Number(cg?.afil_goal)||0),
+            barGoalPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,(Number(cg?.afil_goal)||0)/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
+            barCurrPct: (Number(cg?.afil_goal)||0)>0?Math.min(100,afilCurr/Math.max(afilCurr,(Number(cg?.afil_goal)||0))*100):100,
+          })}
 
-          {/* Tabela existente */}
+          {/* 5. Afiliação por mercado */}
+          {afilCurr>0&&(()=>{
+            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, isNewStructure(year,month)));
+            const seen = new Set();
+            const rows = allMkts.filter(({key})=>{ if(seen.has(key)) return false; seen.add(key); return true; })
+              .map(({key,label})=>({ key, label, v: Number(cg[`afil_${key}`])||0 }))
+              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
+            const total = rows.reduce((s,r)=>s+r.v,0);
+            if (!total) return null;
+            return <PieChart data={rows.map(({label,v})=>({label,v}))} title="Afiliação por mercado" />;
+          })()}
+
+          {/* 6. Revenda + Afiliação */}
+          {(fatCurr>0||afilCurr>0)&&(()=>{
+            const raCurr = revendaAfilCurr;
+            const raPrev = revendaAfilPrev;
+            const raGoal = fatGoal + (Number(cg?.afil_goal)||0);
+            const raAcima = raCurr - raGoal;
+            const raPct = raGoal>0 ? (raCurr/raGoal*100).toFixed(2) : null;
+            const raEvolVs = raPrev>0 ? ((raCurr-raPrev)/raPrev*100).toFixed(2) : null;
+            const raGanho = raCurr - raPrev;
+            const raOver = raCurr > raGoal;
+            const raBarGoal = raGoal>0 ? Math.min(100, raGoal/Math.max(raCurr,raGoal)*100) : 100;
+            const raBarCurr = raGoal>0 ? Math.min(100, raCurr/Math.max(raCurr,raGoal)*100) : 100;
+            const pctFat = raCurr>0 ? (fatCurr/raCurr*100).toFixed(1) : null;
+            const pctAfil = raCurr>0 ? (afilCurr/raCurr*100).toFixed(1) : null;
+            return renderKpiCard({
+              title:"Revenda + Afiliação",
+              curr:raCurr, prev:raPrev, goal:raGoal,
+              acimaObj:raAcima, pctObj:raPct, evolVs:raEvolVs, ganhoAbs:raGanho,
+              overGoal:raOver, barGoalPct:raBarGoal, barCurrPct:raBarCurr,
+              extraMetrics:[
+                {label:"% Faturação s/ total", value:pctFat!=null?pctFat+"%":"—", color:C.muted},
+                {label:"% Afiliação s/ total", value:pctAfil!=null?pctAfil+"%":"—", color:C.muted},
+              ],
+            });
+          })()}
+
+          {/* 7. Novos parceiros por programa */}
+          {totalPC>0&&<div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>Novos parceiros por programa</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — {totalPC} novos parceiros</p>
+            <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
+          </div>}
+
+          {/* 8. Novos parceiros por mercado */}
+          {totalPC>0&&<div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:4}}>Novos parceiros por mercado</p>
+            <p style={{fontSize:12,color:C.muted,margin:"0 0 16px"}}>{MONTH_NAMES[month]} {year} — {totalPC} novos parceiros</p>
+            <PieChart data={Object.entries(byMkt).map(([key,n])=>{
+              const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
+              return {label:allMkts.find(m=>m.key===key)?.label||key,v:n};
+            }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
+          </div>}
+
+          {/* 9. Tabela existente */}
           <div style={T.card}>
             <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
               <span style={{fontSize:13,fontWeight:500,color:C.green}}>Partners</span>
@@ -3041,12 +2998,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                 <Row label="Revenda + Afiliação" c={revendaAfilCurr||null} p={revendaAfilPrev||null} />
               </tbody>
             </table>
-          </div>
-
-          {/* Pie charts */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-            <PieChart data={fatMktData} title="Faturação por mercado" />
-            <PieChart data={fatProgData} title="Faturação por programa" />
           </div>
         </>;
       })() : <>
