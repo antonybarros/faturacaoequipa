@@ -3209,17 +3209,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             const filtered = rows.filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
             const total = filtered.reduce((s,r)=>s+r.v,0);
             return <>
-              {filtered.map(({key,label,v})=>(
-                <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-                  <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
-                  <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
-                  <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
-                </div>
-              ))}
-              {total>0&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
-                <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
-                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
-              </div>}
               {filtered.length>1&&<PieChart data={filtered.map(({label,v})=>({label,v}))} title="" />}
             </>;
           })()}
@@ -3234,20 +3223,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
               .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
             const total = rows.reduce((s,r)=>s+r.v,0);
             if (!total) return <p style={{fontSize:12,color:C.muted}}>Sem dados</p>;
-            return <>
-              {rows.map(({key,label,v})=>(
-                <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-                  <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
-                  <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
-                  <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{total>0?(v/total*100).toFixed(1):0}%</span>
-                </div>
-              ))}
-              <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
-                <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
-                <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(total)}</span>
-              </div>
-              <PieChart data={rows.map(({label,v})=>({label,v}))} title="" />
-            </>;
+            return <PieChart data={rows.map(({label,v})=>({label,v}))} title="" />;
           })()}
         </div>
       </div>}
