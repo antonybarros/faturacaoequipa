@@ -1032,18 +1032,22 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
           <div style={T.card}>
             <p style={{...T.sectionTitle,marginBottom:4}}>ENCOMENDAS — MERCADOS SECUNDÁRIOS</p>
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:12}}>
-              {naMonthlyMkts.map(mkt=>{
-                const fkey = `orders_total_${mkt.key}`;
-                return (
-                  <div key={fkey}>
-                    <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>{mkt.label}</p>
-                    <input type="number" value={goals[fkey]??""} placeholder="0"
-                      onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[fkey]:e.target.value}}))}
-                      onBlur={saveAll}
-                      style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
-                  </div>
-                );
-              })}
+              {naMonthlyMkts.flatMap(mkt=>[
+                <div key={`tot_${mkt.key}`}>
+                  <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>Total enc. — {mkt.label}</p>
+                  <input type="number" value={goals[`orders_total_${mkt.key}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`orders_total_${mkt.key}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>,
+                <div key={`fst_${mkt.key}`}>
+                  <p style={{fontSize:12,color:C.muted,margin:"0 0 6px"}}>1ªs enc. — {mkt.label}</p>
+                  <input type="number" value={goals[`orders_first_${mkt.key}`]??""} placeholder="0"
+                    onChange={e=>setMonthData(prev=>({...prev,team_goals:{...prev.team_goals,[`orders_first_${mkt.key}`]:e.target.value}}))}
+                    onBlur={saveAll}
+                    style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",border:`0.5px solid ${C.border}`,borderRadius:8,fontSize:14,background:C.bg,color:C.text,outline:"none"}} />
+                </div>
+              ])}
             </div>
           </div>
         );
@@ -2582,8 +2586,11 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
   const newStructPrev = isNewStructure(prevYear,month);
   const dailyFirstCurr = buildDailyFirstRev(ce, totalDaysCurr, newStructCurr, currentTeam);
   const dailyFirstPrev = buildDailyFirstRev(pe, totalDaysPrev, newStructPrev, currentTeam);
-  const fat1Curr = dailyFirstCurr.length>0 ? dailyFirstCurr[totalDaysCurr-1]?.cumul||0 : 0;
-  const fat1Prev = dailyFirstPrev.length>0 ? dailyFirstPrev[totalDaysPrev-1]?.cumul||0 : 0;
+  const naSecondaryFirst = ["SK","GR","CY","PL"];
+  const fat1CurrSecondary = currentTeam==="equipa_na" ? naSecondaryFirst.reduce((s,mk)=>s+(Number(cg["first_rev_"+mk])||0),0) : 0;
+  const fat1PrevSecondary = currentTeam==="equipa_na" ? naSecondaryFirst.reduce((s,mk)=>s+(Number(pg["first_rev_"+mk])||0),0) : 0;
+  const fat1Curr = (dailyFirstCurr.length>0 ? dailyFirstCurr[totalDaysCurr-1]?.cumul||0 : 0) + fat1CurrSecondary;
+  const fat1Prev = (dailyFirstPrev.length>0 ? dailyFirstPrev[totalDaysPrev-1]?.cumul||0 : 0) + fat1PrevSecondary;
   const ticket1Curr = enc1Curr>0 ? Math.round(fat1Curr/enc1Curr) : null;
   const ticket1Prev = enc1Prev>0 ? Math.round(fat1Prev/enc1Prev) : null;
   const revendaAfilCurr = (fatCurr||0)+(afilCurr||0);
