@@ -3119,6 +3119,47 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           </tbody>
         </table>
       </div>
+      {currentTeam!=="global"&&(()=>{
+        const leads = Number(cg?.perf_leads)||0;
+        const leadsAng = Number(cg?.perf_leads_ang)||0;
+        const leadsSem = Number(cg?.perf_leads_sem)||0;
+        const prospects = Number(cg?.perf_prospects)||0;
+        const angPct = leads>0?(leadsAng/leads*100).toFixed(1):0;
+        const semPct = leads>0?(leadsSem/leads*100).toFixed(1):0;
+        if (!leads && !prospects) return null;
+        return <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
+            {[
+              {label:"Leads Be a Partner", value:leads, sub:null, color:C.text},
+              {label:"Com angariador", value:leadsAng, sub:`${angPct}% do total`, color:C.text},
+              {label:"Sem angariador", value:leadsSem, sub:`${semPct}% do total`, color:C.text},
+              {label:"Leads prospeção", value:prospects, sub:null, color:C.green},
+            ].map((s,i)=>(
+              <div key={i} style={T.card}>
+                <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
+                <p style={{fontSize:28,fontWeight:500,color:s.color,margin:"0 0 4px"}}>{s.value}</p>
+                {s.sub&&<p style={{fontSize:12,color:C.muted,margin:0}}>{s.sub}</p>}
+              </div>
+            ))}
+          </div>
+          {leads>0&&<div style={T.card}>
+            <p style={{...T.sectionTitle,marginBottom:12}}>Origem dos leads recebidos</p>
+            <div style={{position:"relative",height:20,borderRadius:10,overflow:"hidden",background:C.border,marginBottom:12}}>
+              <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${angPct}%`,background:C.green,borderRadius:"10px 0 0 10px"}}/>
+            </div>
+            <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.green,fontWeight:500}}>
+                <span style={{width:10,height:10,borderRadius:"50%",background:C.green,display:"inline-block"}}/>
+                Com angariador — {leadsAng} ({angPct}%)
+              </span>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
+                <span style={{width:10,height:10,borderRadius:"50%",background:C.border,display:"inline-block"}}/>
+                Sem angariador — {leadsSem} ({semPct}%)
+              </span>
+            </div>
+          </div>}
+        </>;
+      })()}
       {mktTab!=="global"&&md.partnersMktC>0&&(
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa — {mktList.find(m=>m.key===mktTab)?.label}</p>
@@ -3136,54 +3177,16 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:isSingleMarket?"repeat(1,minmax(0,1fr))":"repeat(2,minmax(0,1fr))",gap:10}}>
         {!isSingleMarket&&<div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
-          {Object.entries(byMkt).map(([key,n])=>{
-            const allMkts = TEAMS.flatMap(t=>getTeamMarkets(t.key, true));
-            const label = allMkts.find(m=>m.key===key)?.label || key;
-            const p = totalPC>0?(n/totalPC*100).toFixed(1):0;
-            return {key,label,n,p};
-          }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
-            <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-              <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
-              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>
-          ))}
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",marginTop:4}}>
-            <span style={{fontSize:12,color:C.muted,flex:1}}>Total</span>
-            <span style={{fontSize:13,fontWeight:500,color:C.text}}>{totalPC}</span>
-          </div>
           <PieChart data={Object.entries(byMkt).map(([key,n])=>({label:getTeamMarkets(currentTeam,true).find(m=>m.key===key)?.label||key,v:n})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
         </div>}
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por programa</p>
-          {PROGS_RES.map(prog=>{
-            const n=byProg[prog]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
-            return {prog,n,p};
-          }).sort((a,b)=>b.n-a.n).map(({prog,n,p})=>(
-            n>0?<div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-              <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
-              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{n}</span>
-              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>:null
-          ))}
           <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
         </div>
       </div>}
       {mktTab==="global"&&totalFatProg>0&&<div style={T.card}>
         <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por programa</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:4}}>
-          {PROGS_RES.map(prog=>{
-            const v=Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0;
-            const p=totalFatProg>0?(v/totalFatProg*100).toFixed(1):0;
-            return {prog,v,p};
-          }).filter(({v})=>v>0).sort((a,b)=>b.v-a.v).map(({prog,v,p})=>(
-            <div key={prog} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
-              <span style={{fontSize:13,color:C.text,flex:1}}>{prog}</span>
-              <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
-              <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
-            </div>
-          ))}
-        </div>
+        <PieChart data={PROGS_RES.map(prog=>({label:prog,v:Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
       </div>}
       {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
@@ -3197,7 +3200,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                 for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[key]!==undefined){ v=Number(e[key])||0; break; } }
                 return {key,label,v};
               });
-            // Add NA secondary markets from team_goals (fat_SK, fat_GR, fat_CY, fat_PL) — only for global
             if (currentTeam==="global") {
               [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}].forEach(({key,label})=>{
                 const v = Number(cg[`fat_${key}`])||0;
@@ -3249,47 +3251,6 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           })()}
         </div>
       </div>}
-      {currentTeam!=="global"&&(()=>{
-        const leads = Number(cg?.perf_leads)||0;
-        const leadsAng = Number(cg?.perf_leads_ang)||0;
-        const leadsSem = Number(cg?.perf_leads_sem)||0;
-        const prospects = Number(cg?.perf_prospects)||0;
-        const angPct = leads>0?(leadsAng/leads*100).toFixed(1):0;
-        const semPct = leads>0?(leadsSem/leads*100).toFixed(1):0;
-        if (!leads && !prospects) return null;
-        return <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-            {[
-              {label:"Leads Be a Partner", value:leads, sub:null, color:C.text},
-              {label:"Com angariador", value:leadsAng, sub:`${angPct}% do total`, color:C.text},
-              {label:"Sem angariador", value:leadsSem, sub:`${semPct}% do total`, color:C.text},
-              {label:"Leads prospeção", value:prospects, sub:null, color:C.green},
-            ].map((s,i)=>(
-              <div key={i} style={T.card}>
-                <p style={{fontSize:11,color:C.muted,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>{s.label}</p>
-                <p style={{fontSize:28,fontWeight:500,color:s.color,margin:"0 0 4px"}}>{s.value}</p>
-                {s.sub&&<p style={{fontSize:12,color:C.muted,margin:0}}>{s.sub}</p>}
-              </div>
-            ))}
-          </div>
-          {leads>0&&<div style={T.card}>
-            <p style={{...T.sectionTitle,marginBottom:12}}>Origem dos leads recebidos</p>
-            <div style={{position:"relative",height:20,borderRadius:10,overflow:"hidden",background:C.border,marginBottom:12}}>
-              <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${angPct}%`,background:C.green,borderRadius:"10px 0 0 10px"}}/>
-            </div>
-            <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.green,fontWeight:500}}>
-                <span style={{width:10,height:10,borderRadius:"50%",background:C.green,display:"inline-block"}}/>
-                Com angariador — {leadsAng} ({angPct}%)
-              </span>
-              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
-                <span style={{width:10,height:10,borderRadius:"50%",background:C.border,display:"inline-block"}}/>
-                Sem angariador — {leadsSem} ({semPct}%)
-              </span>
-            </div>
-          </div>}
-        </>;
-      })()}
       {mktTab==="global"&&(()=>{
         const explanations = {
           season: {
