@@ -723,17 +723,18 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
   // Safety net: the Registo tab can never operate on "global" — it is a computed
   // aggregate, not a real team, and must never be written to Supabase.
 
-  const SUB_TABS = [
-    { id:"faturacao",   label:"Faturação diária" },
-    { id:"primeiras",   label:"1ªs Compras" },
-    { id:"afiliacao",   label:"Afiliação" },
-    { id:"encomendas",  label:"Encomendas" },
-    { id:"parceiros",   label:"Parceiros / Leads" },
-    { id:"margem",      label:"Margem" },
-    { id:"fat_programa", label:"Fat. Programa" },
-    { id:"objetivos",   label:"Objetivos" },
-    ...(isAdmin && currentTeam==="global" ? [{ id:"partners_goals", label:"Partners" }] : []),
-  ];
+  const SUB_TABS = currentTeam === "global"
+    ? [{ id:"partners_goals", label:"Partners" }]
+    : [
+        { id:"faturacao",   label:"Faturação diária" },
+        { id:"primeiras",   label:"1ªs Compras" },
+        { id:"afiliacao",   label:"Afiliação" },
+        { id:"encomendas",  label:"Encomendas" },
+        { id:"parceiros",   label:"Parceiros / Leads" },
+        { id:"margem",      label:"Margem" },
+        { id:"fat_programa", label:"Fat. Programa" },
+        { id:"objetivos",   label:"Objetivos" },
+      ];
 
   const save = async (newData) => {
     // Partners sub-tab saves objectives to equipa_fr (admin's team) so loadAllTeamsData can read them via mergedGoals
@@ -2727,9 +2728,10 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
         // Pie chart colors
         const PIE_COLORS = ["#2d6a4f","#40916c","#52b788","#74c69d","#95d5b2","#b7e4c7","#d8f3dc","#1b4332","#081c15","#a8dadc","#457b9d","#1d3557"];
 
-        const PieChart = ({data, title}) => {
+        const PieChart = ({data, title, fmtFn}) => {
           const total = data.reduce((s,d)=>s+d.v,0);
           if (!total) return null;
+          const formatVal = fmtFn || fmtEur;
           let cumAngle = 0;
           const slices = data.map((d,i)=>{
             const pct = d.v/total;
@@ -2740,8 +2742,8 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
           const toRad = a => (a-90)*Math.PI/180;
           const cx=100,cy=100,r=80;
           return (
-            <div style={T.card}>
-              <p style={{...T.sectionTitle,marginBottom:12}}>{title}</p>
+            <div style={title?T.card:{marginTop:12}}>
+              {title&&<p style={{...T.sectionTitle,marginBottom:12}}>{title}</p>}
               <div style={{display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
                 <svg width="200" height="200" viewBox="0 0 200 200">
                   {slices.map((s,i)=>{
@@ -2757,7 +2759,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                     <div key={i} style={{display:"flex",alignItems:"center",gap:8}}>
                       <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
                       <span style={{fontSize:12,color:C.text,flex:1}}>{s.label}</span>
-                      <span style={{fontSize:12,fontWeight:500,color:C.text}}>{fmtEur(s.v)}</span>
+                      <span style={{fontSize:12,fontWeight:500,color:C.text}}>{formatVal(s.v)}</span>
                       <span style={{fontSize:11,color:C.muted,minWidth:40,textAlign:"right"}}>{(s.pct*100).toFixed(1)}%</span>
                     </div>
                   ))}
@@ -2928,7 +2930,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                     <span style={{fontSize:11,color:C.muted,minWidth:44,textAlign:"right"}}>{p}%</span>
                   </div>
                 ))}
-                <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
+                <PieChart data={PROGS_RES.map(prog=>({label:prog,v:byProg[prog]||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
               </div>
               {/* Por mercado — lista + pie */}
               <div>
@@ -2948,7 +2950,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                 <PieChart data={Object.entries(byMkt).map(([key,n])=>{
                   const allMkts=TEAMS.flatMap(t=>getTeamMarkets(t.key,true));
                   return {label:allMkts.find(m=>m.key===key)?.label||key,v:n};
-                }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
+                }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
               </div>
             </div>
           </div>}
