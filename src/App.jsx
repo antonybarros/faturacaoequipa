@@ -2734,11 +2734,16 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
                 let v=0;
                 for(let d=totalDaysCurr;d>=1;d--){ const e=ce[d]||{}; if(e[key]!==undefined){ v=Number(e[key])||0; break; } }
                 return {key,label,v};
-              })
-              .filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
-            const total = rows.reduce((s,r)=>s+r.v,0);
+              });
+            // Add NA secondary markets from team_goals (fat_SK, fat_GR, fat_CY, fat_PL)
+            [{key:"SK",label:"Eslováquia"},{key:"GR",label:"Grécia"},{key:"CY",label:"Chipre"},{key:"PL",label:"Polónia"}].forEach(({key,label})=>{
+              const v = Number(cg[`fat_${key}`])||0;
+              if (v>0) rows.push({key,label,v});
+            });
+            const filtered = rows.filter(({v})=>v>0).sort((a,b)=>b.v-a.v);
+            const total = filtered.reduce((s,r)=>s+r.v,0);
             return <>
-              {rows.map(({key,label,v})=>(
+              {filtered.map(({key,label,v})=>(
                 <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
                   <span style={{fontSize:13,color:C.text,flex:1}}>{label}</span>
                   <span style={{fontSize:13,fontWeight:500,color:C.text}}>{fmtEur(v)}</span>
