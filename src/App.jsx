@@ -1973,38 +1973,64 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
 
   useEffect(()=>{
     setLoading(true);
-    // Load current month + last 12 months for YoY and trend
     const keys = [];
     for (let i=0;i<=12;i++){
       const d = new Date(year, month-i, 1);
       keys.push(monthKey(d.getFullYear(), d.getMonth()));
     }
-    const teamObj = TEAMS.find(t=>t.key===perfTeam);
-    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
-    Promise.all([
-      supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
-      supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
-      // Load partners detail for current month
-      supabase.from("partner_followup").select("market,programme,gestor")
-        .gte("original_created_at", new Date(year,month,1).toISOString())
-        .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
-        .neq("status","deleted")
-        .in("market", markets)
-        .limit(5000),
-    ]).then(([curr, hist, partners])=>{
-      setMonthData(curr.data || { team_goals:{} });
-      setHistData(hist.data || []);
-      const pd = partners.data || [];
-      setPartnersCount(pd.length);
-      setPartnersData(pd);
-      setLoading(false);
-    });
+    if (perfTeam === "partners") {
+      // Aggregate all teams
+      const allMarkets = TEAMS.flatMap(t=>t.markets);
+      Promise.all([
+        supabase.from("billing_months").select("team,team_goals").eq("month_key", monthKey(year,month)).in("team", TEAMS.map(t=>t.key)),
+        supabase.from("billing_months").select("month_key,team,team_goals").in("month_key", keys).in("team", TEAMS.map(t=>t.key)),
+        supabase.from("partner_followup").select("market,programme,gestor")
+          .gte("original_created_at", new Date(year,month,1).toISOString())
+          .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
+          .neq("status","deleted")
+          .limit(5000),
+      ]).then(([curr, hist, partners])=>{
+        // Merge team_goals from all teams
+        const merged = {};
+        (curr.data||[]).forEach(row=>{
+          Object.entries(row.team_goals||{}).forEach(([k,v])=>{
+            if (typeof v==="number"||(typeof v==="string"&&!isNaN(v)))
+              merged[k]=(Number(merged[k])||0)+(Number(v)||0);
+          });
+        });
+        setMonthData({ team_goals: merged });
+        setHistData(hist.data||[]);
+        const pd = partners.data||[];
+        setPartnersCount(pd.length);
+        setPartnersData(pd);
+        setLoading(false);
+      });
+    } else {
+      const teamObj = TEAMS.find(t=>t.key===perfTeam);
+      const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
+      Promise.all([
+        supabase.from("billing_months").select("team_goals").eq("month_key", monthKey(year,month)).eq("team", perfTeam).maybeSingle(),
+        supabase.from("billing_months").select("month_key,team_goals").in("month_key", keys).eq("team", perfTeam),
+        supabase.from("partner_followup").select("market,programme,gestor")
+          .gte("original_created_at", new Date(year,month,1).toISOString())
+          .lte("original_created_at", new Date(year,month+1,0,23,59,59).toISOString())
+          .neq("status","deleted")
+          .in("market", markets)
+          .limit(5000),
+      ]).then(([curr, hist, partners])=>{
+        setMonthData(curr.data || { team_goals:{} });
+        setHistData(hist.data || []);
+        const pd = partners.data || [];
+        setPartnersCount(pd.length);
+        setPartnersData(pd);
+        setLoading(false);
+      });
+    }
   },[year, month, perfTeam, refreshKey]);
 
   const save = async (newGoals) => {
-    if (perfTeam === "global") {
-      // Safety net: never persist a row with team='global' — it's a computed aggregate.
-      console.error("Blocked attempt to save Performance goals with team='global'. No write performed.");
+    if (perfTeam === "global" || perfTeam === "partners") {
+      console.error("Blocked attempt to save Performance goals with team='"+perfTeam+"'. No write performed.");
       return;
     }
     const key = monthKey(year, month);
@@ -2031,9 +2057,24 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   const convRate = leads>0?(prospects/leads*100).toFixed(1):0;
   const angPct = leads>0?(leadsAng/leads*100).toFixed(1):0;
 
+  // For Partners, aggregate histData (multiple rows per month_key) into one per month
+  const histAgg = perfTeam === "partners"
+    ? (() => {
+        const map = {};
+        (histData||[]).forEach(row=>{
+          if (!map[row.month_key]) map[row.month_key] = { month_key: row.month_key, team_goals:{} };
+          Object.entries(row.team_goals||{}).forEach(([k,v])=>{
+            if (typeof v==="number"||(typeof v==="string"&&!isNaN(v)))
+              map[row.month_key].team_goals[k]=(Number(map[row.month_key].team_goals[k])||0)+(Number(v)||0);
+          });
+        });
+        return Object.values(map);
+      })()
+    : histData;
+
   // YoY comparison
   const prevYearKey = monthKey(year-1, month);
-  const prevYearData = histData.find(d=>d.month_key===prevYearKey)?.team_goals||{};
+  const prevYearData = histAgg.find(d=>d.month_key===prevYearKey)?.team_goals||{};
   const prevLeads = Number(prevYearData.perf_leads)||0;
   const prevProspects = Number(prevYearData.perf_prospects)||0;
   const leadsYoY = prevLeads>0?((leads-prevLeads)/prevLeads*100).toFixed(1):null;
@@ -2042,20 +2083,20 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   // Last 6 months trend with partners count
   const [trendPartners, setTrendPartners] = useState({});
   useEffect(()=>{
+    const isPartners = perfTeam === "partners";
     const teamObj = TEAMS.find(t=>t.key===perfTeam);
-    const markets = teamObj?.dashboardMarkets || teamObj?.markets || [];
+    const markets = isPartners ? null : (teamObj?.dashboardMarkets || teamObj?.markets || []);
     const promises = [];
     for (let i=0;i<=5;i++){
       const d = new Date(year, month-i, 1);
       const start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
       const end = new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59).toISOString();
       const k = monthKey(d.getFullYear(), d.getMonth());
-      promises.push(
-        supabase.from("partner_followup").select("*",{count:"exact",head:true})
-          .gte("original_created_at", start).lte("original_created_at", end)
-          .neq("status","deleted").in("market", markets)
-          .then(({count})=>({key:k, count:count||0}))
-      );
+      let q = supabase.from("partner_followup").select("*",{count:"exact",head:true})
+        .gte("original_created_at", start).lte("original_created_at", end)
+        .neq("status","deleted");
+      if (!isPartners) q = q.in("market", markets);
+      promises.push(q.then(({count})=>({key:k, count:count||0})));
     }
     Promise.all(promises).then(results=>{
       const map = {};
@@ -2068,7 +2109,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   for (let i=5;i>=0;i--){
     const d = new Date(year, month-i, 1);
     const k = monthKey(d.getFullYear(), d.getMonth());
-    const g = histData.find(h=>h.month_key===k)?.team_goals||{};
+    const g = histAgg.find(h=>h.month_key===k)?.team_goals||{};
     trend.push({
       label: MONTH_NAMES[d.getMonth()].slice(0,3)+" "+d.getFullYear(),
       leads: Number(g.perf_leads)||0,
@@ -2085,7 +2126,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
       <div style={{...T.card,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <p style={{...T.sectionTitle,margin:0,flex:1}}>Performance — {MONTH_NAMES[month]} {year}</p>
         <div style={{display:"flex",gap:6}}>
-          {TEAMS.map(t=>(
+          {[...TEAMS, {key:"partners", label:"Partners"}].map(t=>(
             <button key={t.key} onClick={()=>setPerfTeam(t.key)}
               style={{padding:"5px 12px",borderRadius:20,fontSize:12,border:`0.5px solid ${C.border}`,cursor:"pointer",
                 background:perfTeam===t.key?C.green:"transparent",color:perfTeam===t.key?"#fff":C.muted}}>
