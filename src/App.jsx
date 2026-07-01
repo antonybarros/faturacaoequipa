@@ -1961,7 +1961,7 @@ function CockpitTab({ gestor, isAdmin, year, month }) {
 }
 
 // ── PerformanceTab ────────────────────────────────────────────────────────────
-function PerformanceTab({ year, month, isAdmin, currentTeam }) {
+function PerformanceTab({ year, month, isAdmin, currentTeam, refreshKey=0 }) {
   const [perfTab, setPerfTab] = useState("registo");
   const [monthData, setMonthData] = useState({ team_goals:{} });
   const [histData, setHistData] = useState([]);
@@ -2000,7 +2000,7 @@ function PerformanceTab({ year, month, isAdmin, currentTeam }) {
       setPartnersData(pd);
       setLoading(false);
     });
-  },[year, month, perfTeam]);
+  },[year, month, perfTeam, refreshKey]);
 
   const save = async (newGoals) => {
     if (perfTeam === "global") {
@@ -2925,6 +2925,11 @@ function MainApp({ role, onLogout }) {
   const isAdmin = role.isAdmin;
   const gestor = role.gestor;
   const [tab, setTab] = useState("analise");
+  const [perfRefreshKey, setPerfRefreshKey] = useState(0);
+  const handleTabChange = (t) => {
+    if (t === "performance") setPerfRefreshKey(k => k + 1);
+    setTab(t);
+  };
   const [selMonth, setSelMonth] = useState(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`);
   const [monthData, setMonthData] = useState({ entries:{}, team_goals:{} });
   const [loading, setLoading] = useState(true);
@@ -2975,7 +2980,7 @@ function MainApp({ role, onLogout }) {
           {[{id:"analise",l:"Dashboard",adminOnly:false},{id:"cockpit",l:"Cockpit",adminOnly:false,hidden:true},{id:"parceiros",l:"Follow-up",adminOnly:false},{id:"registo",l:"Registo",adminOnly:false},{id:"resultados",l:"Resultados",adminOnly:false},{id:"performance",l:"Performance",adminOnly:true}]
             .filter(t=>(!t.adminOnly||isAdmin)&&!t.hidden&&(t.id!=="registo"||role.canEditRegisto))
             .map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)}
+            <button key={t.id} onClick={()=>handleTabChange(t.id)}
               style={{ padding:"7px 18px", border:`0.5px solid ${tab===t.id?C.green:C.border}`, borderRadius:20,
                 background:tab===t.id?C.green:"transparent", color:tab===t.id?"#fff":C.muted, fontWeight:tab===t.id?500:400, fontSize:13, cursor:"pointer" }}>
               {t.l}
@@ -3010,7 +3015,7 @@ function MainApp({ role, onLogout }) {
                 ))}
               </div>
               <RegistoTab year={year} month={month} totalDays={totalDays} closedDay={closedDay} monthData={monthData} setMonthData={setMonthData} currentTeam={currentTeam} setCurrentTeam={setCurrentTeam} />
-            </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            </div> : tab==="performance" ? <PerformanceTab year={year} month={month} isAdmin={isAdmin} currentTeam={currentTeam} refreshKey={perfRefreshKey} /> : tab==="resultados" ? <div style={{display:"flex",flexDirection:"column",gap:14}}>
               <div style={{...T.card,display:"flex",gap:6,flexWrap:"wrap",padding:"10px 14px"}}>
                 {[{key:"global",label:"Global"},...TEAMS].map(t=>(
                   <button key={t.key} onClick={()=>setCurrentTeam(t.key)}
