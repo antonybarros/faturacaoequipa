@@ -2676,8 +2676,9 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
       {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:isSingleMarket?"repeat(1,minmax(0,1fr))":"repeat(2,minmax(0,1fr))",gap:10}}>
         {!isSingleMarket&&<div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Novos parceiros por mercado</p>
-          {getTeamMarkets(currentTeam, isNewStructure(year,month)).map(({key,label})=>{
-            const n=byMkt[key]||0, p=totalPC>0?(n/totalPC*100).toFixed(1):0;
+          {Object.entries(byMkt).map(([key,n])=>{
+            const label = MARKET_LABELS[key]||key;
+            const p = totalPC>0?(n/totalPC*100).toFixed(1):0;
             return {key,label,n,p};
           }).sort((a,b)=>b.n-a.n).map(({key,label,n,p})=>(
             <div key={key} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"0.5px solid "+C.border}}>
