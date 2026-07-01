@@ -738,7 +738,7 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
 
   const save = async (newData) => {
     // Partners sub-tab saves objectives to equipa_fr (admin's team) so loadAllTeamsData can read them via mergedGoals
-    const teamToSave = (currentTeam === "global" && subTab === "partners_goals") ? "equipa_fr" : currentTeam;
+    const teamToSave = (currentTeam === "global" && (subTab === "partners_goals" || subTab === "partners_hist")) ? "equipa_fr" : currentTeam;
     if (teamToSave === "global") {
       console.error("Blocked attempt to save Registo data with team='global'. No write performed.");
       return;
