@@ -737,13 +737,21 @@ function RegistoTab({ year, month, totalDays, closedDay, monthData, setMonthData
       ];
 
   const save = async (newData) => {
-    // Partners sub-tab saves objectives to equipa_fr (admin's team) so loadAllTeamsData can read them via mergedGoals
     const teamToSave = (currentTeam === "global" && (subTab === "partners_goals" || subTab === "partners_hist")) ? "equipa_fr" : currentTeam;
     if (teamToSave === "global") {
-      console.error("Blocked attempt to save Registo data with team='global'. No write performed.");
+      console.error("Blocked attempt to save with team='global'.");
       return;
     }
     const key = monthKey(year, month);
+    if (subTab === "partners_hist" || subTab === "partners_goals") {
+      // Only write the specific team_goals fields changed — fetch current row first to avoid overwriting other data
+      const newGoals = newData.team_goals || {};
+      const { data: existing } = await supabase.from("billing_months").select("team_goals").eq("month_key", key).eq("team", teamToSave).maybeSingle();
+      const merged = { ...(existing?.team_goals||{}), ...newGoals };
+      await supabase.from("billing_months").upsert({ month_key: key, team: teamToSave, team_goals: merged }, { onConflict:"month_key,team" });
+      setMonthData(prev => ({ ...prev, team_goals: { ...prev.team_goals, ...newGoals } }));
+      return;
+    }
     await supabase.from("billing_months").upsert({ month_key: key, team: teamToSave, ...newData }, { onConflict:"month_key,team" });
     setMonthData(prev => ({ ...prev, ...newData }));
   };
