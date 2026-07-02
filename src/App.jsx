@@ -3150,31 +3150,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
             }).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" fmtFn={v=>v} />
           </div>}
 
-          {/* 9. Tabela existente */}
-          <div style={T.card}>
-            <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-              <span style={{fontSize:13,fontWeight:500,color:C.green}}>Partners</span>
-            </div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{borderBottom:"0.5px solid "+C.border}}>
-                {["Métrica",MONTH_NAMES[month]+" "+year,MONTH_NAMES[month]+" "+prevYear,"Var. YoY"].map((h,i)=>(
-                  <th key={i} style={{padding:"8px 12px",textAlign:i===0?"left":"right",color:C.muted,fontWeight:500,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                <Row label="Faturação total" c={fatCurr||null} p={fatPrev||null} />
-                <Row label="Margem" c={margemCurr?Number(margemCurr):null} p={margemPrev?Number(margemPrev):null} f={v=>v.toFixed(1)} suf="%" />
-                <Row label="Nº encomendas" c={encCurr||null} p={encPrev||null} f={fmt} />
-                <Row label="Ticket médio" c={ticketCurr} p={ticketPrev} />
-                <Row label="Faturação 1ªs compras" c={fat1Curr||null} p={fat1Prev||null} />
-                <Row label="Nº 1ªs encomendas" c={enc1Curr||null} p={enc1Prev||null} f={fmt} />
-                <Row label="Ticket médio 1ªs compras" c={ticket1Curr} p={ticket1Prev} />
-                <Row label="Novos parceiros" c={totalPC||null} p={totalPP||null} f={fmt} />
-                <Row label="Afiliação" c={afilCurr||null} p={afilPrev||null} />
-                <Row label="Revenda + Afiliação" c={revendaAfilCurr||null} p={revendaAfilPrev||null} />
-              </tbody>
-            </table>
-          </div>
+          {/* 9. Tabela existente — oculta */}
         </>;
       })() : <>
       <div style={T.card}>
@@ -3288,7 +3264,7 @@ function ResultadosTab({ year, month, partnersCount, currentTeam="equipa_fr" }) 
         <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por programa</p>
         <PieChart data={PROGS_RES.map(prog=>({label:prog,v:Number(cg["fat_prog_"+prog.replace(/ /g,"_").toLowerCase()])||0})).filter(r=>r.v>0).sort((a,b)=>b.v-a.v)} title="" />
       </div>}
-      {mktTab==="global"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+      {mktTab==="global"&&!isSingleMarket&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
         <div style={T.card}>
           <p style={{...T.sectionTitle,marginBottom:10}}>Faturação por mercado</p>
           {(()=>{
